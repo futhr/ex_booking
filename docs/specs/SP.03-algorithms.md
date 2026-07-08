@@ -137,7 +137,23 @@ A 30-minute meeting on a 15-minute grid over a 09:00–10:00 free window yields
   ≥ `meeting_type.capacity_required`; resources with `capacity > 1` count
   remaining seats (capacity − overlapping bookings).
 
-## 6. Conflict detection
+## 6. RRULE subset expansion
+
+`ExBooking.RRule` implements a conservative RFC 5545 subset for recurrence
+interop without adding runtime dependencies:
+
+- `FREQ=DAILY` and `FREQ=WEEKLY`
+- `INTERVAL`
+- `COUNT`
+- UTC `UNTIL`
+- weekly `BYDAY`
+
+The caller supplies `DTSTART`, duration, and the `[from, until]` search horizon.
+The expander emits UTC `Interval` values sorted by start and clipped to the
+horizon. Unsupported rule parts fail as `{:unsupported, :rrule, part}` rather
+than being ignored.
+
+## 7. Conflict detection
 
 A requested slot conflicts iff, for a required resource, the slot inflated by
 effective buffers overlaps any busy interval:
@@ -150,7 +166,7 @@ Note the asymmetry with §3.5: at assembly time buffers inflate busy; at validat
 time inflating the slot is equivalent and cheaper (one inflation instead of many).
 Both directions must agree — property-tested.
 
-## 7. Complexity targets
+## 8. Complexity targets
 
 With `n` busy intervals per resource, `w` expanded windows, `r` resources:
 assembly is `O(r · (n log n + w log w))` (sort-merge based subtraction, no

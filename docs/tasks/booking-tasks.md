@@ -35,13 +35,12 @@ to the first occurrence and snaps through spring-forward gaps
 | M1 | v0.1 — temporal core | 7 | 7 | 100% | Complete |
 | M2 | v0.2 — assignment and policy | 6 | 6 | 100% | Complete |
 | M3 | v0.3 — lifecycle, events, multi-party | 7 | 7 | 100% | Complete |
-| M4 | v0.4 — standards spike | 1 | 4 | 25% | Partially deferred |
-| — | **Total** | **29** | **32** | **91%** | |
+| M4 | v0.4 — standards spike | 2 | 4 | 50% | In progress |
+| — | **Total** | **30** | **32** | **94%** | |
 
 > M3 is complete. M3.07 is validated in the separate `host application` consumer
-> repository with a documented walkthrough and integration test. M4.04 is
-> dependency-free and complete; M4.01–M4.03 remain deferred pending a dependency
-> discussion (RRULE/ICS/JSCalendar).
+> repository with a documented walkthrough and integration test. M4.01 chose a
+> dependency-free RRULE subset after package evaluation; M4.02–M4.03 remain.
 
 ## Operating Rules
 
@@ -234,11 +233,11 @@ to the first occurrence and snaps through spring-forward gaps
 ## M4 — v0.4 Standards Spike
 
 > Specs: `SP.07` v0.4; `R.01` §3, §8.
-> Depends on: M3. **Partially blocked on dependency discussion** — RRULE/ICS
-> options add deps, which `CLAUDE.md` forbids without discussion. Dependency-free
-> grid alignment is implemented.
+> Depends on: M3. Dependency-heavy standards adapters are avoided unless the
+> dependency discussion reopens them; built-in support remains narrow and
+> explicit.
 
-- [ ] M4.01 RRULE expansion spike: evaluate `ical` vs `rrule` vs a minimal
+- [x] M4.01 RRULE expansion spike: evaluate `ical` vs `rrule` vs a minimal
   in-house RFC 5545 subset; keep any dep optional. (`cocktail` excluded on
   protocol alignment — `R.01` §4.)
 - [ ] M4.02 ICS free/busy import helpers (normalize into `Interval` lists).

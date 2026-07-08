@@ -29,6 +29,7 @@ defmodule ExBooking do
   alias ExBooking.Policy
   alias ExBooking.Request
   alias ExBooking.Resource
+  alias ExBooking.RRule
 
   @search_opts NimbleOptions.new!(
                  now: [type: {:struct, DateTime}, required: true],
@@ -54,6 +55,11 @@ defmodule ExBooking do
                )
 
   @now_opts NimbleOptions.new!(now: [type: {:struct, DateTime}, required: true])
+
+  @rrule_opts NimbleOptions.new!(
+                from: [type: {:struct, DateTime}, required: true],
+                until: [type: {:struct, DateTime}, required: true]
+              )
 
   @doc """
   Runs the full availability pipeline (spec 03 §3) and returns bookable
@@ -177,6 +183,20 @@ defmodule ExBooking do
   @spec assign([Resource.t()], Interval.t(), keyword()) ::
           {:ok, [Resource.t()]} | {:error, :no_eligible_resource}
   defdelegate assign(resources, slot, opts), to: Assignment
+
+  @doc """
+  Expands a supported RFC 5545 RRULE subset into UTC intervals over a caller
+  supplied horizon.
+
+  Supported rule parts are documented in `ExBooking.RRule`.
+  """
+  @spec expand_rrule(String.t() | RRule.t(), DateTime.t(), pos_integer(), keyword()) ::
+          {:ok, [Interval.t()]} | {:error, term()}
+  def expand_rrule(rrule, %DateTime{} = dtstart, duration_min, opts) do
+    with {:ok, opts} <- validate_opts(opts, @rrule_opts) do
+      RRule.expand(rrule, dtstart, duration_min, opts[:from], opts[:until])
+    end
+  end
 
   # `reschedule` is nil for decide/5, or `{existing, new}` for reschedule/6.
   defp decision(request, meeting_type, resources, rules, opts, reschedule) do

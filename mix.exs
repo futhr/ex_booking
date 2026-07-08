@@ -112,6 +112,7 @@ defmodule ExBooking.MixProject do
       extras: [
         "README.md": [title: "Overview"],
         "docs/research/R.01-booking-space-and-kernel-rationale.md": [title: "Research"],
+        "docs/research/R.02-standards-spike.md": [title: "Research: Standards Spike"],
         "docs/specs/SP.00-overview.md": [title: "Spec: Overview"],
         "docs/specs/SP.01-data-model.md": [title: "Spec: Data Model"],
         "docs/specs/SP.02-public-api.md": [title: "Spec: Public API"],
@@ -141,7 +142,8 @@ defmodule ExBooking.MixProject do
           ExBooking.Interval,
           ExBooking.Schedule,
           ExBooking.Slotting,
-          ExBooking.Availability
+          ExBooking.Availability,
+          ExBooking.RRule
         ],
         "Domain Model": [
           ExBooking.AvailabilityRule,

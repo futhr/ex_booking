@@ -117,6 +117,19 @@ are consumer concerns layered on the result.
 Standalone assignment (SP.04) for consumers that run their own availability
 search but want kernel strategies.
 
+```elixir
+@spec expand_rrule(
+        String.t() | ExBooking.RRule.t(),
+        dtstart :: DateTime.t(),
+        duration_min :: pos_integer(),
+        keyword()
+      ) :: {:ok, [ExBooking.Interval.t()]} | {:error, term()}
+```
+
+Expands the supported RFC 5545 RRULE subset over `:from`/`:until`. Supported
+parts are `FREQ=DAILY`, `FREQ=WEEKLY`, `INTERVAL`, `COUNT`, `UNTIL`, and weekly
+`BYDAY`. Unsupported parts fail explicitly.
+
 ## Error vocabulary
 
 `{:error, _}` payloads and `Decision.reasons` entries are tagged tuples, stable

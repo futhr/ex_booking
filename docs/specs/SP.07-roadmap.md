@@ -41,7 +41,7 @@ ex_booking:
 
 ## v0.4 — standards spike (current)
 
-- [ ] RRULE expansion: evaluate `ical` (RFC 5545-compliant recurrence +
+- [x] RRULE expansion: evaluate `ical` (RFC 5545-compliant recurrence +
   parsing; enumerate its BY* coverage in the spike) and `rrule` (wraps the
   strictly validated `rust-rrule` crate; costs a Rust toolchain) vs a minimal
   in-house RFC 5545 subset; pick one, keep the dep optional if possible.
