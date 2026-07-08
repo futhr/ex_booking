@@ -98,7 +98,7 @@ defmodule ExBooking.RRule do
           true -> {:cont, {:ok, Map.put(acc, key, value)}}
         end
 
-      _part, _acc ->
+      _, _ ->
         {:halt, {:error, {:invalid, :rrule, :part}}}
     end)
   end
@@ -115,22 +115,22 @@ defmodule ExBooking.RRule do
     end
   end
 
-  defp build_rule({:ok, _parts}), do: {:error, {:invalid, :rrule, :freq}}
+  defp build_rule({:ok, _}), do: {:error, {:invalid, :rrule, :freq}}
 
   defp parse_freq("DAILY"), do: {:ok, :daily}
   defp parse_freq("WEEKLY"), do: {:ok, :weekly}
   defp parse_freq(freq), do: {:error, {:unsupported, :rrule, {:freq, freq}}}
 
-  defp parse_positive(nil, default, _field), do: {:ok, default}
+  defp parse_positive(nil, default, _), do: {:ok, default}
 
-  defp parse_positive(value, _default, field) do
+  defp parse_positive(value, _, field) do
     case Integer.parse(value) do
       {integer, ""} when integer > 0 -> {:ok, integer}
-      _invalid -> {:error, {:invalid, :rrule, field}}
+      _ -> {:error, {:invalid, :rrule, field}}
     end
   end
 
-  defp parse_optional_positive(nil, _field), do: {:ok, nil}
+  defp parse_optional_positive(nil, _), do: {:ok, nil}
   defp parse_optional_positive(value, field), do: parse_positive(value, nil, field)
 
   defp parse_until(nil), do: {:ok, nil}
@@ -138,12 +138,12 @@ defmodule ExBooking.RRule do
   defp parse_until(value) do
     case parse_utc(value) do
       {:ok, datetime} -> {:ok, datetime}
-      {:error, _reason} -> {:error, {:invalid, :rrule, :until}}
+      {:error, _} -> {:error, {:invalid, :rrule, :until}}
     end
   end
 
-  defp parse_byday(nil, _freq), do: {:ok, nil}
-  defp parse_byday(_value, :daily), do: {:error, {:unsupported, :rrule, :byday}}
+  defp parse_byday(nil, _), do: {:ok, nil}
+  defp parse_byday(_, :daily), do: {:error, {:unsupported, :rrule, :byday}}
 
   defp parse_byday(value, :weekly) do
     days =
@@ -166,8 +166,8 @@ defmodule ExBooking.RRule do
     |> occurrence_stream(dtstart)
     |> Stream.take_while(&within_rule_bounds?(&1, rule, until))
     |> Stream.with_index(1)
-    |> Stream.take_while(fn {_start_at, index} -> rule.count == nil or index <= rule.count end)
-    |> Stream.map(fn {start_at, _index} ->
+    |> Stream.take_while(fn {_, index} -> rule.count == nil or index <= rule.count end)
+    |> Stream.map(fn {start_at, _} ->
       Interval.new!(start_at, DateTime.add(start_at, duration_min, :minute), kind: :available)
     end)
     |> Stream.map(&Interval.clip(&1, Interval.new!(from, until)))
@@ -207,7 +207,7 @@ defmodule ExBooking.RRule do
     end
   end
 
-  defp parse_utc(_value), do: {:error, :invalid}
+  defp parse_utc(_), do: {:error, :invalid}
 
   defp parse_date(<<year::binary-size(4), month::binary-size(2), day::binary-size(2)>>) do
     with {year, ""} <- Integer.parse(year),
@@ -215,7 +215,7 @@ defmodule ExBooking.RRule do
          {day, ""} <- Integer.parse(day) do
       Date.new(year, month, day)
     else
-      _invalid -> {:error, :invalid}
+      _ -> {:error, :invalid}
     end
   end
 
@@ -225,7 +225,7 @@ defmodule ExBooking.RRule do
          {second, ""} <- Integer.parse(second) do
       Time.new(hour, minute, second)
     else
-      _invalid -> {:error, :invalid}
+      _ -> {:error, :invalid}
     end
   end
 end

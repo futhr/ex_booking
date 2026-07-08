@@ -10,7 +10,7 @@ defmodule ExBooking.DSTFixturesTest do
       test "spring-forward wall time falls in a gap" do
         {date, time, timezone} = DSTFixtures.gap_wall_time(unquote(zone))
 
-        assert {:gap, _before, _after} = DateTime.new(date, time, timezone)
+        assert {:gap, _, _} = DateTime.new(date, time, timezone)
       end
 
       test "fall-back wall time is ambiguous" do

@@ -50,7 +50,7 @@ defmodule ExBooking.Slotting do
     |> Stream.map(fn start_at ->
       {start_at, DateTime.add(start_at, duration_min, :minute)}
     end)
-    |> Stream.take_while(fn {_start_at, end_at} ->
+    |> Stream.take_while(fn {_, end_at} ->
       DateTime.compare(end_at, free.end_at) != :gt
     end)
     |> Enum.map(fn {start_at, end_at} ->
@@ -80,7 +80,7 @@ defmodule ExBooking.Slotting do
     |> Enum.sort_by(& &1.start_at, DateTime)
   end
 
-  defp first_start(free, _step_min, :free_start), do: free.start_at
+  defp first_start(free, _, :free_start), do: free.start_at
 
   defp first_start(free, step_min, :clock) do
     case rem(minutes_since_midnight(free.start_at), step_min) do

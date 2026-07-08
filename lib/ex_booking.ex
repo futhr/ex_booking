@@ -157,7 +157,7 @@ defmodule ExBooking do
           {:ok, Decision.t()} | {:error, term()}
   def decide(%Request{} = request, %MeetingType{} = meeting_type, resources, rules, opts) do
     with {:ok, opts} <- validate_opts(opts, @decide_opts) do
-      {:ok, decision(request, meeting_type, resources, rules, opts, nil)}
+      {:ok, decision(request, meeting_type, {resources, rules}, opts, nil)}
     end
   end
 
@@ -174,6 +174,7 @@ defmodule ExBooking do
           [AvailabilityRule.t()],
           keyword()
         ) :: {:ok, Decision.t()} | {:error, term()}
+  # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   def reschedule(
         %Interval{} = existing,
         %Request{} = request,
@@ -186,7 +187,9 @@ defmodule ExBooking do
       case Policy.notice_ok(existing, meeting_type.reschedule_policy, opts[:now]) do
         :ok ->
           released = Enum.map(resources, &release_busy(&1, existing))
-          {:ok, decision(request, meeting_type, released, rules, opts, {existing, request.slot})}
+
+          {:ok,
+           decision(request, meeting_type, {released, rules}, opts, {existing, request.slot})}
 
         {:error, reason} ->
           {:ok,
@@ -319,13 +322,13 @@ defmodule ExBooking do
   @spec import_jscalendar_busy(map()) :: {:ok, [Interval.t()]} | {:error, term()}
   defdelegate import_jscalendar_busy(object), to: JSCalendar, as: :busy_intervals
 
-  defp decision(request, meeting_type, resources, rules, opts, reschedule) do
+  defp decision(request, meeting_type, {resources, rules}, opts, reschedule) do
     case Availability.eligible(request, meeting_type, resources, rules, opts[:now]) do
       {:ok, free} ->
         assign_decision(request, meeting_type, free, opts, reschedule)
 
       {:error, reasons} ->
-        rejected_decision(request, reasons, meeting_type, resources, rules, opts)
+        rejected_decision(request, reasons, meeting_type, {resources, rules}, opts)
     end
   end
 
@@ -347,8 +350,7 @@ defmodule ExBooking do
           request,
           [{:no_eligible_resource, request.slot}],
           meeting_type,
-          free,
-          [],
+          {free, []},
           opts
         )
     end
@@ -375,7 +377,7 @@ defmodule ExBooking do
     }
   end
 
-  defp event_type(_opts, {_existing, _new}), do: :booking_rescheduled
+  defp event_type(_, {_, _}), do: :booking_rescheduled
   defp event_type(opts, nil), do: if(opts[:hold], do: :booking_reserved, else: :booking_confirmed)
 
   defp event_data(nil), do: %{}
@@ -394,7 +396,7 @@ defmodule ExBooking do
     end
   end
 
-  defp intents(event, opts, {_existing, _new}, resource_ids, meeting_type) do
+  defp intents(event, opts, {_, _}, resource_ids, meeting_type) do
     release =
       case opts[:release_hold_id] do
         nil -> []
@@ -412,7 +414,7 @@ defmodule ExBooking do
     %{slot: event.slot, resource_ids: resource_ids, meeting_type_id: meeting_type.id}
   end
 
-  defp rejected_decision(request, reasons, meeting_type, resources, rules, opts) do
+  defp rejected_decision(request, reasons, meeting_type, {resources, rules}, opts) do
     %Decision{
       status: rejection_status(reasons),
       slot: request.slot,
@@ -423,8 +425,8 @@ defmodule ExBooking do
 
   defp rejection_status(reasons) do
     cond do
-      Enum.any?(reasons, &match?({:no_eligible_resource, _slot}, &1)) -> :needs_routing
-      Enum.any?(reasons, &match?({:conflict, _resource_id, _interval}, &1)) -> :conflict
+      Enum.any?(reasons, &match?({:no_eligible_resource, _}, &1)) -> :needs_routing
+      Enum.any?(reasons, &match?({:conflict, _, _}, &1)) -> :conflict
       true -> :policy_reject
     end
   end
@@ -449,11 +451,11 @@ defmodule ExBooking do
       |> Enum.sort_by(&alternative_key(&1, requested))
       |> Enum.take(opts[:alternatives_limit])
     else
-      _no_horizon_or_slots -> []
+      _ -> []
     end
   end
 
-  defp alternatives(_request, _meeting_type, _resources, _rules, _opts), do: []
+  defp alternatives(_, _, _, _, _), do: []
 
   defp same_interval?(a, b), do: a.start_at == b.start_at and a.end_at == b.end_at
 

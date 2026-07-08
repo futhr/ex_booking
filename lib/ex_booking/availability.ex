@@ -55,7 +55,7 @@ defmodule ExBooking.Availability do
     until = Keyword.fetch!(opts, :until)
 
     with {:ok, pairs} <- pair(resources, rules) do
-      {:ok, combine(meeting_type, pairs, from, until, now, slotting_opts(opts))}
+      {:ok, combine(meeting_type, pairs, {from, until, now, slotting_opts(opts)})}
     end
   end
 
@@ -68,7 +68,7 @@ defmodule ExBooking.Availability do
           :ok | {:error, [term()]}
   def validate(%Request{} = request, %MeetingType{} = meeting_type, resources, rules, opts) do
     case eligible(request, meeting_type, resources, rules, Keyword.fetch!(opts, :now)) do
-      {:ok, _free} -> :ok
+      {:ok, _} -> :ok
       {:error, reasons} -> {:error, reasons}
     end
   end
@@ -87,7 +87,7 @@ defmodule ExBooking.Availability do
           DateTime.t()
         ) ::
           {:ok, [Resource.t()]} | {:error, [term()]}
-  def eligible(%Request{slot: nil}, %MeetingType{}, _resources, _rules, _now) do
+  def eligible(%Request{slot: nil}, %MeetingType{}, _, _, _) do
     {:error, [{:invalid, :slot, :missing}]}
   end
 
@@ -112,10 +112,7 @@ defmodule ExBooking.Availability do
   defp combine(
          %MeetingType{participants: :one} = meeting_type,
          pairs,
-         from,
-         until,
-         now,
-         slotting_opts
+         {from, until, now, slotting_opts}
        ) do
     pairs
     |> Enum.flat_map(fn {resource, rule} ->
@@ -128,10 +125,7 @@ defmodule ExBooking.Availability do
   defp combine(
          %MeetingType{participants: :collective} = meeting_type,
          pairs,
-         from,
-         until,
-         now,
-         slotting_opts
+         {from, until, now, slotting_opts}
        ) do
     pairs
     |> Enum.map(fn {resource, rule} ->
@@ -145,10 +139,7 @@ defmodule ExBooking.Availability do
   defp combine(
          %MeetingType{participants: :pool} = meeting_type,
          pairs,
-         from,
-         until,
-         now,
-         slotting_opts
+         {from, until, now, slotting_opts}
        ) do
     offerables =
       Enum.map(pairs, fn {resource, rule} ->
@@ -157,7 +148,7 @@ defmodule ExBooking.Availability do
       end)
 
     offerables
-    |> Enum.flat_map(fn {_resource, _rule, offerable} ->
+    |> Enum.flat_map(fn {_, _, offerable} ->
       Slotting.generate_all(
         offerable,
         meeting_type.duration_min,
@@ -216,7 +207,7 @@ defmodule ExBooking.Availability do
     |> Interval.merge()
   end
 
-  defp screen([], _meeting_type, slot, _now), do: {:error, [{:no_eligible_resource, slot}]}
+  defp screen([], _, slot, _), do: {:error, [{:no_eligible_resource, slot}]}
 
   defp screen(candidates, %MeetingType{participants: :one} = meeting_type, slot, now) do
     {free, reasons} =
@@ -229,7 +220,7 @@ defmodule ExBooking.Availability do
 
     case free do
       [] -> {:error, Enum.uniq(reasons)}
-      _free -> {:ok, Enum.reverse(free)}
+      _ -> {:ok, Enum.reverse(free)}
     end
   end
 
@@ -242,7 +233,7 @@ defmodule ExBooking.Availability do
       |> Enum.uniq()
 
     if reasons == [] do
-      {:ok, Enum.map(candidates, fn {resource, _rule} -> resource end)}
+      {:ok, Enum.map(candidates, fn {resource, _} -> resource end)}
     else
       {:error, reasons}
     end
@@ -269,16 +260,16 @@ defmodule ExBooking.Availability do
   end
 
   defp seat_contribution(resource, 0, slot), do: {0, nil, [{:conflict, resource.id, slot}]}
-  defp seat_contribution(resource, seats, _slot), do: {seats, resource, []}
+  defp seat_contribution(resource, seats, _), do: {seats, resource, []}
 
   defp merge_contribution({seats, nil, reasons}, {total, free, acc}),
     do: {total + seats, free, acc ++ reasons}
 
-  defp merge_contribution({seats, resource, _reasons}, {total, free, acc}),
+  defp merge_contribution({seats, resource, _}, {total, free, acc}),
     do: {total + seats, [resource | free], acc}
 
   defp pool_reasons([], slot), do: [{:no_eligible_resource, slot}]
-  defp pool_reasons(reasons, _slot), do: Enum.uniq(reasons)
+  defp pool_reasons(reasons, _), do: Enum.uniq(reasons)
 
   defp failures(slot, resource, meeting_type, rule, now) do
     conflicts(slot, resource, meeting_type, rule) ++ Policy.violations(slot, rule, resource, now)
@@ -309,14 +300,14 @@ defmodule ExBooking.Availability do
   defp candidates(pairs, []), do: pairs
 
   defp candidates(pairs, ids),
-    do: Enum.filter(pairs, fn {resource, _rule} -> resource.id in ids end)
+    do: Enum.filter(pairs, fn {resource, _} -> resource.id in ids end)
 
   defp effective_buffers(%MeetingType{buffers: nil}, rule), do: rule.buffers
-  defp effective_buffers(%MeetingType{buffers: buffers}, _rule), do: buffers
+  defp effective_buffers(%MeetingType{buffers: buffers}, _), do: buffers
 
   defp pair(resources, rules) when length(resources) == length(rules) do
     {:ok, Enum.zip(resources, rules)}
   end
 
-  defp pair(_resources, _rules), do: {:error, {:invalid, :rules, :length_mismatch}}
+  defp pair(_, _), do: {:error, {:invalid, :rules, :length_mismatch}}
 end

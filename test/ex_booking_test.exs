@@ -47,10 +47,10 @@ defmodule ExBookingTest do
     end
 
     test "decide/5 validates :scorer arity" do
-      assert {:error, {:invalid, :opts, _message}} =
+      assert {:error, {:invalid, :opts, _}} =
                ExBooking.decide(build(:request), build(:meeting_type), [], [],
                  now: @now,
-                 scorer: fn _resource -> 1 end
+                 scorer: fn _ -> 1 end
                )
     end
   end
@@ -176,7 +176,7 @@ defmodule ExBookingTest do
       assert decision.resource_ids == ["res_1"]
       assert [%ExBooking.Event{type: :booking_confirmed}] = decision.events
 
-      assert [{:calendar_event, :create, _payload}, {:emit, %ExBooking.Event{}}] =
+      assert [{:calendar_event, :create, _}, {:emit, %ExBooking.Event{}}] =
                decision.intents
     end
 
@@ -285,7 +285,7 @@ defmodule ExBookingTest do
 
       assert decision.status == :ok
       assert [%ExBooking.Event{type: :booking_reserved}] = decision.events
-      assert [{:reserve, ^hold}, {:emit, _event}] = decision.intents
+      assert [{:reserve, ^hold}, {:emit, _}] = decision.intents
     end
   end
 
@@ -439,10 +439,10 @@ defmodule ExBookingTest do
 
       assert decision.status == :ok
 
-      assert [%ExBooking.Event{type: :booking_rescheduled, data: %{from: _from, to: _to}}] =
+      assert [%ExBooking.Event{type: :booking_rescheduled, data: %{from: _, to: _}}] =
                decision.events
 
-      assert Enum.any?(decision.intents, &match?({:calendar_event, :move, _payload}, &1))
+      assert Enum.any?(decision.intents, &match?({:calendar_event, :move, _}, &1))
     end
 
     test "release_hold_id prepends a :release intent" do
@@ -460,7 +460,7 @@ defmodule ExBookingTest do
                  release_hold_id: "old_hold"
                )
 
-      assert [{:release, "old_hold"} | _rest] = decision.intents
+      assert [{:release, "old_hold"} | _] = decision.intents
     end
 
     test "a blocked reschedule policy yields :policy_reject" do

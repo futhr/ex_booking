@@ -217,7 +217,7 @@ defmodule ExBooking.AvailabilityTest do
                  now: @now
                )
 
-      assert {:error, [{:conflict, "b", _busy}]} =
+      assert {:error, [{:conflict, "b", _}]} =
                Availability.validate(
                  request(slot),
                  meeting_type,
@@ -237,7 +237,7 @@ defmodule ExBooking.AvailabilityTest do
                  now: @now
                )
 
-      assert Enum.any?(reasons, &match?({:lead_time, _short}, &1))
+      assert Enum.any?(reasons, &match?({:lead_time, _}, &1))
     end
 
     test ":pool needs enough free seats" do
@@ -255,7 +255,7 @@ defmodule ExBooking.AvailabilityTest do
                  now: @now
                )
 
-      assert {:error, _reasons} =
+      assert {:error, _} =
                Availability.validate(
                  request(slot),
                  meeting_type,

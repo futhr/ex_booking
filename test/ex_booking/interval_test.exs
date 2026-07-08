@@ -115,7 +115,7 @@ defmodule ExBooking.IntervalTest do
 
         case remainders do
           [left, right] -> refute Interval.overlaps?(left, right)
-          _other -> :ok
+          _ -> :ok
         end
       end
     end

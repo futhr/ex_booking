@@ -56,8 +56,8 @@ defmodule ExBooking.ICalendar do
 
   defp period_values(line) do
     case String.split(line, ":", parts: 2) do
-      [_name, values] -> String.split(values, ",", trim: true)
-      _invalid -> []
+      [_, values] -> String.split(values, ",", trim: true)
+      _ -> []
     end
   end
 
@@ -84,7 +84,7 @@ defmodule ExBooking.ICalendar do
 
   defp parse_period(value) do
     case String.split(value, "/", parts: 2) do
-      [start_value, "P" <> _duration = duration_value] ->
+      [start_value, "P" <> _ = duration_value] ->
         with {:ok, start_at} <- parse_utc(start_value),
              {:ok, seconds} <- parse_duration(duration_value) do
           Interval.new(start_at, DateTime.add(start_at, seconds, :second), kind: :busy)
@@ -96,7 +96,7 @@ defmodule ExBooking.ICalendar do
           Interval.new(start_at, end_at, kind: :busy)
         end
 
-      _invalid ->
+      _ ->
         {:error, {:invalid, :freebusy, :period}}
     end
   end
@@ -108,7 +108,7 @@ defmodule ExBooking.ICalendar do
     end
   end
 
-  defp parse_utc(_value), do: {:error, {:unsupported, :freebusy, :datetime}}
+  defp parse_utc(_), do: {:error, {:unsupported, :freebusy, :datetime}}
 
   defp parse_duration(value) do
     case Regex.run(~r/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/, value) do
@@ -140,7 +140,7 @@ defmodule ExBooking.ICalendar do
          {day, ""} <- Integer.parse(day) do
       Date.new(year, month, day)
     else
-      _invalid -> {:error, {:invalid, :freebusy, :date}}
+      _ -> {:error, {:invalid, :freebusy, :date}}
     end
   end
 
@@ -150,7 +150,7 @@ defmodule ExBooking.ICalendar do
          {second, ""} <- Integer.parse(second) do
       Time.new(hour, minute, second)
     else
-      _invalid -> {:error, {:invalid, :freebusy, :time}}
+      _ -> {:error, {:invalid, :freebusy, :time}}
     end
   end
 end

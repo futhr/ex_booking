@@ -21,7 +21,7 @@
           {Credo.Check.Consistency.SpaceAroundOperators, []},
           {Credo.Check.Consistency.SpaceInParentheses, []},
           {Credo.Check.Consistency.TabsOrSpaces, []},
-          {Credo.Check.Consistency.UnusedVariableNames, [force: :meaningful]},
+          {Credo.Check.Consistency.UnusedVariableNames, [force: :anonymous]},
 
           # ── Design ───────────────────────────────────────
           {Credo.Check.Design.SkipTestWithoutComment, []},
@@ -29,7 +29,8 @@
           {Credo.Check.Design.TagTODO, [exit_status: 0]},
 
           # ── Readability ──────────────────────────────────
-          {Credo.Check.Readability.AliasAs, []},
+          # AliasAs — keep local aliases simple and explicit when needed
+          {Credo.Check.Readability.AliasAs, false},
           {Credo.Check.Readability.AliasOrder, []},
           {Credo.Check.Readability.BlockPipe, []},
           {Credo.Check.Readability.FunctionNames, []},
@@ -71,9 +72,7 @@
           {Credo.Check.Refactor.FilterCount, []},
           {Credo.Check.Refactor.FilterFilter, []},
           {Credo.Check.Refactor.FilterReject, []},
-          # FunctionArity max 6 — kernel entry points take explicit immutable inputs
-          # (e.g. reschedule/6 per docs/specs/02-public-api.md)
-          {Credo.Check.Refactor.FunctionArity, [max_arity: 6]},
+          {Credo.Check.Refactor.FunctionArity, [max_arity: 5]},
           {Credo.Check.Refactor.IoPuts, []},
           # MapInto — incompatible with Elixir >= 1.8.0
           {Credo.Check.Refactor.MapInto, false},

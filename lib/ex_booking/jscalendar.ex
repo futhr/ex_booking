@@ -44,17 +44,17 @@ defmodule ExBooking.JSCalendar do
   end
 
   def busy_intervals(%{"@type" => type}), do: {:error, {:unsupported, :jscalendar, type}}
-  def busy_intervals(_object), do: {:error, {:invalid, :jscalendar, :object}}
+  def busy_intervals(_), do: {:error, {:invalid, :jscalendar, :object}}
 
   defp normalize_entries(entries) when is_list(entries), do: entries
 
   defp normalize_entries(entries) when is_map(entries) do
     entries
-    |> Enum.sort_by(fn {id, _entry} -> id end)
-    |> Enum.map(fn {_id, entry} -> entry end)
+    |> Enum.sort_by(fn {id, _} -> id end)
+    |> Enum.map(fn {_, entry} -> entry end)
   end
 
-  defp normalize_entries(_entries), do: :invalid
+  defp normalize_entries(_), do: :invalid
 
   defp parse_entries(:invalid), do: {:error, {:invalid, :jscalendar, :entries}}
 
@@ -80,7 +80,7 @@ defmodule ExBooking.JSCalendar do
     {:error, {:unsupported, :jscalendar, {:free_busy_status, status}}}
   end
 
-  defp event_interval(%{"recurrenceRules" => _rules}) do
+  defp event_interval(%{"recurrenceRules" => _}) do
     {:error, {:unsupported, :jscalendar, :recurrence}}
   end
 
@@ -93,10 +93,10 @@ defmodule ExBooking.JSCalendar do
     end
   end
 
-  defp event_interval(%{"start" => _start}),
+  defp event_interval(%{"start" => _}),
     do: {:error, {:unsupported, :jscalendar, :floating_time}}
 
-  defp event_interval(_event), do: {:error, {:invalid, :jscalendar, :event}}
+  defp event_interval(_), do: {:error, {:invalid, :jscalendar, :event}}
 
   defp parse_local_datetime(<<date::binary-size(10), "T", time::binary-size(8)>>, timezone) do
     with {:ok, date} <- Date.from_iso8601(date),
@@ -105,14 +105,14 @@ defmodule ExBooking.JSCalendar do
     end
   end
 
-  defp parse_local_datetime(_value, _timezone), do: {:error, {:invalid, :jscalendar, :start}}
+  defp parse_local_datetime(_, _), do: {:error, {:invalid, :jscalendar, :start}}
 
   defp resolve_datetime(date, time, timezone) do
     case DateTime.new(date, time, timezone) do
       {:ok, datetime} -> {:ok, datetime}
-      {:ambiguous, first, _second} -> {:ok, first}
-      {:gap, _before, after_gap} -> {:ok, after_gap}
-      {:error, _reason} -> {:error, {:invalid, :jscalendar, :timezone}}
+      {:ambiguous, first, _} -> {:ok, first}
+      {:gap, _, after_gap} -> {:ok, after_gap}
+      {:error, _} -> {:error, {:invalid, :jscalendar, :timezone}}
     end
   end
 
@@ -129,7 +129,7 @@ defmodule ExBooking.JSCalendar do
     end
   end
 
-  defp parse_duration(_value), do: {:error, {:invalid, :jscalendar, :duration}}
+  defp parse_duration(_), do: {:error, {:invalid, :jscalendar, :duration}}
 
   defp pad_captures(captures), do: captures ++ List.duplicate("", 5 - length(captures))
 
@@ -151,7 +151,7 @@ defmodule ExBooking.JSCalendar do
   defp parse_duration_part(""), do: 0
   defp parse_duration_part(value), do: String.to_integer(value)
 
-  defp add_duration(start_at, %{days: 0, seconds: seconds}, _timezone) do
+  defp add_duration(start_at, %{days: 0, seconds: seconds}, _) do
     {:ok, DateTime.add(start_at, seconds, :second)}
   end
 

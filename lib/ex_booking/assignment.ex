@@ -61,9 +61,9 @@ defmodule ExBooking.Assignment do
   """
   @spec assign([Resource.t()], Interval.t(), keyword()) ::
           {:ok, [Resource.t()]} | {:error, :no_eligible_resource}
-  def assign([], %Interval{} = _slot, _opts), do: {:error, :no_eligible_resource}
+  def assign([], %Interval{} = _, _), do: {:error, :no_eligible_resource}
 
-  def assign(resources, %Interval{} = _slot, opts) do
+  def assign(resources, %Interval{} = _, opts) do
     strategy = Keyword.get(opts, :strategy, :first_available)
     scorer = Keyword.get(opts, :scorer)
     routing_context = Keyword.get(opts, :routing_context, %{})
@@ -86,10 +86,10 @@ defmodule ExBooking.Assignment do
      resource.id}
   end
 
-  defp negated_score(_resource, nil, _routing_context), do: 0
+  defp negated_score(_, nil, _), do: 0
   defp negated_score(resource, scorer, routing_context), do: -scorer.(resource, routing_context)
 
-  defp strategy_key(_resource, :first_available), do: {0}
+  defp strategy_key(_, :first_available), do: {0}
 
   defp strategy_key(resource, :round_robin),
     do: {assignments_count(resource), last_assigned_key(resource)}
@@ -107,7 +107,7 @@ defmodule ExBooking.Assignment do
     {owner_rank(resource, owner_id), strategy_key(resource, fallback)}
   end
 
-  defp strategy_key(resource, {strategy, _opts}), do: strategy_key(resource, strategy)
+  defp strategy_key(resource, {strategy, _}), do: strategy_key(resource, strategy)
 
   defp owner_rank(resource, owner_id), do: if(resource.id == owner_id, do: 0, else: 1)
 

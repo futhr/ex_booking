@@ -89,7 +89,7 @@ defmodule ExBooking.Schedule do
 
     case Interval.new(to_utc(start_at), to_utc(end_at)) do
       {:ok, interval} -> [interval]
-      {:error, _reason} -> []
+      {:error, _} -> []
     end
   end
 
@@ -100,8 +100,8 @@ defmodule ExBooking.Schedule do
   defp resolve(date, time, tz) do
     case DateTime.new(date, time, tz) do
       {:ok, datetime} -> datetime
-      {:ambiguous, first, _second} -> first
-      {:gap, _just_before, just_after} -> just_after
+      {:ambiguous, first, _} -> first
+      {:gap, _, just_after} -> just_after
     end
   end
 

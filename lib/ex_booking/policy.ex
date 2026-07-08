@@ -89,8 +89,8 @@ defmodule ExBooking.Policy do
   """
   @spec notice_ok(Interval.t(), map() | nil, DateTime.t()) ::
           :ok | {:error, :not_allowed | :min_notice}
-  def notice_ok(_existing, nil, _now), do: :ok
-  def notice_ok(_existing, %{allowed: false}, _now), do: {:error, :not_allowed}
+  def notice_ok(_, nil, _), do: :ok
+  def notice_ok(_, %{allowed: false}, _), do: {:error, :not_allowed}
 
   def notice_ok(%Interval{} = existing, %{min_notice_min: min_notice_min}, %DateTime{} = now) do
     if DateTime.compare(DateTime.add(now, min_notice_min, :minute), existing.start_at) == :gt do
@@ -107,7 +107,7 @@ defmodule ExBooking.Policy do
     if seconds_short > 0, do: {:lead_time, ceil_div(seconds_short, 60)}
   end
 
-  defp booking_window_violation(_slot, %AvailabilityRule{booking_window_days: nil}, _now), do: nil
+  defp booking_window_violation(_, %AvailabilityRule{booking_window_days: nil}, _), do: nil
 
   defp booking_window_violation(slot, rule, now) do
     last_date = Date.add(today(rule.timezone, now), rule.booking_window_days)
@@ -116,7 +116,7 @@ defmodule ExBooking.Policy do
     if Date.compare(slot_date, last_date) == :gt, do: {:outside_window, slot_date}
   end
 
-  defp daily_cap_violation(_slot, %AvailabilityRule{max_per_day: nil}, _resource), do: nil
+  defp daily_cap_violation(_, %AvailabilityRule{max_per_day: nil}, _), do: nil
 
   defp daily_cap_violation(slot, rule, resource) do
     slot_date = local_date(slot.start_at, rule.timezone)

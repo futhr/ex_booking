@@ -170,7 +170,7 @@ defmodule ExBooking.ScheduleTest do
         from = utc(Date.add(fb.date, -1), ~T[00:00:00], tz)
         until = utc(Date.add(fb.date, 1), ~T[12:00:00], tz)
 
-        {:ambiguous, first, _second} = DateTime.new(fb.date, start_time, tz)
+        {:ambiguous, first, _} = DateTime.new(fb.date, start_time, tz)
 
         assert {:ok, [interval]} = Schedule.expand(rule, from, until)
         assert interval.start_at == DateTime.shift_zone!(first, "Etc/UTC")
