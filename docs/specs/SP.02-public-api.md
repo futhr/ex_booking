@@ -138,6 +138,15 @@ parts are `FREQ=DAILY`, `FREQ=WEEKLY`, `INTERVAL`, `COUNT`, `UNTIL`, and weekly
 Normalizes RFC 5545 iCalendar `FREEBUSY` periods from caller-supplied text into
 UTC busy intervals. No file or network I/O is performed.
 
+```elixir
+@spec import_jscalendar_busy(map()) ::
+        {:ok, [ExBooking.Interval.t()]} | {:error, term()}
+```
+
+Normalizes decoded RFC 8984 JSCalendar `Event` or `Group` maps into UTC busy
+intervals. The kernel does not decode JSON, expand recurrence rules, or invent
+non-standard calendar shapes.
+
 ## Error vocabulary
 
 `{:error, _}` payloads and `Decision.reasons` entries are tagged tuples, stable

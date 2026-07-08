@@ -14,8 +14,8 @@ defmodule ExBooking do
 
   The full v0.1–v0.3 surface is implemented: availability assembly, slot
   validation, assignment strategies, and the booking lifecycle (decide,
-  reschedule, cancellation). Standards interop (RRULE/ICS/JSCalendar) is future
-  work per `docs/specs/SP.07-roadmap.md`.
+  reschedule, cancellation). Standards interop covers dependency-free
+  RRULE/ICS/JSCalendar helpers per `docs/specs/SP.07-roadmap.md`.
   """
 
   alias ExBooking.Assignment
@@ -26,6 +26,7 @@ defmodule ExBooking do
   alias ExBooking.Hold
   alias ExBooking.ICalendar
   alias ExBooking.Interval
+  alias ExBooking.JSCalendar
   alias ExBooking.MeetingType
   alias ExBooking.Policy
   alias ExBooking.Request
@@ -207,6 +208,15 @@ defmodule ExBooking do
   """
   @spec import_ics_free_busy(String.t()) :: {:ok, [Interval.t()]} | {:error, term()}
   defdelegate import_ics_free_busy(ics), to: ICalendar, as: :free_busy
+
+  @doc """
+  Normalizes a decoded JSCalendar `Event` or `Group` into busy intervals.
+
+  This is a pure mapper over caller-supplied maps. JSON decoding and recurrence
+  expansion remain consumer concerns.
+  """
+  @spec import_jscalendar_busy(map()) :: {:ok, [Interval.t()]} | {:error, term()}
+  defdelegate import_jscalendar_busy(object), to: JSCalendar, as: :busy_intervals
 
   # `reschedule` is nil for decide/5, or `{existing, new}` for reschedule/6.
   defp decision(request, meeting_type, resources, rules, opts, reschedule) do

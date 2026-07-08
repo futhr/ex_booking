@@ -164,7 +164,19 @@ because the kernel only needs normalized busy time.
 The helper returns merged, sorted `Interval` values with `kind: :busy`.
 Unsupported local date-times or malformed periods fail explicitly.
 
-## 8. Conflict detection
+## 8. JSCalendar busy-time mapping
+
+`ExBooking.JSCalendar` accepts already decoded RFC 8984 JSCalendar maps and
+maps `Event` or `Group` objects into UTC busy intervals. The supported event
+surface is `start`, `timeZone`, optional `duration`, `status`, and
+`freeBusyStatus`; `freeBusyStatus: "free"` and `status: "cancelled"` do not
+produce busy intervals.
+
+The mapper deliberately rejects floating events (missing `timeZone`) and
+recurrence rules. JSON decoding, full recurrence expansion, and vendor-specific
+calendar shapes are consumer concerns outside this kernel.
+
+## 9. Conflict detection
 
 A requested slot conflicts iff, for a required resource, the slot inflated by
 effective buffers overlaps any busy interval:
@@ -177,7 +189,7 @@ Note the asymmetry with §3.5: at assembly time buffers inflate busy; at validat
 time inflating the slot is equivalent and cheaper (one inflation instead of many).
 Both directions must agree — property-tested.
 
-## 9. Complexity targets
+## 10. Complexity targets
 
 With `n` busy intervals per resource, `w` expanded windows, `r` resources:
 assembly is `O(r · (n log n + w log w))` (sort-merge based subtraction, no

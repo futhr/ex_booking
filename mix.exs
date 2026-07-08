@@ -144,7 +144,8 @@ defmodule ExBooking.MixProject do
           ExBooking.Slotting,
           ExBooking.Availability,
           ExBooking.RRule,
-          ExBooking.ICalendar
+          ExBooking.ICalendar,
+          ExBooking.JSCalendar
         ],
         "Domain Model": [
           ExBooking.AvailabilityRule,
