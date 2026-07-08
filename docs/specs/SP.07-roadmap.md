@@ -37,7 +37,7 @@ ex_booking:
 - [x] `:collective` and `:pool` participant modes
 - [x] `Hold`, full intent/event emission per SP.05
 - [x] `reschedule/6`, `evaluate_cancellation/3` complete
-- [ ] First real consumer integration validates the boundary
+- [x] First real consumer integration validates the boundary
 
 ## v0.4 — standards spike (current)
 

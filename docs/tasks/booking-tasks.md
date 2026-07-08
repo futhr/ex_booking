@@ -34,13 +34,13 @@ to the first occurrence and snaps through spring-forward gaps
 | F  | Foundation and docs governance | 8 | 8 | 100% | Complete |
 | M1 | v0.1 — temporal core | 7 | 7 | 100% | Complete |
 | M2 | v0.2 — assignment and policy | 6 | 6 | 100% | Complete |
-| M3 | v0.3 — lifecycle, events, multi-party | 6 | 7 | 86% | Complete |
+| M3 | v0.3 — lifecycle, events, multi-party | 7 | 7 | 100% | Complete |
 | M4 | v0.4 — standards spike (deferred) | 0 | 4 | 0% | Deferred |
-| — | **Total** | **27** | **32** | **84%** | |
+| — | **Total** | **28** | **32** | **88%** | |
 
-> M3.07 (a real consumer integration validating the boundary) is the only open
-> in-scope item; it lives in a separate consumer repository, not this kernel.
-> M4 is deferred pending a dependency discussion (RRULE/ICS/JSCalendar).
+> M3 is complete. M3.07 is validated in the separate `host application` consumer
+> repository with a documented walkthrough and integration test. M4 is deferred
+> pending a dependency discussion (RRULE/ICS/JSCalendar).
 
 ## Operating Rules
 
@@ -224,7 +224,7 @@ to the first occurrence and snaps through spring-forward gaps
   - AC: pure `{:ok, %{allowed?: _, reason: _}}` against `cancellation_policy`
     and `now`.
   - Tests: allowed/blocked/min-notice.
-- [ ] M3.07 Reference consumer integration validates the kernel boundary.
+- [x] M3.07 Reference consumer integration validates the kernel boundary.
   - Spec: `R.01` §7; `SP.00` layering.
   - AC: an external consumer drives `available_slots/4` → `decide/5` and executes
     the returned intents; the boundary holds (no kernel changes needed).
