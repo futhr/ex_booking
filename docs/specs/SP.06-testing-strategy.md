@@ -29,7 +29,7 @@ lineage (ExUnit, doctests, StreamData properties, ExCoveralls gate).
      overlap the subtrahend
    - `merge/1` idempotence and normal form (sorted, disjoint, non-adjacent)
    - `clip/2` containment in both operands
-   - assembly/validation buffer equivalence (SP.03 §6): inflating busy at
+   - assembly/validation buffer equivalence (SP.03 §9): inflating busy at
      assembly time and inflating the slot at validation time agree
    - slot generation: every emitted slot fits inside its free interval, starts
      on the grid, and consecutive starts differ by exactly the step

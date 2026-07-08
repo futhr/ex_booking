@@ -270,7 +270,7 @@ defmodule ExBooking.AvailabilityTest do
     end
   end
 
-  property "buffer equivalence: inflating the slot and inflating busy agree (SP.03 §6)" do
+  property "buffer equivalence: inflating the slot and inflating busy agree (SP.03 §9)" do
     check all(
             slot <- interval(),
             busy <- interval(),

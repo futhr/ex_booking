@@ -160,7 +160,6 @@ across patch versions:
 {:daily_cap, resource_id :: String.t(), Date.t()}
 {:policy, :cancellation | :reschedule, :not_allowed | :min_notice}
 {:no_eligible_resource, ExBooking.Interval.t()}
-:not_implemented
 ```
 
 ## Stability

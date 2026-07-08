@@ -48,7 +48,7 @@ defmodule ExBooking.Availability do
   @doc """
   Checks a specific requested slot against conflict and policy for a meeting
   type, without committing to an assignment (`docs/specs/SP.03-algorithms.md`
-  §6). Returns `:ok`, or `{:error, reasons}` with every failing reason.
+  §9). Returns `:ok`, or `{:error, reasons}` with every failing reason.
   """
   @spec validate(Request.t(), MeetingType.t(), [Resource.t()], [AvailabilityRule.t()], keyword()) ::
           :ok | {:error, [term()]}
@@ -192,7 +192,7 @@ defmodule ExBooking.Availability do
 
   # Buffers are swapped when inflating busy so that subtracting inflated busy at
   # assembly time is equivalent to inflating the slot by `(before, after)` at
-  # validation time (SP.03 §6).
+  # validation time (SP.03 §9).
   defp inflated_busy(resource, meeting_type, rule) do
     %{before_min: before_min, after_min: after_min} = effective_buffers(meeting_type, rule)
 

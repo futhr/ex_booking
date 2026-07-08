@@ -185,8 +185,9 @@ effective buffers overlaps any busy interval:
 conflict? = Interval.overlaps?(Interval.inflate(slot, before, after), busy)
 ```
 
-Note the asymmetry with §3.5: at assembly time buffers inflate busy; at validation
-time inflating the slot is equivalent and cheaper (one inflation instead of many).
+Note the asymmetry with assembly step 5: at assembly time buffers inflate busy;
+at validation time inflating the slot is equivalent and cheaper (one inflation
+instead of many).
 Both directions must agree — property-tested.
 
 ## 10. Complexity targets

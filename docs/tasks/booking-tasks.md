@@ -88,7 +88,7 @@ to the first occurrence and snaps through spring-forward gaps
 
 ## M1 — v0.1 Temporal Core
 
-> Specs: `SP.03` (§2 DST, §3 assembly, §4 slotting, §6 conflict); `SP.02`.
+> Specs: `SP.03` (§2 DST, §3 assembly, §4 slotting, §9 conflict); `SP.02`.
 > Depends on: F.
 > Exit criteria: `available_slots/4` and `validate_request/5` return real
 > results (no `:not_implemented`); property + DST corpus green; `mix check`
@@ -124,7 +124,7 @@ to the first occurrence and snaps through spring-forward gaps
   - Tests: doctest happy path; 30-min meeting on 15-min grid in 60-min window
     yields exactly three slots.
 - [x] M1.05 Conflict detection + `ExBooking.validate_request/5`.
-  - Spec: `SP.03` §6; `SP.02`.
+  - Spec: `SP.03` §9; `SP.02`.
   - AC: conflict iff `Interval.overlaps?(inflate(slot, before, after), busy)`;
     returns ALL failing reasons, not just the first; error vocabulary matches
     `SP.02` (`{:conflict, _, _}`, `{:lead_time, _}`, `{:outside_window, _}`,
@@ -180,7 +180,7 @@ to the first occurrence and snaps through spring-forward gaps
     `{:policy, :cancellation | :reschedule, :not_allowed | :min_notice}`.
   - Tests: allowed/blocked/min-notice boundary.
 - [x] M2.06 Benchmarks (`bench/run.exs`).
-  - Spec: `SP.03` §7 complexity targets.
+  - Spec: `SP.03` §10 complexity targets.
   - AC: subtraction over large busy sets and multi-week slot generation
     benchmarked; no quadratic scans.
   - Tests: `mix bench` runs; results in `bench/`.

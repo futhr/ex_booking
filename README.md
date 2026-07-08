@@ -9,8 +9,8 @@ inputs. No database, no supervision tree, no HTTP, no side effects.
 > DST-safe slot generation, conflict detection, assignment strategies, and the
 > booking lifecycle (decide, reschedule, cancellation). The data model, public
 > API, and algorithms are specified in [`docs/specs/`](docs/specs/SP.00-overview.md).
-> Standards interop (RRULE/ICS/JSCalendar) is future work per the
-> [roadmap](docs/specs/SP.07-roadmap.md).
+> v0.4 standards interop is also implemented with narrow, dependency-free
+> RRULE, ICS free/busy, and JSCalendar helpers.
 
 ## Why
 

@@ -39,7 +39,7 @@ ex_booking:
 - [x] `reschedule/6`, `evaluate_cancellation/3` complete
 - [x] First real consumer integration validates the boundary
 
-## v0.4 — standards spike (current)
+## v0.4 — standards spike
 
 - [x] RRULE expansion: evaluate `ical` (RFC 5545-compliant recurrence +
   parsing; enumerate its BY* coverage in the spike) and `rrule` (wraps the

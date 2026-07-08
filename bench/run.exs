@@ -2,7 +2,7 @@
 #
 # Usage: mix bench
 #
-# Exercises the two hot paths called out in docs/specs/SP.03-algorithms.md §7:
+# Exercises the two hot paths called out in docs/specs/SP.03-algorithms.md §10:
 # interval subtraction over a large busy set, and availability assembly across
 # a multi-week horizon. Assembly must stay sort-merge based (no quadratic
 # scans) as the busy set and horizon grow.

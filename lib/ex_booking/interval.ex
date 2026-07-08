@@ -215,7 +215,7 @@ defmodule ExBooking.Interval do
 
   @doc """
   Widens an interval by minutes on each side. Used to apply buffers to busy
-  time (see spec 03 §3 and §6).
+  time (see spec 03 §3 and §9).
 
   ## Examples
 
