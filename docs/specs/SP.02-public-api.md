@@ -48,6 +48,11 @@ Full availability pipeline (SP.03): expand rules → subtract busy (buffer-infla
 → snap to slot grid → filter lead time/window/caps → apply participant mode.
 Returns slots sorted ascending by `start_at`.
 
+Supported options:
+
+- `:now`, `:from`, `:until` — required `DateTime` inputs supplied by the caller.
+- `:align` — optional slot-grid anchoring, `:free_start` (default) or `:clock`.
+
 ```elixir
 @spec validate_request(
         ExBooking.Request.t(),

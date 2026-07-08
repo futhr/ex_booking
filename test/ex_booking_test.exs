@@ -24,6 +24,18 @@ defmodule ExBookingTest do
       assert message =~ "bogus"
     end
 
+    test "invalid alignment options are rejected" do
+      assert {:error, {:invalid, :opts, message}} =
+               ExBooking.available_slots(
+                 build(:meeting_type),
+                 [],
+                 [],
+                 [align: :local] ++ @horizon
+               )
+
+      assert message =~ ":align"
+    end
+
     test "decide/5 validates :scorer arity" do
       assert {:error, {:invalid, :opts, _message}} =
                ExBooking.decide(build(:request), build(:meeting_type), [], [],
@@ -61,6 +73,32 @@ defmodule ExBookingTest do
                  [],
                  @horizon
                )
+    end
+
+    test "clock alignment reaches the slotting pipeline" do
+      rule =
+        build(:rule,
+          timezone: "Etc/UTC",
+          windows: [%{weekday: 1, start_time: ~T[09:07:00], end_time: ~T[10:00:00]}]
+        )
+
+      resource = build(:resource, timezone: "Etc/UTC")
+
+      assert {:ok, slots} =
+               ExBooking.available_slots(
+                 build(:meeting_type),
+                 [resource],
+                 [rule],
+                 now: @now,
+                 from: ~U[2026-07-13 09:00:00Z],
+                 until: ~U[2026-07-13 10:00:00Z],
+                 align: :clock
+               )
+
+      assert Enum.map(slots, & &1.start_at) == [
+               ~U[2026-07-13 09:15:00Z],
+               ~U[2026-07-13 09:30:00Z]
+             ]
     end
   end
 

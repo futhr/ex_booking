@@ -41,7 +41,7 @@ defmodule ExBooking.Availability do
     until = Keyword.fetch!(opts, :until)
 
     with {:ok, pairs} <- pair(resources, rules) do
-      {:ok, combine(meeting_type, pairs, from, until, now)}
+      {:ok, combine(meeting_type, pairs, from, until, now, slotting_opts(opts))}
     end
   end
 
@@ -97,26 +97,47 @@ defmodule ExBooking.Availability do
 
   # --- assembly per participant mode ---
 
-  defp combine(%MeetingType{participants: :one} = meeting_type, pairs, from, until, now) do
+  defp combine(
+         %MeetingType{participants: :one} = meeting_type,
+         pairs,
+         from,
+         until,
+         now,
+         slotting_opts
+       ) do
     pairs
     |> Enum.flat_map(fn {resource, rule} ->
-      resource_slots(meeting_type, resource, rule, from, until, now)
+      resource_slots(meeting_type, resource, rule, {from, until, now}, slotting_opts)
     end)
     |> Enum.uniq_by(& &1.start_at)
     |> Enum.sort_by(& &1.start_at, DateTime)
   end
 
-  defp combine(%MeetingType{participants: :collective} = meeting_type, pairs, from, until, now) do
+  defp combine(
+         %MeetingType{participants: :collective} = meeting_type,
+         pairs,
+         from,
+         until,
+         now,
+         slotting_opts
+       ) do
     pairs
     |> Enum.map(fn {resource, rule} ->
       resource_free(meeting_type, resource, rule, from, until)
     end)
     |> intersect_all()
-    |> Slotting.generate_all(meeting_type.duration_min, step(meeting_type))
+    |> Slotting.generate_all(meeting_type.duration_min, step(meeting_type), slotting_opts)
     |> Enum.filter(&all_pass_policy?(pairs, &1, now))
   end
 
-  defp combine(%MeetingType{participants: :pool} = meeting_type, pairs, from, until, now) do
+  defp combine(
+         %MeetingType{participants: :pool} = meeting_type,
+         pairs,
+         from,
+         until,
+         now,
+         slotting_opts
+       ) do
     offerables =
       Enum.map(pairs, fn {resource, rule} ->
         {:ok, offerable} = Schedule.expand(rule, from, until)
@@ -125,7 +146,12 @@ defmodule ExBooking.Availability do
 
     offerables
     |> Enum.flat_map(fn {_resource, _rule, offerable} ->
-      Slotting.generate_all(offerable, meeting_type.duration_min, step(meeting_type))
+      Slotting.generate_all(
+        offerable,
+        meeting_type.duration_min,
+        step(meeting_type),
+        slotting_opts
+      )
     end)
     |> Enum.uniq_by(& &1.start_at)
     |> Enum.sort_by(& &1.start_at, DateTime)
@@ -134,10 +160,10 @@ defmodule ExBooking.Availability do
     )
   end
 
-  defp resource_slots(meeting_type, resource, rule, from, until, now) do
+  defp resource_slots(meeting_type, resource, rule, {from, until, now}, slotting_opts) do
     meeting_type
     |> resource_free(resource, rule, from, until)
-    |> Slotting.generate_all(meeting_type.duration_min, step(meeting_type))
+    |> Slotting.generate_all(meeting_type.duration_min, step(meeting_type), slotting_opts)
     |> Enum.filter(&(Policy.violations(&1, rule, resource, now) == []))
   end
 
@@ -277,6 +303,8 @@ defmodule ExBooking.Availability do
 
   defp step(%MeetingType{slot_interval_min: nil, duration_min: duration}), do: duration
   defp step(%MeetingType{slot_interval_min: step}), do: step
+
+  defp slotting_opts(opts), do: [align: Keyword.get(opts, :align, :free_start)]
 
   defp candidates(pairs, []), do: pairs
 

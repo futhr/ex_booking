@@ -51,7 +51,7 @@ ex_booking:
 - [ ] ICS free/busy import helpers (normalization into `Interval` lists)
 - [ ] JSCalendar (RFC 8984 / the 2.0 draft) mapping scope for any JSON
   interop surface — do not invent a JSON calendar shape
-- [ ] Optional grid alignment to clock boundaries (`:align` option)
+- [x] Optional grid alignment to clock boundaries (`:align` option)
 
 ## Out of scope, permanently
 

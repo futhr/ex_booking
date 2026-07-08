@@ -47,6 +47,28 @@ defmodule ExBooking.SlottingTest do
 
       assert Enum.all?(Slotting.generate_slots(free, 30, 15), &(&1.kind == :available))
     end
+
+    test "clock alignment skips the partial leading offset" do
+      free = Interval.new!(~U[2026-07-13 09:07:00Z], ~U[2026-07-13 10:00:00Z])
+
+      starts =
+        free
+        |> Slotting.generate_slots(30, 15, align: :clock)
+        |> Enum.map(& &1.start_at)
+
+      assert starts == [~U[2026-07-13 09:15:00Z], ~U[2026-07-13 09:30:00Z]]
+    end
+
+    test "free-start alignment remains the default" do
+      free = Interval.new!(~U[2026-07-13 09:07:00Z], ~U[2026-07-13 10:00:00Z])
+
+      starts =
+        free
+        |> Slotting.generate_slots(30, 15)
+        |> Enum.map(& &1.start_at)
+
+      assert starts == [~U[2026-07-13 09:07:00Z], ~U[2026-07-13 09:22:00Z]]
+    end
   end
 
   describe "generate_all/4" do
@@ -79,6 +101,17 @@ defmodule ExBooking.SlottingTest do
         for slot <- Slotting.generate_slots(free, duration_min, step_min) do
           offset_min = div(DateTime.diff(slot.start_at, free.start_at, :second), 60)
           assert rem(offset_min, step_min) == 0
+        end
+      end
+    end
+
+    property "clock-aligned slots start on UTC clock boundaries" do
+      check all(free <- interval(), {duration_min, step_min} <- duration_and_step()) do
+        slots = Slotting.generate_slots(free, duration_min, step_min, align: :clock)
+
+        if first = List.first(slots) do
+          minutes_since_midnight = first.start_at.hour * 60 + first.start_at.minute
+          assert rem(minutes_since_midnight, step_min) == 0
         end
       end
     end

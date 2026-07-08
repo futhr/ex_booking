@@ -120,10 +120,12 @@ candidates(free, duration, step) =
   keep start while start + duration <= free.end_at
 ```
 
-Grid anchoring is to the free interval's start (not to :00 of the hour); an
-optional `:align` opt may later anchor to clock boundaries (roadmap). A
-30-minute meeting on a 15-minute grid over a 09:00–10:00 free window yields
-09:00, 09:15, 09:30.
+Grid anchoring defaults to the free interval's start (`align: :free_start`), not
+to `:00` of the hour. Callers may pass `align: :clock` to anchor the grid to UTC
+clock boundaries and skip the partial leading offset inside each free interval.
+A 30-minute meeting on a 15-minute grid over a 09:00–10:00 free window yields
+09:00, 09:15, 09:30. The same meeting over a 09:07–10:00 free window yields
+09:07, 09:22 by default, or 09:15, 09:30 with `align: :clock`.
 
 ## 5. Participant modes
 

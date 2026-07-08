@@ -38,7 +38,8 @@ defmodule ExBooking do
                    type: {:or, [:atom, {:tuple, [:atom, :keyword_list]}]},
                    default: :first_available
                  ],
-                 scorer: [type: {:fun, 2}]
+                 scorer: [type: {:fun, 2}],
+                 align: [type: {:in, [:free_start, :clock]}, default: :free_start]
                )
 
   @decide_opts NimbleOptions.new!(
@@ -62,6 +63,7 @@ defmodule ExBooking do
 
     * `:now` (required) — the caller's current time
     * `:from`, `:until` (required) — search horizon
+    * `:align` — `:free_start` (default) or `:clock`
     * `:strategy`, `:scorer` — see `ExBooking.Assignment`
 
   """
