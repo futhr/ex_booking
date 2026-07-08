@@ -14,8 +14,7 @@ defmodule ExBooking do
 
   The implemented surface covers availability assembly, slot validation,
   alternatives, assignment strategies, lifecycle transitions, and narrow
-  dependency-free RRULE/ICS/JSCalendar helpers per
-  `docs/specs/SP.07-roadmap.md`.
+  dependency-free RRULE/ICS/JSCalendar helpers per `docs/specs/`.
   """
 
   alias ExBooking.Assignment

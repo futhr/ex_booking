@@ -108,9 +108,11 @@ defmodule ExBooking.MixProject do
 
   defp docs do
     [
-      main: "readme",
+      main: "readme-1",
       extras: [
         "README.md": [title: "Overview"],
+        "docs/README.md": [title: "Docs Index"],
+        "docs/research/README.md": [title: "Research Index"],
         "docs/research/R.01-booking-space-and-kernel-rationale.md": [title: "Research"],
         "docs/research/R.02-standards-spike.md": [title: "Research: Standards Spike"],
         "docs/research/R.03-post-build-kernel-audit.md": [title: "Research: Kernel Audit"],
@@ -120,15 +122,15 @@ defmodule ExBooking.MixProject do
         "docs/specs/SP.03-algorithms.md": [title: "Spec: Algorithms"],
         "docs/specs/SP.04-assignment.md": [title: "Spec: Assignment"],
         "docs/specs/SP.05-lifecycle-and-events.md": [title: "Spec: Lifecycle & Events"],
-        "docs/specs/SP.06-testing-strategy.md": [title: "Spec: Testing Strategy"],
-        "docs/specs/SP.07-roadmap.md": [title: "Spec: Roadmap"],
+        "docs/specs/SP.06-standards-interop.md": [title: "Spec: Standards Interop"],
+        "docs/specs/SP.07-validation.md": [title: "Spec: Validation"],
         "CHANGELOG.md": [title: "Changelog"],
         "CONTRIBUTING.md": [title: "Contributing"],
         "CLAUDE.md": [title: "Agent Guide"],
         LICENSE: [title: "License"]
       ],
       groups_for_extras: [
-        "Getting Started": ~r/README/,
+        "Getting Started": ~r/(^README\.md|docs\/README\.md)/,
         Research: ~r/research/,
         Specification: ~r/specs/,
         Reference: ~r/CHANGELOG|CONTRIBUTING|CLAUDE|LICENSE/

@@ -1,6 +1,6 @@
 # ExBooking
 
-**A pure booking kernel for sales scheduling.** ExBooking answers deterministic
+**A pure booking kernel for scheduling applications.** ExBooking answers deterministic
 questions — *what slots are valid? does this request conflict? which host should
 take it? what side effects must happen next?* — as pure functions over immutable
 inputs. No database, no supervision tree, no HTTP, no side effects.
@@ -25,8 +25,8 @@ only, deliberately small. The full rationale lives in
 - **Deterministic** — same inputs, same outputs. The caller supplies `now`;
   the kernel never reads the clock, generates randomness, or touches I/O.
 - **Facts and intents** — the kernel returns decisions and side-effect
-  *intents* (create calendar event, send notification, emit billing event).
-  The consuming application executes them.
+  *intents* (create calendar event, send notification, emit billing event). The
+  consuming application executes them.
 - **Slot interval ≠ duration** — a 30-minute meeting can sit on a 15-minute
   grid. Slot stepping is a first-class, independent setting.
 - **DST-safe** — wall-time expansion resolves ambiguous times to the first
@@ -39,7 +39,7 @@ only, deliberately small. The full rationale lives in
 
 Persistence, background jobs, OAuth, calendar sync, CRM sync, payments,
 notifications, UI, and multi-tenancy are all consumer concerns. See the
-[scope table](docs/specs/SP.00-overview.md) for the explicit boundary.
+[kernel scope](docs/specs/SP.00-overview.md) for the explicit boundary.
 
 ## Quick look
 
@@ -88,6 +88,8 @@ config :elixir, :time_zone_database, Tz.TimeZoneDatabase
 
 ## Documentation
 
+- [Docs index and flow diagrams](docs/README.md)
+- [Research index](docs/research/README.md)
 - [Research: the booking space and why a kernel](docs/research/R.01-booking-space-and-kernel-rationale.md)
 - [Research: post-build kernel audit](docs/research/R.03-post-build-kernel-audit.md)
 - [Spec 00 — Overview, scope, determinism contract](docs/specs/SP.00-overview.md)
@@ -96,8 +98,8 @@ config :elixir, :time_zone_database, Tz.TimeZoneDatabase
 - [Spec 03 — Algorithms](docs/specs/SP.03-algorithms.md)
 - [Spec 04 — Assignment strategies](docs/specs/SP.04-assignment.md)
 - [Spec 05 — Lifecycle and events](docs/specs/SP.05-lifecycle-and-events.md)
-- [Spec 06 — Testing strategy](docs/specs/SP.06-testing-strategy.md)
-- [Spec 07 — Roadmap](docs/specs/SP.07-roadmap.md)
+- [Spec 06 — Standards interop helpers](docs/specs/SP.06-standards-interop.md)
+- [Spec 07 — Validation](docs/specs/SP.07-validation.md)
 
 ## License
 

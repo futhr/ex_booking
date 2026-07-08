@@ -80,9 +80,9 @@ collapsing the kernel/orchestration boundary.
 
 ## Impact on ExBooking
 
-- Specs updated: `SP.01`, `SP.02`, `SP.05`, `SP.07`.
+- Specs updated: `SP.01`, `SP.02`, `SP.05`.
 - Modules affected: `lib/ex_booking.ex`.
-- Tasks: `docs/tasks/booking-tasks.md`, milestone M5.
+- Tasks: recorded in `docs/tasks/booking-tasks.md`.
 - Breaking changes: no.
 
 ## Sources

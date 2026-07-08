@@ -1,48 +1,64 @@
 ---
 ex_booking:
   template_type: task
-  template_version: "1.0.0"
+  template_version: "1.1.0"
 ---
 
 # [Project] Tasks
 
-Canonical execution checklist. One file, milestone sections in strict order.
-Every accepted design in `docs/specs/` has a task entry here before broad
-implementation.
+Single roadmap for this repo. Specs explain code contracts; this file tracks
+planned, in-progress, and completed repo work.
 
-## Progress Summary
+Legend:
 
-| # | Milestone | Done | Total | % | Status |
-|----|-----------|-----:|------:|-----:|-------------|
-| [ID] | [Name] | [N] | [N] | [%] | [Planned/In progress/Complete] |
-| — | **Total** | **[N]** | **[N]** | **[%]** |  |
+```text
+[x] complete
+[ ] planned / not started
+[~] in progress
+```
 
 ## Operating Rules
 
-- Read `CLAUDE.md` first; it is the canonical contract.
-- Purity and determinism are non-negotiable (no clock, no I/O, no randomness).
-- Update the spec in the same change as the code.
+```text
+[ ] Read CLAUDE.md before changing code.
+[ ] Keep specs descriptive, not roadmap-shaped.
+[ ] Keep this file as the single roadmap.
+[ ] Update the matching SP.NN spec with behavior changes.
+[ ] Run mix check --no-retry before handoff.
+```
 
-## Mandatory Gates For Every Commit
+## Quality Gates
 
-- [ ] `mix format --check-formatted`.
-- [ ] `mix compile --warnings-as-errors`.
-- [ ] `mix credo --strict`.
-- [ ] `mix deps.audit`.
-- [ ] `mix dialyzer`.
-- [ ] `mix doctor` (100% moduledoc, ≥80% `@spec`).
-- [ ] `mix docs`.
-- [ ] `mix test --cover` (≥95%).
-- [ ] `mix check` clean.
+```text
+[ ] mix format --check-formatted
+[ ] mix compile --warnings-as-errors
+[ ] mix credo --strict
+[ ] mix deps.audit
+[ ] mix dialyzer
+[ ] mix doctor
+[ ] mix docs
+[ ] mix test --cover
+[ ] mix check --no-retry
+```
 
-## [MILESTONE-ID] — [Milestone Name]
+## SP.NN — [Spec Name]
 
-> Specs: `SP.NN`.
-> Depends on: [prior milestone].
-> Exit criteria: [what "done" means; `mix check` clean].
+Spec: `docs/specs/SP.NN-[slug].md`
+Files: `[paths]`
 
-- [ ] [MILESTONE-ID].NN [One-line task summary].
-  - Spec: `docs/specs/SP.NN-[slug].md` — [section].
-  - AC: [specific, testable criterion].
-  - AC: [error/edge behavior].
-  - Tests: [doctest / property / DST fixture / example].
+```text
+[ ] [Concrete repo task]
+[ ] [Concrete repo task]
+```
+
+## Open Roadmap
+
+```text
+[ ] [Next repo task, or "No in-repo tasks are currently open."]
+```
+
+## Delegated Outside This Repo
+
+```text
+[-] [External concern owned by consumer/adapters]
+```

@@ -104,7 +104,7 @@ releasing may simply be finished, so recency is never the criterion:
 | Package | Latest release | Verdict for ex_booking |
 |---|---|---|
 | `tz` | 0.28.2 · 2026-05 | **Adopted.** Native `DateTime` + `tz` for all timezone math; no heavyweight date-time framework. (Timezone databases do need current data — here recency *is* part of correctness.) |
-| `ical` | 2.0.2 · 2026-05 | **Primary candidate** for the v0.4 spike: RFC 5545-compliant parsing/serialization/recurrence, timezone handling designed around `tz`/`time_zone_info`, retains unknown `X-*` properties. Gaps to verify in the spike: BY\* rule coverage is not fully enumerated in its docs; `VFREEBUSY` is listed as future work. |
+| `ical` | 2.0.2 · 2026-05 | Evaluated during the standards spike: RFC 5545-compliant parsing/serialization/recurrence, timezone handling designed around `tz`/`time_zone_info`, retains unknown `X-*` properties. Not adopted as a runtime dependency because this repo kept only narrow dependency-free helpers. |
 | `rrule` | 0.7.0 · 2025-04 | Second candidate: wraps the `rust-rrule` crate, a strictly validated RFC 5545 RRULE implementation. Cost: a Rust toolchain in the build (no documented precompiled NIFs) — weigh against expansion speed. |
 | `cocktail` | 0.10.3 · 2024-01 | **Disqualified on protocol alignment**, not age: its own README documents unresolved DST bugs with zoned datetimes, incomplete RRULE options, no `WKST`, no `EXRULE`. DST correctness is this kernel's defining property, so those documented gaps rule it out. Useful as an Elixir-native design reference. |
 | `calendar_recurrence` | 0.2.0 · 2025-11 | Deliberately minimal recurrence scope; reference only. |
@@ -155,9 +155,10 @@ calls outside DB transactions.
 5. **Assignment as pure policy** — fairness counters, owner priority, and scores
    are explicit inputs; GTM/CRM context flows through an opaque scoring hook. The
    kernel never learns CRM semantics.
-6. **Recurrence deferred** — v0 ships weekly windows + date overrides + blackouts;
-   full RRULE arrives via a spike (v0.4) aligned with RFC 5545, with `ical` as the
-   leading candidate and JSCalendar (RFC 8984) as the target for any JSON interop.
+6. **Standards kept narrow** — weekly windows + date overrides + blackouts remain
+   the core schedule model. The standards spike added only dependency-free RRULE,
+   ICS free/busy, and JSCalendar busy-time helpers; full provider sync and full
+   calendar-format fidelity remain adapter concerns.
 7. **MIT license**, boring descriptive name (`ex_booking`), `ExBooking` namespace
    chosen so it can never alias-shadow a consumer's own `Booking` context.
 
@@ -182,9 +183,6 @@ those layers live with their own codebases, not here.
 
 ## 8. Open questions
 
-- RRULE/ICS spike (v0.4): `ical` (RFC 5545-compliant, BY\* coverage to be
-  enumerated) vs `rrule` (rust-rrule wrapper, Rust toolchain cost) vs a minimal
-  in-house RFC 5545 subset; JSCalendar mapping scope.
 - Whether an Ash-resource wrapper package is worth building once a real consumer
   integration exists.
 - Whether non-sales appointment commerce (packages, deposits, gift certificates)

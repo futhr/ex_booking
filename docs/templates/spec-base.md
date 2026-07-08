@@ -46,7 +46,7 @@ minor-version changes; removals/renames are breaking.
 ## Testing Strategy
 
 Doctests, example tests, StreamData properties, and DST fixtures required for
-this behavior (per `SP.06`). Name the laws that must hold.
+this behavior (per `SP.07`). Name the laws that must hold.
 
 ## Sources
 

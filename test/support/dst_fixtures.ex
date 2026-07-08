@@ -6,7 +6,7 @@ defmodule ExBooking.DSTFixtures do
   spring-forward (gap) and fall-back (ambiguity) points for at least
   Europe/Stockholm and America/New_York. The corpus itself is verified by
   `test/ex_booking/dst_fixtures_test.exs` so the dates can be trusted when
-  `ExBooking.Schedule` lands (roadmap v0.1).
+  `ExBooking.Schedule` changes.
   """
 
   @transitions %{

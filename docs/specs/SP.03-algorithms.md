@@ -1,198 +1,141 @@
 ---
 ex_booking:
   id: "SP.03"
-  title: "Algorithms"
+  title: "Temporal Availability Algorithms"
   domain: booking
   status: normative
   priority: critical
   created: "2026-07-08"
   updated: "2026-07-08"
-  tags: ["algorithms", "interval-algebra", "dst", "slotting", "conflict-detection"]
-  depends_on: ["R.01", "SP.01"]
+  tags: ["interval", "schedule", "availability", "slotting", "policy"]
+  depends_on: ["SP.01"]
 ---
 
-# SP.03 — Algorithms
+# SP.03 — Temporal Availability Algorithms
 
-## 1. Interval algebra (`ExBooking.Interval`)
+This spec maps to these files:
 
-The foundation. All intervals are half-open `[start_at, end_at)` UTC `DateTime`s.
+```text
+lib/ex_booking/interval.ex
+lib/ex_booking/schedule.ex
+lib/ex_booking/slotting.ex
+lib/ex_booking/availability.ex
+lib/ex_booking/policy.ex
+```
 
-| Operation | Contract |
+It does not describe assignment, lifecycle, standards interop, or external
+calendar sync. Those live in `SP.04`, `SP.05`, `SP.06`, or consumer repositories.
+
+## `ExBooking.Interval`
+
+All intervals are half-open `[start_at, end_at)` `DateTime`s. Public operations:
+
+| Function | Contract |
 |---|---|
-| `overlaps?(a, b)` | `a.start_at < b.end_at and b.start_at < a.end_at`. Touching intervals do not overlap. |
-| `contains?(outer, inner)` | `outer.start_at <= inner.start_at and inner.end_at <= outer.end_at` |
-| `subtract(a, b)` | `a` minus `b`: `[]`, one, or two intervals. Preserves `a`'s `kind`/`meta`. |
-| `subtract_all(as, bs)` | Fold `subtract` over normalized `bs`; result is sorted, non-overlapping. |
-| `merge(intervals)` | Sort by start, coalesce overlapping *and touching* intervals. Result is the normal form: sorted, disjoint, non-adjacent. |
-| `clip(a, bounds)` | Intersection of `a` with `bounds`, or `nil` when disjoint. |
-| `inflate(a, before_min, after_min)` | Widen: start −`before_min`, end +`after_min`. Used for buffer application. |
-| `duration_min(a)` | Whole minutes between endpoints. |
+| `new/3`, `new!/3` | Build a valid interval where `end_at > start_at` |
+| `overlaps?/2` | `a.start_at < b.end_at and b.start_at < a.end_at`; touching does not overlap |
+| `contains?/2` | `outer.start_at <= inner.start_at and inner.end_at <= outer.end_at` |
+| `subtract/2` | Return `a - b` as zero, one, or two intervals |
+| `subtract_all/2` | Subtract normalized intervals from many intervals |
+| `merge/1` | Sort and coalesce overlapping or touching intervals |
+| `clip/2` | Return intersection or `nil` |
+| `inflate/3` | Widen by minutes before and after |
+| `duration_min/1` | Whole-minute duration |
 
-Laws (property-tested, SP.06):
+`subtract/2` preserves the minuend's `kind` and `meta`. `merge/1` returns normal
+form: sorted, disjoint, and non-adjacent.
 
-- `overlaps?` is symmetric; an interval never overlaps its own complement pieces.
-- `subtract(a, b)` pieces never overlap `b`, are contained in `a`, and are disjoint.
-- `merge` is idempotent; total coverage is preserved when inputs don't overlap.
-- `clip(a, bounds)` result is contained in both; `inflate` then `clip` by the same
-  bounds never exceeds bounds.
+## `ExBooking.Schedule`
 
-## 2. Wall-time expansion and DST
+`Schedule.expand/3` expands an `ExBooking.AvailabilityRule` over a UTC
+`from`/`until` horizon. Weekly windows and overrides are wall time in
+`rule.timezone`.
 
-`AvailabilityRule.windows` are wall time in the rule's timezone. Expansion of one
-window on one date follows this exact procedure (`ExBooking.Schedule.expand/3`):
-
-```text
-resolve(date, time, tz) =
-  case DateTime.new(date, time, tz) do
-    {:ok, dt}              -> dt                # unambiguous
-    {:ambiguous, first, _} -> first             # fall-back: FIRST occurrence
-    {:gap, _before, after} -> after             # spring-forward: snap FORWARD
-  end
-
-expand_window(window, date, tz) =
-  start = resolve(date, window.start_time, tz)
-  end_date = if window.end_time <= window.start_time, do: date + 1 day, else: date
-  end_  = resolve(end_date, window.end_time, tz)     # <= handles cross-midnight
-  if start < end_, do: [Interval(start, end_)], else: []   # gap-snap can empty a window
-```
-
-Worked examples (dates verified against the 2026 IANA tz data; these are the
-fixture cases in `test/support/dst_fixtures.ex`):
-
-- `Europe/Stockholm`, 2026-03-29 (spring forward, 02:00→03:00): a window
-  `02:30–04:00` resolves its start via the gap rule to `03:00` local — the
-  expanded interval is `03:00–04:00` CEST. No phantom 02:xx slots may be emitted.
-- `America/New_York`, 2026-11-01 (fall back, 02:00→01:00): a window starting
-  `01:30` resolves to the **first** occurrence (01:30 EDT, the earlier UTC
-  instant). After UTC normalization, any duplicate slots produced by the repeated
-  wall hour are removed by `merge`/`uniq_by(start_at)` — a wall time never yields
-  two offered slots.
-- A window `22:00–02:00` on any date expands to `[22:00 that day, 02:00 next
-  day)` in the rule timezone before UTC normalization.
-
-These rules are fixed; consumers needing a different DST policy must pre-expand
-windows themselves and pass blackouts/overrides instead.
-
-## 3. Availability assembly pipeline (`ExBooking.Availability`)
-
-Input: meeting type, resources, rules, `from`/`until`/`now`.
+Wall-time resolution is fixed:
 
 ```text
-1. expand    each rule's weekly windows over [from, until] in rule TZ (per §2)
-2. override  replace expanded windows on dates present in rule.overrides
-             (empty override windows remove the day)
-3. blackout  subtract rule.blackouts
-4. normalize to UTC intervals; merge to normal form            → offerable time
-5. busy      per resource: merge resource.busy, inflate each busy interval by
-             effective buffers (meeting_type.buffers || rule.buffers)
-6. subtract  offerable − inflated busy                          → free time
-7. slot      generate candidate slots on the slot grid (§4)
-8. filter    drop slots per the policy definitions below
-9. combine   per meeting_type.participants mode (§5)
-10. sort     ascending start_at, tie-break by resource id       → slots
+DateTime.new(date, time, timezone)
+  {:ok, dt}              -> dt
+  {:ambiguous, first, _} -> first
+  {:gap, _before, after} -> after
 ```
 
-Policy definitions for step 8 (all comparisons on UTC instants unless stated):
+Cross-midnight windows use the next calendar day when `end_time <= start_time`.
+Expanded output is clipped to the horizon and merged.
 
-- **Lead time** — drop a slot when
-  `slot.start_at < DateTime.add(now, rule.lead_time_min, :minute)`.
-- **Booking window** — when `rule.booking_window_days = n` (nil = unbounded),
-  the last bookable *calendar date* is `today_in_rule_tz + n days`, where
-  `today_in_rule_tz = DateTime.shift_zone!(now, rule.timezone) |> DateTime.to_date()`.
-  Drop a slot when its start, shifted to the rule timezone, falls on a later date.
-- **Daily cap** — when `rule.max_per_day = n` (nil = uncapped), count the
-  resource's busy intervals with `kind == :busy` (holds do not count) whose
-  start, shifted to the rule timezone, falls on the slot's rule-timezone date.
-  Drop the slot when that count `>= n`.
+Overrides replace the regular windows for a date. An override with `windows: []`
+removes the whole day. Blackouts are subtracted after expansion.
 
-Buffers inflate *busy* time, not slots: a buffer prevents a new booking from
-starting too close to existing commitments but does not consume offerable time at
-the edges of the working day.
+## `ExBooking.Slotting`
 
-## 4. Slot generation (`ExBooking.Slotting`)
+`Slotting.generate_slots/4` emits candidate slots inside one free interval.
+`Slotting.generate_all/4` applies the same logic to many intervals.
 
-The grid step is `slot_interval_min || duration_min` — **independent of
-duration**. Within each free interval:
+The grid step is always caller-supplied by the meeting type pipeline:
 
 ```text
-candidates(free, duration, step) =
-  starts = free.start_at, free.start_at + step, free.start_at + 2·step, …
-  keep start while start + duration <= free.end_at
+step = meeting_type.slot_interval_min || meeting_type.duration_min
 ```
 
-Grid anchoring defaults to the free interval's start (`align: :free_start`), not
-to `:00` of the hour. Callers may pass `align: :clock` to anchor the grid to UTC
-clock boundaries and skip the partial leading offset inside each free interval.
-A 30-minute meeting on a 15-minute grid over a 09:00–10:00 free window yields
-09:00, 09:15, 09:30. The same meeting over a 09:07–10:00 free window yields
-09:07, 09:22 by default, or 09:15, 09:30 with `align: :clock`.
+The step is independent of meeting duration. A 30-minute booking on a 15-minute
+grid over 09:00-10:00 yields starts at 09:00, 09:15, and 09:30.
 
-## 5. Participant modes
+Supported alignment:
 
-- `:one` — each resource yields slots independently; a slot is offered if *any*
-  eligible resource is free (assignment picks the winner, SP.04).
-- `:collective` — intersection: a slot is offered only where *all* listed
-  resources are free (free-time intersection before slotting).
-- `:pool` — capacity-aware: a slot is offered while the number of free resources
-  ≥ `meeting_type.capacity_required`; resources with `capacity > 1` count
-  remaining seats (capacity − overlapping bookings).
+- `align: :free_start` — default; grid starts at each free interval start.
+- `align: :clock` — grid is anchored to UTC clock boundaries and skips any
+  partial leading offset inside the free interval.
 
-## 6. RRULE subset expansion
+Output is sorted by `start_at` and de-duplicated by start time by callers that
+merge resource results.
 
-`ExBooking.RRule` implements a conservative RFC 5545 subset for recurrence
-interop without adding runtime dependencies:
+## `ExBooking.Policy`
 
-- `FREQ=DAILY` and `FREQ=WEEKLY`
-- `INTERVAL`
-- `COUNT`
-- UTC `UNTIL`
-- weekly `BYDAY`
+`Policy.violations/4` returns all policy failures for a slot/resource/rule/now
+combination.
 
-The caller supplies `DTSTART`, duration, and the `[from, until]` search horizon.
-The expander emits UTC `Interval` values sorted by start and clipped to the
-horizon. Unsupported rule parts fail as `{:unsupported, :rrule, part}` rather
-than being ignored.
+Policy checks:
 
-## 7. ICS free/busy normalization
+- **Lead time** — reject when `slot.start_at < now + lead_time_min`.
+- **Booking window** — compare slot start date in the rule timezone with
+  `now`'s rule-timezone date plus `booking_window_days`.
+- **Daily cap** — count only resource busy intervals with `kind == :busy`; holds
+  do not count toward the cap.
 
-`ExBooking.ICalendar` scans unfolded iCalendar text for `FREEBUSY` properties
-and normalizes comma-separated period values into UTC busy intervals. Supported
-period forms are `start/end` and `start/duration`; date-times must be UTC
-(`YYYYMMDDTHHMMSSZ`). Parameters such as `FBTYPE` are accepted and ignored
-because the kernel only needs normalized busy time.
+`Policy.notice_ok/3` is shared by cancellation and reschedule policy checks.
+`nil` policy allows the action. `allowed: false` returns `{:error, :not_allowed}`.
+Insufficient notice returns `{:error, :min_notice}`.
 
-The helper returns merged, sorted `Interval` values with `kind: :busy`.
-Unsupported local date-times or malformed periods fail explicitly.
+## `ExBooking.Availability`
 
-## 8. JSCalendar busy-time mapping
+`Availability.assemble/4` is the slot-search pipeline used by
+`ExBooking.available_slots/4` and rejected-decision alternatives.
 
-`ExBooking.JSCalendar` accepts already decoded RFC 8984 JSCalendar maps and
-maps `Event` or `Group` objects into UTC busy intervals. The supported event
-surface is `start`, `timeZone`, optional `duration`, `status`, and
-`freeBusyStatus`; `freeBusyStatus: "free"` and `status: "cancelled"` do not
-produce busy intervals.
-
-The mapper deliberately rejects floating events (missing `timeZone`) and
-recurrence rules. JSON decoding, full recurrence expansion, and vendor-specific
-calendar shapes are consumer concerns outside this kernel.
-
-## 9. Conflict detection
-
-A requested slot conflicts iff, for a required resource, the slot inflated by
-effective buffers overlaps any busy interval:
-
-```elixir
-conflict? = Interval.overlaps?(Interval.inflate(slot, before, after), busy)
+```text
+resources + rules are paired positionally
+  -> expand rule windows with Schedule.expand/3
+  -> subtract buffer-inflated resource busy intervals
+  -> generate slots with Slotting.generate_all/4
+  -> filter Policy.violations/4
+  -> combine by participant mode
+  -> sort deterministically
 ```
 
-Note the asymmetry with assembly step 5: at assembly time buffers inflate busy;
-at validation time inflating the slot is equivalent and cheaper (one inflation
-instead of many).
-Both directions must agree — property-tested.
+Participant modes:
 
-## 10. Complexity targets
+- `:one` — slots are offered when any resource is eligible.
+- `:collective` — slots are offered only where all listed resources are free.
+- `:pool` — slots are offered when available seats meet
+  `meeting_type.capacity_required`; resource `capacity > 1` contributes remaining
+  seats after overlapping busy intervals.
 
-With `n` busy intervals per resource, `w` expanded windows, `r` resources:
-assembly is `O(r · (n log n + w log w))` (sort-merge based subtraction, no
-quadratic scans). Slot emission is lazy-friendly (streams internally) but returns
-lists at the API boundary for determinism.
+`Availability.validate/5` and `Availability.eligible/5` check a requested slot.
+They return every failing reason rather than stopping at the first failure.
+Conflict detection inflates the requested slot by effective buffers and checks
+for overlap with resource busy intervals.
+
+## Deterministic Ordering
+
+The availability pipeline sorts slots ascending by `start_at`. Where resources
+are later assigned, `SP.04` supplies the final resource-id tie-break. No function
+reads the clock; every time-relative decision uses caller-supplied `now`.

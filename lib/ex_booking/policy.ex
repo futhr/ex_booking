@@ -5,7 +5,8 @@ defmodule ExBooking.Policy do
   violation is reported as a tagged reason from the stable error vocabulary
   (`docs/specs/SP.02-public-api.md`).
 
-  Cancellation and reschedule policy evaluation land in roadmap v0.2.
+  Cancellation and reschedule policy evaluation is exposed through the facade
+  lifecycle functions.
   """
 
   alias ExBooking.AvailabilityRule

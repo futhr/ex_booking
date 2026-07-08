@@ -8,7 +8,7 @@ ex_booking:
   created: "2026-07-08"
   updated: "2026-07-08"
   tags: ["rrule", "ics", "jscalendar", "standards"]
-  depends_on: ["R.01", "SP.07"]
+  depends_on: ["R.01", "SP.06"]
 ---
 
 # R.02 — Standards Interop Spike
