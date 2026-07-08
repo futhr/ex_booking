@@ -5,12 +5,11 @@ questions — *what slots are valid? does this request conflict? which host shou
 take it? what side effects must happen next?* — as pure functions over immutable
 inputs. No database, no supervision tree, no HTTP, no side effects.
 
-> Version 0.1.0. The v0.1–v0.3 kernel is implemented — availability assembly,
-> DST-safe slot generation, conflict detection, assignment strategies, and the
-> booking lifecycle (decide, reschedule, cancellation). The data model, public
-> API, and algorithms are specified in [`docs/specs/`](docs/specs/SP.00-overview.md).
-> v0.4 standards interop is also implemented with narrow, dependency-free
-> RRULE, ICS free/busy, and JSCalendar helpers.
+> Version 0.1.0. The kernel implements availability assembly, DST-safe slot
+> generation, conflict detection, alternatives, assignment strategies, lifecycle
+> transitions, and narrow dependency-free RRULE, ICS free/busy, and JSCalendar
+> helpers. The data model, public API, and algorithms are specified in
+> [`docs/specs/`](docs/specs/SP.00-overview.md).
 
 ## Why
 
@@ -51,15 +50,17 @@ meeting_type = %ExBooking.MeetingType{
   slot_interval_min: 15
 }
 
+now = ~U[2026-07-08 12:00:00Z]
+
 {:ok, slots} =
   ExBooking.available_slots(meeting_type, resources, rules,
     from: ~U[2026-07-13 00:00:00Z],
     until: ~U[2026-07-17 23:59:59Z],
-    now: DateTime.utc_now()
+    now: now
   )
 
 {:ok, %ExBooking.Decision{} = decision} =
-  ExBooking.decide(request, meeting_type, resources, rules, now: DateTime.utc_now())
+  ExBooking.decide(request, meeting_type, resources, rules, now: now)
 
 decision.events
 #=> [%ExBooking.Event{type: :booking_confirmed, ...}]
@@ -88,6 +89,7 @@ config :elixir, :time_zone_database, Tz.TimeZoneDatabase
 ## Documentation
 
 - [Research: the booking space and why a kernel](docs/research/R.01-booking-space-and-kernel-rationale.md)
+- [Research: post-build kernel audit](docs/research/R.03-post-build-kernel-audit.md)
 - [Spec 00 — Overview, scope, determinism contract](docs/specs/SP.00-overview.md)
 - [Spec 01 — Data model](docs/specs/SP.01-data-model.md)
 - [Spec 02 — Public API](docs/specs/SP.02-public-api.md)

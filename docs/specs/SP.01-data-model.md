@@ -125,14 +125,15 @@ An invitee's intent, before decision.
 
 ## ExBooking.Decision
 
-The kernel's answer to `decide/5`, `reschedule/6`.
+The kernel's answer to booking decision and lifecycle transition functions.
 
 ```elixir
 %ExBooking.Decision{
   status: :ok | :conflict | :policy_reject | :needs_routing,
   slot: ExBooking.Interval.t() | nil,
   resource_ids: [String.t()],
-  alternatives: [ExBooking.Interval.t()],  # nearest valid slots when status != :ok
+  alternatives: [ExBooking.Interval.t()],  # nearest valid slots when a rejected
+                                           # decision has an explicit horizon
   reasons: [reason()],                     # machine-readable, e.g.
                                            # {:conflict, resource_id, interval}
                                            # {:lead_time, minutes_short}

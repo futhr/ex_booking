@@ -53,6 +53,13 @@ ex_booking:
   interop surface — do not invent a JSON calendar shape
 - [x] Optional grid alignment to clock boundaries (`:align` option)
 
+## v0.5 — research audit hardening
+
+- [x] Rejected decisions compute nearest alternatives from an explicit horizon
+- [x] Pure lifecycle transitions for cancellation, hold expiry, and no-show
+- [x] Keep payment state, provider behaviors, Ash wrappers, routing forms,
+  analytics, and AI out of the kernel boundary
+
 ## Out of scope, permanently
 
 Persistence, jobs, calendar/CRM/video/payment integrations, notifications, UI,

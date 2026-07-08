@@ -36,12 +36,17 @@ to the first occurrence and snaps through spring-forward gaps
 | M2 | v0.2 — assignment and policy | 6 | 6 | 100% | Complete |
 | M3 | v0.3 — lifecycle, events, multi-party | 7 | 7 | 100% | Complete |
 | M4 | v0.4 — standards spike | 4 | 4 | 100% | Complete |
-| — | **Total** | **32** | **32** | **100%** | |
+| M5 | v0.5 — research audit hardening | 3 | 3 | 100% | Complete |
+| — | **Total** | **35** | **35** | **100%** | |
 
 > M3 is complete. M3.07 is validated in the separate `host application` consumer
 > repository with a documented walkthrough and integration test. M4.01 chose a
 > dependency-free RRULE subset after package evaluation. M4 is complete with
 > pure ICS free/busy normalization and decoded JSCalendar busy-time mapping.
+> M5 closes post-build audit gaps from the base research: rejected decisions now
+> return horizon-bound alternatives, and lifecycle events have pure transition
+> helpers without pulling payments, providers, Ash, routing forms, analytics, or
+> AI into the kernel.
 
 ## Operating Rules
 
@@ -244,6 +249,31 @@ to the first occurrence and snaps through spring-forward gaps
 - [x] M4.02 ICS free/busy import helpers (normalize into `Interval` lists).
 - [x] M4.03 JSCalendar (RFC 8984) mapping scope for any JSON interop surface.
 - [x] M4.04 Optional grid alignment to clock boundaries (`:align` option).
+
+## M5 — v0.5 Research Audit Hardening
+
+> Specs: `SP.02`; `SP.05`; `SP.07`.
+> Depends on: M4.
+> Exit criteria: important kernel-level gaps from the base research are closed,
+> while orchestration-layer concerns stay outside the pure package.
+
+- [x] M5.01 Rejected `decide/5` responses compute nearest alternatives when the
+  caller supplies a `:from`/`:until` horizon.
+  - Spec: `SP.02`; `SP.05`.
+  - AC: alternatives sort by distance from requested start, then start time; no
+    horizon means no guessed alternatives.
+  - Tests: conflict decision with two nearest alternatives; no-horizon branch.
+- [x] M5.02 Pure lifecycle transition helpers for cancellation, hold expiry, and
+  no-show.
+  - Spec: `SP.02`; `SP.05`.
+  - AC: `cancel/3` validates policy and emits cancel intents; `expire_hold/2`
+    emits release + expired event; `mark_no_show/3` emits no-show event.
+  - Tests: allowed/blocked cancellation, hold expiry, no-show event.
+- [x] M5.03 Preserve the kernel boundary after the research audit.
+  - Spec: `SP.07`; `R.01`.
+  - AC: payment state, provider behaviors, Ash wrappers, routing forms,
+    analytics, GTM/CRM enrichment, and AI stay in consumers/adapters.
+  - Tests: `mix check` green; docs explicitly record the boundary.
 
 ## Out of Scope, Permanently
 

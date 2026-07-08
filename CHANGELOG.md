@@ -13,3 +13,4 @@
 - Assignment and policy: deterministic strategies, scoring hook, booking decisions, cancellation, and reschedule checks.
 - Lifecycle and events: holds, reserve/release intents, canonical event emission, collective mode, and pool capacity.
 - Standards helpers: dependency-free RRULE subset expansion, ICS free/busy normalization, JSCalendar busy mapping, and clock-aligned slots.
+- Research audit hardening: rejected-decision alternatives plus pure cancel, hold-expiry, and no-show transitions.

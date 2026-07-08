@@ -190,6 +190,54 @@ defmodule ExBookingTest do
       assert Enum.any?(decision.reasons, &match?({:conflict, "res_1", _}, &1))
     end
 
+    test "returns nearest alternatives when a rejected decision has a horizon", %{
+      request: request
+    } do
+      busy = %Interval{
+        start_at: ~U[2026-07-13 07:00:00Z],
+        end_at: ~U[2026-07-13 07:30:00Z],
+        kind: :busy
+      }
+
+      assert {:ok, decision} =
+               ExBooking.decide(
+                 request,
+                 build(:meeting_type),
+                 [build(:resource, busy: [busy])],
+                 [build(:rule)],
+                 now: @now,
+                 from: ~U[2026-07-13 00:00:00Z],
+                 until: ~U[2026-07-13 23:59:59Z],
+                 alternatives_limit: 2
+               )
+
+      assert decision.status == :conflict
+
+      assert Enum.map(decision.alternatives, & &1.start_at) == [
+               ~U[2026-07-13 07:30:00Z],
+               ~U[2026-07-13 07:45:00Z]
+             ]
+    end
+
+    test "keeps alternatives empty when no alternatives horizon is supplied", %{request: request} do
+      busy = %Interval{
+        start_at: ~U[2026-07-13 07:00:00Z],
+        end_at: ~U[2026-07-13 07:30:00Z],
+        kind: :busy
+      }
+
+      assert {:ok, decision} =
+               ExBooking.decide(
+                 request,
+                 build(:meeting_type),
+                 [build(:resource, busy: [busy])],
+                 [build(:rule)],
+                 now: @now
+               )
+
+      assert decision.alternatives == []
+    end
+
     test "returns a :policy_reject decision when lead time is not met", %{request: request} do
       assert {:ok, decision} =
                ExBooking.decide(
@@ -228,6 +276,93 @@ defmodule ExBookingTest do
       assert decision.status == :ok
       assert [%ExBooking.Event{type: :booking_reserved}] = decision.events
       assert [{:reserve, ^hold}, {:emit, _event}] = decision.intents
+    end
+  end
+
+  describe "cancel/3" do
+    @existing build(:interval,
+                start_at: ~U[2026-07-13 09:00:00Z],
+                end_at: ~U[2026-07-13 09:30:00Z]
+              )
+
+    test "emits cancellation event and intents when policy allows it" do
+      meeting_type =
+        build(:meeting_type, cancellation_policy: %{min_notice_min: 60, allowed: true})
+
+      assert {:ok, decision} =
+               ExBooking.cancel(@existing, meeting_type,
+                 now: ~U[2026-07-13 07:00:00Z],
+                 resource_ids: ["res_1"],
+                 routing_context: %{"utm_campaign" => "demo"},
+                 release_hold_id: "hold_1"
+               )
+
+      assert decision.status == :ok
+
+      assert [
+               %ExBooking.Event{
+                 type: :booking_canceled,
+                 routing_context: %{"utm_campaign" => "demo"}
+               }
+             ] = decision.events
+
+      assert [
+               {:release, "hold_1"},
+               {:calendar_event, :cancel, %{resource_ids: ["res_1"]}},
+               {:emit, %ExBooking.Event{type: :booking_canceled}}
+             ] = decision.intents
+    end
+
+    test "returns policy rejection when cancellation is blocked" do
+      meeting_type =
+        build(:meeting_type, cancellation_policy: %{min_notice_min: 0, allowed: false})
+
+      assert {:ok, decision} =
+               ExBooking.cancel(@existing, meeting_type, now: ~U[2026-07-13 07:00:00Z])
+
+      assert decision.status == :policy_reject
+      assert decision.reasons == [{:policy, :cancellation, :not_allowed}]
+    end
+  end
+
+  describe "expire_hold/2" do
+    test "emits expiry event and release intent for the supplied hold" do
+      hold = %ExBooking.Hold{
+        id: "hold_1",
+        slot: build(:interval),
+        resource_ids: ["res_1"],
+        meeting_type_id: "demo_30",
+        expires_at: ~U[2026-07-13 08:55:00Z]
+      }
+
+      assert {:ok, decision} =
+               ExBooking.expire_hold(hold, routing_context: %{source: :worker})
+
+      assert decision.status == :ok
+
+      assert [
+               %ExBooking.Event{
+                 type: :booking_expired,
+                 data: %{hold_id: "hold_1", expires_at: ~U[2026-07-13 08:55:00Z]},
+                 routing_context: %{source: :worker}
+               }
+             ] = decision.events
+
+      assert [{:release, "hold_1"}, {:emit, %ExBooking.Event{type: :booking_expired}}] =
+               decision.intents
+    end
+  end
+
+  describe "mark_no_show/3" do
+    test "emits no-show event without performing side effects" do
+      assert {:ok, decision} =
+               ExBooking.mark_no_show(build(:interval), build(:meeting_type),
+                 resource_ids: ["res_1"]
+               )
+
+      assert decision.status == :ok
+      assert [%ExBooking.Event{type: :booking_no_show}] = decision.events
+      assert [{:emit, %ExBooking.Event{type: :booking_no_show}}] = decision.intents
     end
   end
 

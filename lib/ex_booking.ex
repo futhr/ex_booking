@@ -12,10 +12,10 @@ defmodule ExBooking do
   specification lives in `docs/specs/` — start with spec 00 (overview) and
   spec 02 (public API).
 
-  The full v0.1–v0.3 surface is implemented: availability assembly, slot
-  validation, assignment strategies, and the booking lifecycle (decide,
-  reschedule, cancellation). Standards interop covers dependency-free
-  RRULE/ICS/JSCalendar helpers per `docs/specs/SP.07-roadmap.md`.
+  The implemented surface covers availability assembly, slot validation,
+  alternatives, assignment strategies, lifecycle transitions, and narrow
+  dependency-free RRULE/ICS/JSCalendar helpers per
+  `docs/specs/SP.07-roadmap.md`.
   """
 
   alias ExBooking.Assignment
@@ -53,10 +53,30 @@ defmodule ExBooking do
                  ],
                  scorer: [type: {:fun, 2}],
                  hold: [type: {:struct, ExBooking.Hold}],
-                 release_hold_id: [type: :string]
+                 release_hold_id: [type: :string],
+                 from: [type: {:struct, DateTime}],
+                 until: [type: {:struct, DateTime}],
+                 align: [type: {:in, [:free_start, :clock]}, default: :free_start],
+                 alternatives_limit: [type: :non_neg_integer, default: 3]
                )
 
   @now_opts NimbleOptions.new!(now: [type: {:struct, DateTime}, required: true])
+
+  @cancel_opts NimbleOptions.new!(
+                 now: [type: {:struct, DateTime}, required: true],
+                 resource_ids: [type: {:list, :string}, default: []],
+                 routing_context: [type: {:map, :any, :any}, default: %{}],
+                 release_hold_id: [type: :string]
+               )
+
+  @transition_opts NimbleOptions.new!(
+                     resource_ids: [type: {:list, :string}, default: []],
+                     routing_context: [type: {:map, :any, :any}, default: %{}]
+                   )
+
+  @routing_context_opts NimbleOptions.new!(
+                          routing_context: [type: {:map, :any, :any}, default: %{}]
+                        )
 
   @rrule_opts NimbleOptions.new!(
                 from: [type: {:struct, DateTime}, required: true],
@@ -179,6 +199,68 @@ defmodule ExBooking do
   end
 
   @doc """
+  Computes the pure cancellation transition for an existing booking.
+
+  When cancellation policy allows the action, the returned decision emits
+  `:booking_canceled`, requests calendar cancellation, optionally releases an
+  existing hold, and leaves persistence/publishing to the consumer.
+  """
+  @spec cancel(Interval.t(), MeetingType.t(), keyword()) :: {:ok, Decision.t()} | {:error, term()}
+  def cancel(%Interval{} = existing, %MeetingType{} = meeting_type, opts) do
+    with {:ok, opts} <- validate_opts(opts, @cancel_opts) do
+      case Policy.notice_ok(existing, meeting_type.cancellation_policy, opts[:now]) do
+        :ok -> {:ok, cancel_decision(existing, meeting_type, opts)}
+        {:error, reason} -> {:ok, policy_reject(existing, [{:policy, :cancellation, reason}])}
+      end
+    end
+  end
+
+  @doc """
+  Computes the pure expiry transition for a consumer-supplied hold.
+
+  Consumers decide when a hold is expired by comparing `expires_at` with their
+  own clock. This helper only returns the canonical event and release intent.
+  """
+  @spec expire_hold(Hold.t(), keyword()) :: {:ok, Decision.t()} | {:error, term()}
+  def expire_hold(%Hold{} = hold, opts) do
+    with {:ok, opts} <- validate_opts(opts, @routing_context_opts) do
+      event = %Event{
+        type: :booking_expired,
+        slot: hold.slot,
+        resource_ids: hold.resource_ids,
+        meeting_type_id: hold.meeting_type_id,
+        routing_context: opts[:routing_context],
+        data: %{hold_id: hold.id, expires_at: hold.expires_at}
+      }
+
+      {:ok,
+       %Decision{
+         status: :ok,
+         slot: hold.slot,
+         resource_ids: hold.resource_ids,
+         events: [event],
+         intents: [{:release, hold.id}, {:emit, event}]
+       }}
+    end
+  end
+
+  @doc """
+  Computes the pure no-show transition for an existing booking.
+
+  No-show detection, fees, and notifications are consumer concerns. The kernel
+  returns the canonical event so analytics and billing layers can consume a
+  stable vocabulary.
+  """
+  @spec mark_no_show(Interval.t(), MeetingType.t(), keyword()) ::
+          {:ok, Decision.t()} | {:error, term()}
+  def mark_no_show(%Interval{} = existing, %MeetingType{} = meeting_type, opts) do
+    with {:ok, opts} <- validate_opts(opts, @transition_opts) do
+      event = transition_event(:booking_no_show, existing, meeting_type, opts)
+      {:ok, transition_decision(existing, opts[:resource_ids], event, [{:emit, event}])}
+    end
+  end
+
+  @doc """
   Standalone assignment over pre-filtered free resources, for consumers that
   run their own availability search. See `ExBooking.Assignment`.
   """
@@ -221,8 +303,11 @@ defmodule ExBooking do
   # `reschedule` is nil for decide/5, or `{existing, new}` for reschedule/6.
   defp decision(request, meeting_type, resources, rules, opts, reschedule) do
     case Availability.eligible(request, meeting_type, resources, rules, opts[:now]) do
-      {:ok, free} -> assign_decision(request, meeting_type, free, opts, reschedule)
-      {:error, reasons} -> rejected_decision(request, reasons)
+      {:ok, free} ->
+        assign_decision(request, meeting_type, free, opts, reschedule)
+
+      {:error, reasons} ->
+        rejected_decision(request, reasons, meeting_type, resources, rules, opts)
     end
   end
 
@@ -240,7 +325,14 @@ defmodule ExBooking do
         success_decision(request, meeting_type, winners, opts, reschedule)
 
       {:error, :no_eligible_resource} ->
-        rejected_decision(request, [{:no_eligible_resource, request.slot}])
+        rejected_decision(
+          request,
+          [{:no_eligible_resource, request.slot}],
+          meeting_type,
+          free,
+          [],
+          opts
+        )
     end
   end
 
@@ -303,8 +395,13 @@ defmodule ExBooking do
     %{slot: event.slot, resource_ids: resource_ids, meeting_type_id: meeting_type.id}
   end
 
-  defp rejected_decision(request, reasons) do
-    %Decision{status: rejection_status(reasons), slot: request.slot, reasons: reasons}
+  defp rejected_decision(request, reasons, meeting_type, resources, rules, opts) do
+    %Decision{
+      status: rejection_status(reasons),
+      slot: request.slot,
+      reasons: reasons,
+      alternatives: alternatives(request, meeting_type, resources, rules, opts)
+    }
   end
 
   defp rejection_status(reasons) do
@@ -317,6 +414,78 @@ defmodule ExBooking do
 
   defp release_busy(resource, existing) do
     %{resource | busy: Interval.subtract_all(resource.busy, [existing])}
+  end
+
+  defp alternatives(
+         %Request{slot: %Interval{} = requested},
+         meeting_type,
+         resources,
+         rules,
+         opts
+       ) do
+    with true <- opts[:alternatives_limit] > 0,
+         %DateTime{} <- opts[:from],
+         %DateTime{} <- opts[:until],
+         {:ok, slots} <- Availability.assemble(meeting_type, resources, rules, opts) do
+      slots
+      |> Enum.reject(&same_interval?(&1, requested))
+      |> Enum.sort_by(&alternative_key(&1, requested))
+      |> Enum.take(opts[:alternatives_limit])
+    else
+      _no_horizon_or_slots -> []
+    end
+  end
+
+  defp alternatives(_request, _meeting_type, _resources, _rules, _opts), do: []
+
+  defp same_interval?(a, b), do: a.start_at == b.start_at and a.end_at == b.end_at
+
+  defp alternative_key(slot, requested) do
+    distance = abs(DateTime.diff(slot.start_at, requested.start_at, :second))
+    {distance, DateTime.to_unix(slot.start_at, :microsecond)}
+  end
+
+  defp cancel_decision(existing, meeting_type, opts) do
+    event = transition_event(:booking_canceled, existing, meeting_type, opts)
+
+    release =
+      case opts[:release_hold_id] do
+        nil -> []
+        hold_id -> [{:release, hold_id}]
+      end
+
+    intents =
+      release ++
+        [
+          {:calendar_event, :cancel, calendar_payload(event, opts[:resource_ids], meeting_type)},
+          {:emit, event}
+        ]
+
+    transition_decision(existing, opts[:resource_ids], event, intents)
+  end
+
+  defp transition_event(type, slot, meeting_type, opts) do
+    %Event{
+      type: type,
+      slot: slot,
+      resource_ids: opts[:resource_ids],
+      meeting_type_id: meeting_type.id,
+      routing_context: opts[:routing_context]
+    }
+  end
+
+  defp transition_decision(slot, resource_ids, event, intents) do
+    %Decision{
+      status: :ok,
+      slot: slot,
+      resource_ids: resource_ids,
+      events: [event],
+      intents: intents
+    }
+  end
+
+  defp policy_reject(slot, reasons) do
+    %Decision{status: :policy_reject, slot: slot, reasons: reasons}
   end
 
   defp validate_opts(opts, schema) do

@@ -78,7 +78,17 @@ failing reasons, not just the first.
 
 The core entry point: validate + assign + produce events/intents. A `Decision` is
 returned even for rejections (`status: :conflict | :policy_reject`), including
-nearest `alternatives`. `{:error, _}` is reserved for malformed input.
+nearest `alternatives` when `:from`/`:until` are supplied. `{:error, _}` is
+reserved for malformed input.
+
+Supported options:
+
+- `:now` — required `DateTime` input supplied by the caller.
+- `:from`, `:until` — optional alternatives horizon for rejected decisions.
+- `:alternatives_limit` — optional non-negative integer, default `3`.
+- `:align` — optional slot-grid anchoring for alternatives, `:free_start`
+  (default) or `:clock`.
+- `:strategy`, `:scorer`, `:hold`, `:release_hold_id` — see SP.04/SP.05.
 
 ```elixir
 @spec reschedule(
@@ -105,6 +115,56 @@ existing slot, treats the existing slot's busy time as released, and emits
 
 Pure policy check against `cancellation_policy` and `:now`. Refund/fee semantics
 are consumer concerns layered on the result.
+
+```elixir
+@spec cancel(
+        existing :: ExBooking.Interval.t(),
+        ExBooking.MeetingType.t(),
+        keyword()
+      ) :: {:ok, ExBooking.Decision.t()} | {:error, term()}
+```
+
+Computes the pure cancellation transition. When policy allows cancellation, the
+decision emits `:booking_canceled`, optionally releases a hold, requests calendar
+cancellation, and emits the canonical event.
+
+Supported options:
+
+- `:now` — required `DateTime` input supplied by the caller.
+- `:resource_ids` — optional resource ids attached to the event and payload.
+- `:routing_context` — optional opaque context echoed into the event.
+- `:release_hold_id` — optional hold id released before calendar cancellation.
+
+```elixir
+@spec expire_hold(
+        ExBooking.Hold.t(),
+        keyword()
+      ) :: {:ok, ExBooking.Decision.t()} | {:error, term()}
+```
+
+Computes the pure hold-expiry transition for a consumer-supplied hold. Consumers
+decide *when* expiry happens; the kernel only returns `:booking_expired` and
+`{:release, hold_id}`.
+
+Supported options:
+
+- `:routing_context` — optional opaque context echoed into the event.
+
+```elixir
+@spec mark_no_show(
+        existing :: ExBooking.Interval.t(),
+        ExBooking.MeetingType.t(),
+        keyword()
+      ) :: {:ok, ExBooking.Decision.t()} | {:error, term()}
+```
+
+Computes the pure no-show transition. Fee, notification, and revenue-policy
+effects remain consumer concerns consuming the canonical event.
+
+Supported options:
+
+- `:resource_ids` — optional resource ids attached to the event.
+- `:routing_context` — optional opaque context echoed into the event.
 
 ```elixir
 @spec assign(
