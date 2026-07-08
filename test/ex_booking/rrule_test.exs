@@ -1,7 +1,11 @@
 defmodule ExBooking.RRuleTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias ExBooking.RRule
+
+  doctest ExBooking.RRule
 
   @dtstart ~U[2026-07-13 09:00:00Z]
   @from ~U[2026-07-13 00:00:00Z]

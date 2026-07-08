@@ -5,15 +5,16 @@ Thanks for your interest in contributing!
 ## Ground rules
 
 ExBooking is a **pure kernel**. Every contribution must preserve the design
-contract in [`docs/specs/SP.00-overview.md`](docs/specs/SP.00-overview.md):
+contract:
 
 1. **No side effects in `lib/`** — no database, no processes, no HTTP, no
    file I/O, no message sending. The kernel computes; consumers execute.
 2. **Determinism** — same inputs produce same outputs. Never call
    `DateTime.utc_now/0`, `System.system_time/1`, or any randomness inside
    kernel code. `now` is always a caller-supplied input.
-3. **Spec first** — behavior changes start as a spec change in `docs/specs/`.
-   If the code and the spec disagree, one of them is a bug.
+3. **Contract first** — behavior changes update the relevant contract, tests,
+   and implementation together. If code and documentation disagree, one of them
+   is a bug.
 
 ## Development
 

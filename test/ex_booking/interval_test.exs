@@ -1,4 +1,6 @@
 defmodule ExBooking.IntervalTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
   use ExUnitProperties
 

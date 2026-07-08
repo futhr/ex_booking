@@ -1,20 +1,33 @@
 defmodule ExBooking.Assignment do
   @moduledoc """
-  Pure assignment strategies over explicit fairness inputs
-  (`docs/specs/SP.04-assignment.md`): first-available, round-robin,
-  least-recently-booked, weighted, priority, and owner-first with fallback.
+  Deterministic resource assignment.
 
-  GTM/CRM context influences assignment only through the opaque `:scorer`
-  hook — the kernel never inspects routing context itself. Input resources are
-  pre-filtered for freeness by the caller (or `ExBooking.decide/5`); the winner
-  is chosen by a total, deterministic sort ending in resource id.
+  Assignment runs after availability has already established which resources
+  can take the slot. Strategies use explicit fairness inputs from the caller,
+  then fall back to resource id so ties are stable and replayable.
+
+  A scorer may rank resources before the strategy key. The scorer receives the
+  request routing context as opaque data; the kernel never inspects CRM, GTM,
+  territory, or enrichment semantics.
+
+  ## Example
+
+      iex> slot = ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+      ...>
+      ...> resources = [
+      ...>   %ExBooking.Resource{id: "b", timezone: "Etc/UTC"},
+      ...>   %ExBooking.Resource{id: "a", timezone: "Etc/UTC"}
+      ...> ]
+      ...>
+      ...> {:ok, [winner]} = ExBooking.Assignment.assign(resources, slot, [])
+      ...> winner.id
+      "a"
+
   """
 
   alias ExBooking.Interval
   alias ExBooking.Resource
 
-  # A value that sorts after any real fairness figure, so missing fairness data
-  # ranks last within its comparison (SP.04).
   @ranks_last 1_000_000_000
 
   @typedoc "Assignment strategy selector."
@@ -68,8 +81,6 @@ defmodule ExBooking.Assignment do
     end
   end
 
-  # The normative sort key (SP.04): score descending, then the strategy key,
-  # then resource id ascending as the final total-order tie-break.
   defp sort_key(resource, strategy, scorer, routing_context) do
     {negated_score(resource, scorer, routing_context), strategy_key(resource, strategy),
      resource.id}
@@ -114,7 +125,6 @@ defmodule ExBooking.Assignment do
     Map.get(fairness, :assignments_count, @ranks_last) / Map.get(fairness, :weight, 1.0)
   end
 
-  # `nil` last-assigned (never assigned) ranks first — the LRB exception (SP.04).
   defp last_assigned_key(%Resource{fairness: nil}), do: {0, 0}
 
   defp last_assigned_key(%Resource{fairness: fairness}) do

@@ -1,4 +1,6 @@
 defmodule ExBooking.AvailabilityTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
   use ExUnitProperties
 
@@ -11,11 +13,11 @@ defmodule ExBooking.AvailabilityTest do
   alias ExBooking.Request
   alias ExBooking.Resource
 
+  doctest ExBooking.Availability
+
   @now ~U[2026-07-08 12:00:00Z]
   @horizon [now: @now, from: ~U[2026-07-13 00:00:00Z], until: ~U[2026-07-13 23:59:59Z]]
 
-  # A UTC rule so wall time equals UTC — the timezone/DST math lives in
-  # ExBooking.ScheduleTest. 2026-07-13 is a Monday.
   defp rule(overrides \\ []) do
     defaults = %{
       timezone: "Etc/UTC",
@@ -53,19 +55,14 @@ defmodule ExBooking.AvailabilityTest do
     end
 
     test "buffers block adjacency but not the day edge" do
-      # Busy 11:00–12:00 with a 15-minute before-buffer: a new meeting needs
-      # 15 free minutes before it starts.
       rule = rule(buffers: %{before_min: 15, after_min: 0})
       resource = resource([busy(~U[2026-07-13 11:00:00Z], ~U[2026-07-13 12:00:00Z])])
 
       assert {:ok, slots} = Availability.assemble(meeting_type(), [resource], [rule], @horizon)
       starts = starts(slots)
 
-      # Day edge is unaffected — buffers inflate busy, not the working window.
       assert ~U[2026-07-13 09:00:00Z] in starts
-      # A zero after-buffer keeps the slot ending exactly at 11:00 legal.
       assert ~U[2026-07-13 10:30:00Z] in starts
-      # The before-buffer pushes the next legal start after the busy to 12:15.
       refute ~U[2026-07-13 12:00:00Z] in starts
       assert ~U[2026-07-13 12:15:00Z] in starts
     end
@@ -199,7 +196,6 @@ defmodule ExBooking.AvailabilityTest do
                )
 
       starts = starts(slots)
-      # 09:00 has only one free seat (b is busy) → dropped.
       refute ~U[2026-07-13 09:00:00Z] in starts
       assert ~U[2026-07-13 09:30:00Z] in starts
     end
@@ -270,15 +266,13 @@ defmodule ExBooking.AvailabilityTest do
     end
   end
 
-  property "buffer equivalence: inflating the slot and inflating busy agree (SP.03 §9)" do
+  property "buffer equivalence: inflating the slot and inflating busy agree" do
     check all(
             slot <- interval(),
             busy <- interval(),
             before_min <- integer(0..120),
             after_min <- integer(0..120)
           ) do
-      # Validation inflates the slot by (before, after); assembly subtracts busy
-      # inflated by the swapped (after, before). The two must agree.
       inflate_slot = Interval.overlaps?(Interval.inflate(slot, before_min, after_min), busy)
       inflate_busy = Interval.overlaps?(slot, Interval.inflate(busy, after_min, before_min))
 

@@ -1,10 +1,17 @@
 defmodule ExBooking.Resource do
   @moduledoc """
-  A bookable person or pooled seat.
+  A bookable resource.
 
-  Fairness counters are explicit inputs maintained by the consumer — the
-  kernel never derives them from history, which keeps assignment stateless
-  and deterministic (`docs/specs/SP.04-assignment.md`).
+  A resource is usually a host, but can also represent a pooled seat. Busy
+  intervals, capacity, and fairness counters are explicit inputs maintained by
+  the consuming application, which keeps assignment stateless and repeatable.
+
+  ## Example
+
+      iex> resource = %ExBooking.Resource{id: "host_1", timezone: "Etc/UTC", capacity: 2}
+      ...> {resource.id, resource.capacity}
+      {"host_1", 2}
+
   """
 
   alias ExBooking.Interval

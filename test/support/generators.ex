@@ -1,9 +1,5 @@
 defmodule ExBooking.TestGenerators do
-  @moduledoc """
-  StreamData generators for property tests over the interval algebra and
-  slot generation (spec 06 §3). All generated datetimes are minute-aligned
-  within a bounded horizon so failures shrink to readable cases.
-  """
+  @moduledoc false
 
   import StreamData
 

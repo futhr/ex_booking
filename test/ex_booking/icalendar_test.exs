@@ -1,7 +1,11 @@
 defmodule ExBooking.ICalendarTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias ExBooking.ICalendar
+
+  doctest ExBooking.ICalendar
 
   describe "free_busy/1" do
     test "normalizes start-end FREEBUSY periods" do

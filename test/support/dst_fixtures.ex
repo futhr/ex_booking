@@ -1,13 +1,5 @@
 defmodule ExBooking.DSTFixtures do
-  @moduledoc """
-  The DST transition corpus required by spec 06 §4.
-
-  Any timezone-sensitive kernel function must be exercised against these
-  spring-forward (gap) and fall-back (ambiguity) points for at least
-  Europe/Stockholm and America/New_York. The corpus itself is verified by
-  `test/ex_booking/dst_fixtures_test.exs` so the dates can be trusted when
-  `ExBooking.Schedule` changes.
-  """
+  @moduledoc false
 
   @transitions %{
     stockholm: %{

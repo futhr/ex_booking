@@ -1,11 +1,24 @@
 defmodule ExBooking.JSCalendar do
   @moduledoc """
-  Dependency-free JSCalendar busy-time normalization helpers.
+  JSCalendar busy-time normalization.
 
-  The supported surface is intentionally narrow and pure: callers pass already
-  decoded JSCalendar maps, and event objects are normalized into UTC
-  `ExBooking.Interval` structs with `kind: :busy`. JSON decoding, persistence,
-  recurrence expansion, and vendor-specific extensions remain consumer concerns.
+  Callers pass decoded JSCalendar-shaped maps. This module maps supported
+  `Event` and `Group` objects into merged UTC busy intervals and rejects
+  floating times or recurrence data that require a full adapter.
+
+  ## Example
+
+      iex> event = %{
+      ...>   "@type" => "Event",
+      ...>   "start" => "2026-07-13T09:00:00",
+      ...>   "timeZone" => "Etc/UTC",
+      ...>   "duration" => "PT30M"
+      ...> }
+      ...>
+      ...> {:ok, [busy]} = ExBooking.JSCalendar.busy_intervals(event)
+      ...> busy.end_at
+      ~U[2026-07-13 09:30:00Z]
+
   """
 
   alias ExBooking.Interval

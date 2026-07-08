@@ -1,10 +1,23 @@
 defmodule ExBooking.AvailabilityRule do
   @moduledoc """
-  When a resource is *offerable*, before busy subtraction: weekly wall-time
-  windows, date overrides, blackouts, and booking policy inputs.
+  Offerable-time and policy input for one resource.
 
-  Windows and overrides are wall time in `timezone`; expansion to concrete
-  intervals follows the DST rules in `docs/specs/SP.03-algorithms.md` §2.
+  An availability rule describes weekly wall-time windows in a named timezone,
+  optional date overrides, absolute blackout intervals, and policy constraints
+  such as lead time or daily caps. Expansion turns this data into UTC
+  intervals before busy time is subtracted.
+
+  ## Example
+
+      iex> rule = %ExBooking.AvailabilityRule{
+      ...>   timezone: "Europe/Stockholm",
+      ...>   windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[17:00:00]}],
+      ...>   lead_time_min: 60
+      ...> }
+      ...>
+      ...> {rule.timezone, rule.lead_time_min}
+      {"Europe/Stockholm", 60}
+
   """
 
   alias ExBooking.Interval
@@ -24,7 +37,7 @@ defmodule ExBooking.AvailabilityRule do
   @typedoc """
   A weekly wall-time window. ISO weekday, Monday = 1. An `end_time <=
   start_time` expresses a window crossing midnight into the next day
-  (spec 03 §2).
+  in the rule timezone.
   """
   @type window :: %{weekday: 1..7, start_time: Time.t(), end_time: Time.t()}
 

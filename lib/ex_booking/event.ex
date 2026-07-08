@@ -1,13 +1,18 @@
 defmodule ExBooking.Event do
   @moduledoc """
-  Canonical booking events — the cross-system contract consumed by
-  orchestration, analytics, and billing layers.
+  Canonical booking events emitted by decisions.
 
-  The kernel emits events inside `ExBooking.Decision.t()`; the consumer
-  stamps `occurred_at`, assigns ids, and publishes. `routing_context` is the
-  untouched `ExBooking.Request.t()` context, which is how UTM/CRM
-  attribution reaches downstream systems without kernel involvement.
-  See `docs/specs/SP.05-lifecycle-and-events.md`.
+  Events describe what happened in booking-domain language: confirmed,
+  reserved, rescheduled, canceled, expired, or marked no-show. The consumer
+  stamps ids and occurrence times, stores the events, and publishes them to
+  analytics, billing, calendar, or notification systems as needed.
+
+  ## Example
+
+      iex> event = %ExBooking.Event{type: :booking_confirmed, resource_ids: ["host_1"]}
+      ...> event.type
+      :booking_confirmed
+
   """
 
   alias ExBooking.Interval

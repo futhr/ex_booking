@@ -1,8 +1,5 @@
 defmodule ExBooking.TestBuilders do
-  @moduledoc """
-  Plain-function builders for kernel structs with sensible defaults.
-  No factory library — override with a map or keyword list.
-  """
+  @moduledoc false
 
   alias ExBooking.AvailabilityRule
   alias ExBooking.Interval

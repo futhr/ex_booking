@@ -1,4 +1,6 @@
 defmodule ExBooking.AssignmentTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias ExBooking.Assignment
@@ -77,7 +79,6 @@ defmodule ExBooking.AssignmentTest do
         resource("b", fairness(assignments_count: 6, weight: 3.0))
       ]
 
-      # a: 4/1 = 4.0; b: 6/3 = 2.0 → b wins.
       assert {:ok, [%Resource{id: "b"}]} = winner(resources, strategy: :weighted)
     end
   end
@@ -158,7 +159,6 @@ defmodule ExBooking.AssignmentTest do
         resource("b", fairness(assignments_count: 9))
       ]
 
-      # Round-robin alone picks "a"; the scorer favours "b".
       scorer = fn resource, ctx -> if resource.id == ctx.favourite, do: 100, else: 0 end
 
       assert {:ok, [%Resource{id: "b"}]} =

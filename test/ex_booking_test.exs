@@ -1,12 +1,22 @@
 defmodule ExBookingTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   import ExBooking.TestBuilders
 
   alias ExBooking.Interval
 
+  doctest ExBooking
+  doctest ExBooking.AvailabilityRule
+  doctest ExBooking.Decision
+  doctest ExBooking.Event
+  doctest ExBooking.Hold
+  doctest ExBooking.MeetingType
+  doctest ExBooking.Request
+  doctest ExBooking.Resource
+
   @now ~U[2026-07-08 12:00:00Z]
-  # 2026-07-13 is a Monday; the default rule offers Mon–Fri.
   @horizon [now: @now, from: ~U[2026-07-13 00:00:00Z], until: ~U[2026-07-17 23:59:59Z]]
 
   describe "option validation" do
@@ -479,7 +489,7 @@ defmodule ExBookingTest do
       assert_raise ArgumentError, fn -> struct!(ExBooking.Request, meeting_type_id: "x") end
     end
 
-    test "meeting type defaults follow SP.01" do
+    test "meeting type defaults are stable" do
       meeting_type = build(:meeting_type, slot_interval_min: nil)
 
       assert meeting_type.capacity_required == 1
@@ -487,7 +497,7 @@ defmodule ExBookingTest do
       assert meeting_type.slot_interval_min == nil
     end
 
-    test "availability rule defaults follow SP.01" do
+    test "availability rule defaults are stable" do
       rule = build(:rule)
 
       assert rule.lead_time_min == 0
@@ -496,8 +506,6 @@ defmodule ExBookingTest do
     end
   end
 
-  # A slot at a wall time on Monday 2026-07-13 in the rule timezone
-  # (Europe/Stockholm, CEST = UTC+2).
   defp monday_slot(time) do
     {:ok, start_at} = DateTime.new(~D[2026-07-13], time, "Europe/Stockholm")
     start_utc = DateTime.shift_zone!(start_at, "Etc/UTC")

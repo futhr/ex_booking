@@ -1,4 +1,6 @@
 defmodule ExBooking.SlottingTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
   use ExUnitProperties
 
@@ -10,7 +12,7 @@ defmodule ExBooking.SlottingTest do
   doctest ExBooking.Slotting
 
   describe "generate_slots/4" do
-    test "slot interval is independent of duration (spec 03 §4 reference case)" do
+    test "slot interval is independent of duration" do
       free = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z])
 
       starts =

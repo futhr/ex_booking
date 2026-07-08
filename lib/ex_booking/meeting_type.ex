@@ -1,11 +1,22 @@
 defmodule ExBooking.MeetingType do
   @moduledoc """
-  A bookable meeting template: duration, slot grid, buffers, capacity, and
-  cancellation/reschedule policies.
+  A bookable meeting template.
 
-  `slot_interval_min` is deliberately independent of `duration_min` — a
-  30-minute meeting can sit on a 15-minute grid. `nil` falls back to
-  `duration_min`.
+  A meeting type defines duration, slot grid, participant mode, capacity, and
+  lifecycle policies. `slot_interval_min` is deliberately independent from
+  `duration_min`, so a 30-minute meeting can be offered every 15 minutes.
+
+  ## Example
+
+      iex> meeting_type = %ExBooking.MeetingType{
+      ...>   id: "intro",
+      ...>   duration_min: 30,
+      ...>   slot_interval_min: 15
+      ...> }
+      ...>
+      ...> {meeting_type.duration_min, meeting_type.slot_interval_min}
+      {30, 15}
+
   """
 
   alias ExBooking.AvailabilityRule
@@ -26,7 +37,7 @@ defmodule ExBooking.MeetingType do
   @typedoc "Cancellation or reschedule policy."
   @type policy :: %{min_notice_min: non_neg_integer(), allowed: boolean()}
 
-  @typedoc "Which resources must be free for a slot (see spec 03 §5)."
+  @typedoc "Which resources must be free for a slot."
   @type participants :: :one | :collective | :pool
 
   @typedoc "A meeting type."

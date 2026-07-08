@@ -1,73 +1,43 @@
 # ExBooking
 
-**A pure booking kernel for scheduling applications.** ExBooking answers deterministic
-questions — *what slots are valid? does this request conflict? which host should
-take it? what side effects must happen next?* — as pure functions over immutable
-inputs. No database, no supervision tree, no HTTP, no side effects.
+**Deterministic booking logic for Elixir apps.**
 
-> Version 0.1.0. The kernel implements availability assembly, DST-safe slot
-> generation, conflict detection, alternatives, assignment strategies, lifecycle
-> transitions, and narrow dependency-free RRULE, ICS free/busy, and JSCalendar
-> helpers. The data model, public API, and algorithms are specified in
-> [`docs/specs/`](docs/specs/SP.00-overview.md).
+[![Hex.pm](https://img.shields.io/hexpm/v/ex_booking.svg)](https://hex.pm/packages/ex_booking)
+[![Docs](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/ex_booking)
+[![CI](https://github.com/refpath/ex_booking/actions/workflows/ci.yml/badge.svg)](https://github.com/refpath/ex_booking/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/refpath/ex_booking.svg)](LICENSE)
 
-## Why
+[Installation](#installation) ·
+[Quick Start](#quick-start) ·
+[What It Does](#what-it-does) ·
+[Boundary](#boundary) ·
+[Benchmarks](#benchmarks) ·
+[Development](#development)
 
-Commercial scheduling platforms all converge on the same stack: a compact
-scheduling core wrapped in routing, workflow, and CRM layers. The Elixir
-ecosystem has excellent temporal primitives (`tz`, recurrence, ICS) but no
-reusable booking-domain kernel. ExBooking is that missing layer — the core
-only, deliberately small. The full rationale lives in
-[`docs/research/`](docs/research/R.01-booking-space-and-kernel-rationale.md).
+---
 
-## Design contract
+ExBooking is the small booking brain you put inside a product that already owns
+users, calendars, CRM records, payments, and workflows. Give it normalized data;
+it answers the hard deterministic questions: which slots are valid, whether a
+requested time still works, who should take the booking, and which events or
+intents the host app should execute next.
 
-- **Deterministic** — same inputs, same outputs. The caller supplies `now`;
-  the kernel never reads the clock, generates randomness, or touches I/O.
-- **Facts and intents** — the kernel returns decisions and side-effect
-  *intents* (create calendar event, send notification, emit billing event). The
-  consuming application executes them.
-- **Slot interval ≠ duration** — a 30-minute meeting can sit on a 15-minute
-  grid. Slot stepping is a first-class, independent setting.
-- **DST-safe** — wall-time expansion resolves ambiguous times to the first
-  occurrence and snaps through spring-forward gaps.
-- **Routing is a hook** — assignment strategies are pure functions over
-  explicit inputs; GTM/CRM context enters through an opaque scoring hook,
-  never through kernel knowledge of CRM semantics.
+It has no database, no supervision tree, no provider clients, no jobs, and no
+clock reads. If a decision depends on the current time, the caller passes `now`.
+That makes availability, assignment, holds, cancellation, rescheduling, and
+calendar-data normalization easy to test and safe to replay.
 
-## What it is not
+## What It Does
 
-Persistence, background jobs, OAuth, calendar sync, CRM sync, payments,
-notifications, UI, and multi-tenancy are all consumer concerns. See the
-[kernel scope](docs/specs/SP.00-overview.md) for the explicit boundary.
-
-## Quick look
-
-```elixir
-meeting_type = %ExBooking.MeetingType{
-  id: "demo_30",
-  duration_min: 30,
-  slot_interval_min: 15
-}
-
-now = ~U[2026-07-08 12:00:00Z]
-
-{:ok, slots} =
-  ExBooking.available_slots(meeting_type, resources, rules,
-    from: ~U[2026-07-13 00:00:00Z],
-    until: ~U[2026-07-17 23:59:59Z],
-    now: now
-  )
-
-{:ok, %ExBooking.Decision{} = decision} =
-  ExBooking.decide(request, meeting_type, resources, rules, now: now)
-
-decision.events
-#=> [%ExBooking.Event{type: :booking_confirmed, ...}]
-
-decision.intents
-#=> [{:calendar_event, :create, %{...}}, {:emit, %ExBooking.Event{...}}]
-```
+| Capability | Purpose |
+|------------|---------|
+| **Availability assembly** | Expands wall-time rules, applies overrides and blackouts, subtracts buffered busy time, and returns sorted slots. |
+| **DST-safe scheduling** | Resolves ambiguous fall-back times to the first occurrence and snaps spring-forward gaps forward. |
+| **Participant modes** | Supports one-host, collective, and capacity-aware pool booking. |
+| **Request validation** | Reports all conflicts and policy failures instead of stopping at the first one. |
+| **Assignment** | Picks resources with deterministic first-available, round-robin, least-recently-booked, weighted, priority, owner-first, and scorer-driven strategies. |
+| **Lifecycle decisions** | Emits pure events and ordered intents for confirmation, reservation, release, reschedule, cancellation, expiry, and no-show. |
+| **Calendar interop** | Normalizes a narrow dependency-free RRULE, ICS FREEBUSY, and decoded JSCalendar busy-time surface. |
 
 ## Installation
 
@@ -79,28 +49,110 @@ def deps do
 end
 ```
 
-ExBooking uses [`tz`](https://hex.pm/packages/tz) as its timezone database.
-Configure it once in your application:
+ExBooking uses `tz` for timezone conversion. Configure it once in the host
+application:
 
 ```elixir
 config :elixir, :time_zone_database, Tz.TimeZoneDatabase
 ```
 
-## Documentation
+## Quick Start
 
-- [Docs index and flow diagrams](docs/README.md)
-- [Research index](docs/research/README.md)
-- [Research: the booking space and why a kernel](docs/research/R.01-booking-space-and-kernel-rationale.md)
-- [Research: post-build kernel audit](docs/research/R.03-post-build-kernel-audit.md)
-- [Spec 00 — Overview, scope, determinism contract](docs/specs/SP.00-overview.md)
-- [Spec 01 — Data model](docs/specs/SP.01-data-model.md)
-- [Spec 02 — Public API](docs/specs/SP.02-public-api.md)
-- [Spec 03 — Algorithms](docs/specs/SP.03-algorithms.md)
-- [Spec 04 — Assignment strategies](docs/specs/SP.04-assignment.md)
-- [Spec 05 — Lifecycle and events](docs/specs/SP.05-lifecycle-and-events.md)
-- [Spec 06 — Standards interop helpers](docs/specs/SP.06-standards-interop.md)
-- [Spec 07 — Validation](docs/specs/SP.07-validation.md)
+```elixir
+meeting_type = %ExBooking.MeetingType{
+  id: "intro_call",
+  duration_min: 30,
+  slot_interval_min: 15
+}
+
+resource = %ExBooking.Resource{id: "host_1", timezone: "Etc/UTC"}
+
+rule = %ExBooking.AvailabilityRule{
+  timezone: "Etc/UTC",
+  windows: [
+    %{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[17:00:00]},
+    %{weekday: 2, start_time: ~T[09:00:00], end_time: ~T[17:00:00]}
+  ],
+  lead_time_min: 60
+}
+
+{:ok, slots} =
+  ExBooking.available_slots(meeting_type, [resource], [rule],
+    now: ~U[2026-07-08 12:00:00Z],
+    from: ~U[2026-07-13 00:00:00Z],
+    until: ~U[2026-07-14 23:59:59Z]
+  )
+
+request = %ExBooking.Request{
+  meeting_type_id: "intro_call",
+  invitee_timezone: "America/New_York",
+  slot: hd(slots),
+  routing_context: %{source: "website"}
+}
+
+{:ok, decision} =
+  ExBooking.decide(request, meeting_type, [resource], [rule],
+    now: ~U[2026-07-08 12:00:00Z]
+  )
+
+:ok = decision.status
+[%ExBooking.Event{type: :booking_confirmed}] = decision.events
+[{:calendar_event, :create, _payload}, {:emit, _event}] = decision.intents
+```
+
+## Boundary
+
+ExBooking deliberately stops at decisions. Your application remains responsible
+for persistence, transactions, auth, tenancy, UI, calendar sync, notifications,
+CRM enrichment, routing forms, analytics, payments, retries, webhooks, and AI.
+
+That split is the point: keep reusable booking math in one deterministic library,
+and keep product-specific orchestration in the product.
+
+## Calendar Data
+
+The interop modules are intentionally small:
+
+```elixir
+{:ok, intervals} =
+  ExBooking.expand_rrule("FREQ=WEEKLY;COUNT=4;BYDAY=MO", dtstart, 30,
+    from: from,
+    until: until
+  )
+
+{:ok, busy} = ExBooking.import_ics_free_busy(ics_text)
+{:ok, busy} = ExBooking.import_jscalendar_busy(decoded_jscalendar_map)
+```
+
+Provider auth, transport, JSON decoding, full recurrence sync, and calendar
+writeback belong outside this package.
+
+## Benchmarks
+
+The benchmark suite covers interval algebra, schedule expansion, availability,
+validation, assignment, lifecycle decisions, and calendar-data normalizers.
+
+```bash
+mix bench --smoke   # quick run that refreshes benchmark markdown
+mix bench           # full local measurement run
+```
+
+The generated benchmark report is included in HexDocs as the performance page.
+
+## Development
+
+```bash
+mix setup
+mix test
+mix check --no-retry
+mix docs
+mix bench --smoke
+```
+
+Quality gates require formatted code, no compiler warnings, strict Credo,
+Dialyzer, dependency audit, complete public documentation, generated docs, and
+at least 95% test coverage.
 
 ## License
 
-[MIT](LICENSE)
+ExBooking is released under the MIT License. See [LICENSE](LICENSE).

@@ -1,12 +1,25 @@
 defmodule ExBooking.RRule do
   @moduledoc """
-  Minimal RFC 5545 RRULE expansion for dependency-free kernel interop.
+  Small RFC 5545 RRULE expander.
 
-  This module deliberately implements a narrow subset: `FREQ=DAILY` and
-  `FREQ=WEEKLY`, plus `INTERVAL`, `COUNT`, `UNTIL`, and weekly `BYDAY`. It
-  expands a caller-supplied UTC `DTSTART` and duration into `ExBooking.Interval`
-  values clipped by an explicit search horizon. Unsupported rule parts return
-  `{:error, {:unsupported, :rrule, part}}` rather than being ignored.
+  `ExBooking.RRule` supports a narrow dependency-free subset for common daily
+  and weekly recurrences: `FREQ`, `INTERVAL`, `COUNT`, UTC `UNTIL`, and weekly
+  `BYDAY`. Unsupported rule parts fail explicitly instead of being ignored.
+
+  ## Example
+
+      iex> {:ok, [first, second]} =
+      ...>   ExBooking.RRule.expand(
+      ...>     "FREQ=DAILY;COUNT=2",
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     30,
+      ...>     ~U[2026-07-13 00:00:00Z],
+      ...>     ~U[2026-07-15 00:00:00Z]
+      ...>   )
+      ...>
+      ...> {first.start_at, second.start_at}
+      {~U[2026-07-13 09:00:00Z], ~U[2026-07-14 09:00:00Z]}
+
   """
 
   alias ExBooking.Interval

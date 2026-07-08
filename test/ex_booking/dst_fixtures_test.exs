@@ -1,12 +1,9 @@
 defmodule ExBooking.DSTFixturesTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias ExBooking.DSTFixtures
-
-  # Verifies the DST corpus against the tz database so the fixture dates can
-  # be trusted by every timezone-sensitive test that consumes them
-  # (spec 06 §4). If the tz database shifts these transitions, this fails
-  # loudly instead of silently weakening the corpus.
 
   for zone <- ExBooking.DSTFixtures.zones() do
     describe "#{zone} corpus" do

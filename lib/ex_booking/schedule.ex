@@ -1,12 +1,25 @@
 defmodule ExBooking.Schedule do
   @moduledoc """
-  Wall-time expansion of availability windows into concrete UTC intervals,
-  applying the DST rules from `docs/specs/SP.03-algorithms.md` §2: ambiguous
-  wall times resolve to the first occurrence, gapped wall times snap forward.
+  Wall-time schedule expansion.
 
-  Windows are weekly wall-time ranges in the rule's timezone; overrides replace
-  a day's windows (an empty override removes the day); blackouts subtract
-  absolute intervals. The result is merged, UTC-normalized offerable time.
+  `ExBooking.Schedule` turns weekly windows, date overrides, and blackouts
+  into concrete UTC intervals. It resolves ambiguous fall-back wall times to
+  their first occurrence and snaps spring-forward gaps to the first valid
+  instant after the gap.
+
+  ## Example
+
+      iex> rule = %ExBooking.AvailabilityRule{
+      ...>   timezone: "Etc/UTC",
+      ...>   windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[10:00:00]}]
+      ...> }
+      ...>
+      ...> {:ok, [interval]} =
+      ...>   ExBooking.Schedule.expand(rule, ~U[2026-07-13 00:00:00Z], ~U[2026-07-13 23:59:59Z])
+      ...>
+      ...> {interval.start_at, interval.end_at}
+      {~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z]}
+
   """
 
   alias ExBooking.AvailabilityRule
@@ -48,8 +61,6 @@ defmodule ExBooking.Schedule do
     {:ok, intervals}
   end
 
-  # Rule-timezone dates whose windows could overlap [from, until]. The extra day
-  # at the front catches cross-midnight windows that start the previous evening.
   defp candidate_dates(rule, from, until) do
     tz = rule.timezone
     first = Date.add(local_date(from, tz), -1)
@@ -64,8 +75,6 @@ defmodule ExBooking.Schedule do
     |> Enum.flat_map(&expand_window(&1, date, rule.timezone))
   end
 
-  # An override for the date replaces the weekly windows entirely; an override
-  # with empty windows removes the day.
   defp windows_for(date, rule) do
     case Enum.find(rule.overrides, &(&1.date == date)) do
       nil -> Enum.filter(rule.windows, &(&1.weekday == Date.day_of_week(date)))
@@ -80,7 +89,6 @@ defmodule ExBooking.Schedule do
 
     case Interval.new(to_utc(start_at), to_utc(end_at)) do
       {:ok, interval} -> [interval]
-      # A spring-forward gap can snap `start` to or past `end`, emptying the window.
       {:error, _reason} -> []
     end
   end
@@ -89,7 +97,6 @@ defmodule ExBooking.Schedule do
     Time.compare(window.end_time, window.start_time) in [:lt, :eq]
   end
 
-  # Resolve a wall time to a concrete instant per the DST rules (SP.03 §2).
   defp resolve(date, time, tz) do
     case DateTime.new(date, time, tz) do
       {:ok, datetime} -> datetime

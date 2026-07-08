@@ -1,19 +1,26 @@
 defmodule ExBooking.Policy do
   @moduledoc """
-  Pure booking-policy predicates over a candidate slot: lead time, booking
-  window, and daily cap (`docs/specs/SP.03-algorithms.md` §3 step 8). Every
-  violation is reported as a tagged reason from the stable error vocabulary
-  (`docs/specs/SP.02-public-api.md`).
+  Pure booking-policy predicates.
 
-  Cancellation and reschedule policy evaluation is exposed through the facade
-  lifecycle functions.
+  Policy checks evaluate a candidate slot against caller-supplied rules:
+  lead time, booking window, and daily cap. Notice policies for cancellation
+  and reschedule transitions are evaluated by the facade lifecycle functions.
+
+  ## Example
+
+      iex> rule = %ExBooking.AvailabilityRule{timezone: "Etc/UTC", windows: [], lead_time_min: 60}
+      ...> resource = %ExBooking.Resource{id: "host_1", timezone: "Etc/UTC"}
+      ...> slot = ExBooking.Interval.new!(~U[2026-07-13 09:30:00Z], ~U[2026-07-13 10:00:00Z])
+      ...> ExBooking.Policy.violations(slot, rule, resource, ~U[2026-07-13 09:00:00Z])
+      [{:lead_time, 30}]
+
   """
 
   alias ExBooking.AvailabilityRule
   alias ExBooking.Interval
   alias ExBooking.Resource
 
-  @typedoc "A policy violation reason (SP.02 error vocabulary)."
+  @typedoc "A policy violation reason."
   @type reason ::
           {:lead_time, pos_integer()}
           | {:outside_window, Date.t()}

@@ -1,12 +1,19 @@
 defmodule ExBooking.Interval do
   @moduledoc """
-  A half-open time interval `[start_at, end_at)` and the pure interval algebra
-  the rest of the kernel is built on.
+  Half-open UTC intervals and interval algebra.
 
-  Half-open semantics mean back-to-back intervals (`a.end_at == b.start_at`)
-  do not overlap, so adjacent bookings are always legal. All operations are
-  pure and deterministic; see `docs/specs/SP.03-algorithms.md` for the algebra
-  laws these functions must satisfy.
+  Intervals use `[start_at, end_at)` semantics. That makes back-to-back
+  bookings legal because an interval ending at 10:00 does not overlap one
+  starting at 10:00. The algebra is the foundation for blackout clipping,
+  busy-time subtraction, buffers, slot containment, and free-time merging.
+
+  ## Example
+
+      iex> first = ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+      ...> second = ExBooking.Interval.new!(~U[2026-07-13 09:30:00Z], ~U[2026-07-13 10:00:00Z])
+      ...> ExBooking.Interval.overlaps?(first, second)
+      false
+
   """
 
   @enforce_keys [:start_at, :end_at]
@@ -215,7 +222,7 @@ defmodule ExBooking.Interval do
 
   @doc """
   Widens an interval by minutes on each side. Used to apply buffers to busy
-  time (see spec 03 §3 and §9).
+  time and requested booking time.
 
   ## Examples
 

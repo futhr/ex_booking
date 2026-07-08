@@ -1,7 +1,11 @@
 defmodule ExBooking.JSCalendarTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias ExBooking.JSCalendar
+
+  doctest ExBooking.JSCalendar
 
   describe "busy_intervals/1" do
     test "normalizes a JSCalendar event into a UTC busy interval" do

@@ -1,11 +1,22 @@
 defmodule ExBooking.Request do
   @moduledoc """
-  An invitee's booking intent, before decision.
+  An invitee's booking request.
 
-  `routing_context` is opaque: the kernel never interprets it. It is surfaced
-  to the assignment scoring hook and round-tripped into events untouched —
-  this is how CRM/GTM attribution flows through without the kernel learning
-  CRM semantics.
+  A request carries the desired meeting type, invitee timezone, requested slot,
+  preferred resources, metadata, and opaque routing context. Routing context is
+  passed through to scoring and events without the kernel interpreting it.
+
+  ## Example
+
+      iex> request = %ExBooking.Request{
+      ...>   meeting_type_id: "intro",
+      ...>   invitee_timezone: "America/New_York",
+      ...>   routing_context: %{source: "website"}
+      ...> }
+      ...>
+      ...> request.routing_context.source
+      "website"
+
   """
 
   alias ExBooking.Interval

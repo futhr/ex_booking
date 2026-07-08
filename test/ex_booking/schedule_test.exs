@@ -1,4 +1,6 @@
 defmodule ExBooking.ScheduleTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias ExBooking.AvailabilityRule
@@ -20,7 +22,6 @@ defmodule ExBooking.ScheduleTest do
 
   describe "weekly windows" do
     test "expands a weekday window into a UTC interval" do
-      # 2026-07-13 is a Monday (ISO weekday 1).
       rule =
         rule(
           timezone: "Europe/Stockholm",
@@ -30,7 +31,6 @@ defmodule ExBooking.ScheduleTest do
       assert {:ok, [interval]} =
                Schedule.expand(rule, ~U[2026-07-13 00:00:00Z], ~U[2026-07-13 23:59:59Z])
 
-      # Stockholm is CEST (UTC+2) in July.
       assert interval.start_at == ~U[2026-07-13 07:00:00Z]
       assert interval.end_at == ~U[2026-07-13 10:00:00Z]
     end
@@ -38,7 +38,6 @@ defmodule ExBooking.ScheduleTest do
     test "only windows for the date's weekday are expanded" do
       rule = rule(windows: [%{weekday: 2, start_time: ~T[09:00:00], end_time: ~T[17:00:00]}])
 
-      # 2026-07-13 is Monday, not Tuesday.
       assert {:ok, []} =
                Schedule.expand(rule, ~U[2026-07-13 00:00:00Z], ~U[2026-07-13 23:59:59Z])
     end
@@ -122,7 +121,6 @@ defmodule ExBooking.ScheduleTest do
         %{timezone: tz, spring_forward: sf} = DSTFixtures.transitions(unquote(zone))
         weekday = Date.day_of_week(sf.date)
 
-        # Window starts inside the non-existent gap; end is after the transition.
         rule =
           rule(
             timezone: tz,
@@ -133,7 +131,6 @@ defmodule ExBooking.ScheduleTest do
         until = utc(Date.add(sf.date, 1), ~T[00:00:00], tz)
 
         assert {:ok, [interval]} = Schedule.expand(rule, from, until)
-        # Start snaps to the end of the gap (first valid instant after it).
         assert interval.start_at == utc(sf.date, sf.gap_ends, tz)
       end
     end
@@ -144,8 +141,6 @@ defmodule ExBooking.ScheduleTest do
       %{timezone: tz, spring_forward: sf} = DSTFixtures.transitions(:stockholm)
       weekday = Date.day_of_week(sf.date)
 
-      # 02:15–02:45 on the transition date is a wall-time range that never
-      # exists; both ends snap forward to the same instant, so nothing is offered.
       rule =
         rule(
           timezone: tz,

@@ -1,4 +1,6 @@
 defmodule ExBooking.PolicyTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias ExBooking.AvailabilityRule
@@ -33,7 +35,6 @@ defmodule ExBooking.PolicyTest do
     end
 
     test "violation reports whole minutes short (rounded up)" do
-      # earliest allowed is 10:00; a 09:30 slot is 30 minutes short.
       assert [{:lead_time, 30}] =
                Policy.violations(
                  slot(~U[2026-07-13 09:30:00Z]),
@@ -69,7 +70,6 @@ defmodule ExBooking.PolicyTest do
     end
 
     test "a slot past the last bookable date is outside the window" do
-      # now is 2026-07-13; window of 2 days makes 2026-07-15 the last date.
       slot = slot(~U[2026-07-16 10:00:00Z])
 
       assert [{:outside_window, ~D[2026-07-16]}] =
@@ -178,9 +178,6 @@ defmodule ExBooking.PolicyTest do
   end
 
   test "violations accumulate across policies" do
-    # now is 08:00 on 2026-07-13; a 26-hour lead time pushes the earliest
-    # allowed start to 10:00 on 2026-07-14, while a 0-day window makes
-    # 2026-07-13 the last bookable date — so a 09:00 slot on 2026-07-14 fails both.
     rule = rule(lead_time_min: 26 * 60, booking_window_days: 0)
     reasons = Policy.violations(slot(~U[2026-07-14 09:00:00Z]), rule, resource(), @now)
 

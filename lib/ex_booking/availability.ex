@@ -1,21 +1,35 @@
 defmodule ExBooking.Availability do
   @moduledoc """
-  The availability assembly pipeline (`docs/specs/SP.03-algorithms.md` §3):
-  expand → override → blackout → normalize → subtract buffer-inflated busy →
-  slot → filter → combine per participant mode → sort.
+  Availability assembly and eligibility checks.
 
-  Resources and rules are paired positionally: `resource[i]` is governed by
-  `rule[i]`. Buffers inflate busy time, not slots; the slot grid step is
-  independent of the meeting duration.
+  This module expands each resource's offerable wall time, subtracts busy time
+  with buffers, generates candidate slots, applies policy predicates, and
+  combines results according to the meeting participant mode.
 
-  Participant modes (`docs/specs/SP.03-algorithms.md` §5):
+  Resources and rules are paired by position. `:one` offers slots for any free
+  resource, `:collective` requires every resource to be free, and `:pool`
+  offers slots while enough seats remain across capacity-aware resources.
 
-    * `:one` — a slot is offered if *any* eligible resource is free.
-    * `:collective` — a slot is offered only where *all* resources are free
-      (free-time intersection before slotting).
-    * `:pool` — a slot is offered while free seats ≥ `capacity_required`; a
-      resource with `capacity > 1` contributes `capacity − overlapping bookings`
-      seats.
+  ## Example
+
+      iex> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
+      ...> resource = %ExBooking.Resource{id: "host_1", timezone: "Etc/UTC"}
+      ...>
+      ...> rule = %ExBooking.AvailabilityRule{
+      ...>   timezone: "Etc/UTC",
+      ...>   windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[10:00:00]}]
+      ...> }
+      ...>
+      ...> {:ok, [slot, _]} =
+      ...>   ExBooking.Availability.assemble(meeting_type, [resource], [rule],
+      ...>     now: ~U[2026-07-08 12:00:00Z],
+      ...>     from: ~U[2026-07-13 00:00:00Z],
+      ...>     until: ~U[2026-07-13 23:59:59Z]
+      ...>   )
+      ...>
+      ...> slot.start_at
+      ~U[2026-07-13 09:00:00Z]
+
   """
 
   alias ExBooking.AvailabilityRule
@@ -47,8 +61,8 @@ defmodule ExBooking.Availability do
 
   @doc """
   Checks a specific requested slot against conflict and policy for a meeting
-  type, without committing to an assignment (`docs/specs/SP.03-algorithms.md`
-  §9). Returns `:ok`, or `{:error, reasons}` with every failing reason.
+  type, without committing to an assignment. Returns `:ok`, or
+  `{:error, reasons}` with every failing reason.
   """
   @spec validate(Request.t(), MeetingType.t(), [Resource.t()], [AvailabilityRule.t()], keyword()) ::
           :ok | {:error, [term()]}
@@ -94,8 +108,6 @@ defmodule ExBooking.Availability do
         {:error, [reason]}
     end
   end
-
-  # --- assembly per participant mode ---
 
   defp combine(
          %MeetingType{participants: :one} = meeting_type,
@@ -176,8 +188,6 @@ defmodule ExBooking.Availability do
     Enum.all?(pairs, fn {resource, rule} -> Policy.violations(slot, rule, resource, now) == [] end)
   end
 
-  # Seats offered for `slot` across the pool: a resource contributes only when
-  # the slot is inside its offerable time and passes policy.
   defp offered_seats(offerables, meeting_type, slot, now) do
     Enum.reduce(offerables, 0, fn {resource, rule, offerable}, total ->
       if offerable?(offerable, slot) and Policy.violations(slot, rule, resource, now) == [] do
@@ -190,9 +200,6 @@ defmodule ExBooking.Availability do
 
   defp offerable?(offerable, slot), do: Enum.any?(offerable, &Interval.contains?(&1, slot))
 
-  # Buffers are swapped when inflating busy so that subtracting inflated busy at
-  # assembly time is equivalent to inflating the slot by `(before, after)` at
-  # validation time (SP.03 §9).
   defp inflated_busy(resource, meeting_type, rule) do
     %{before_min: before_min, after_min: after_min} = effective_buffers(meeting_type, rule)
 
@@ -201,7 +208,6 @@ defmodule ExBooking.Availability do
     |> Enum.map(&Interval.inflate(&1, after_min, before_min))
   end
 
-  # Intersection of many free-interval lists: the times free for every resource.
   defp intersect_all([]), do: []
   defp intersect_all([first | rest]), do: Enum.reduce(rest, first, &intersect/2)
 
@@ -209,8 +215,6 @@ defmodule ExBooking.Availability do
     for(a <- as, b <- bs, clipped = Interval.clip(a, b), clipped != nil, do: clipped)
     |> Interval.merge()
   end
-
-  # --- eligibility per participant mode ---
 
   defp screen([], _meeting_type, slot, _now), do: {:error, [{:no_eligible_resource, slot}]}
 
@@ -289,8 +293,6 @@ defmodule ExBooking.Availability do
     |> Enum.map(&{:conflict, resource.id, &1})
   end
 
-  # Remaining concurrent seats for a resource at `slot`: capacity minus the
-  # bookings overlapping the buffered slot (SP.03 §5, `:pool`).
   defp available_seats(resource, meeting_type, rule, slot) do
     %{before_min: before_min, after_min: after_min} = effective_buffers(meeting_type, rule)
     inflated = Interval.inflate(slot, before_min, after_min)
@@ -298,8 +300,6 @@ defmodule ExBooking.Availability do
 
     max(resource.capacity - overlapping, 0)
   end
-
-  # --- shared ---
 
   defp step(%MeetingType{slot_interval_min: nil, duration_min: duration}), do: duration
   defp step(%MeetingType{slot_interval_min: step}), do: step

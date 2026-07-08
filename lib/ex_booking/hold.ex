@@ -1,12 +1,26 @@
 defmodule ExBooking.Hold do
   @moduledoc """
-  A temporary reservation as pure data.
+  Temporary reservation data.
 
-  Consumers persist holds, include them as `kind: :hold` busy time in
-  subsequent availability searches, and expire them by comparing
-  `expires_at` with their own clock. The kernel never expires anything —
-  it does not read the clock. Hold ids are consumer-supplied so consumers
-  can use them as idempotency keys.
+  Holds are caller-owned records. The kernel can emit a reserve intent, treat
+  holds as busy intervals on later searches, and compute a release transition;
+  it never stores, expires, or refreshes them itself.
+
+  ## Example
+
+      iex> slot = ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+      ...>
+      ...> hold = %ExBooking.Hold{
+      ...>   id: "hold_1",
+      ...>   slot: slot,
+      ...>   resource_ids: ["host_1"],
+      ...>   meeting_type_id: "intro",
+      ...>   expires_at: ~U[2026-07-13 08:45:00Z]
+      ...> }
+      ...>
+      ...> hold.id
+      "hold_1"
+
   """
 
   alias ExBooking.Interval

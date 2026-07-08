@@ -1,20 +1,41 @@
 defmodule ExBooking do
   @moduledoc """
-  A pure booking kernel for sales scheduling.
+  Pure booking decisions for scheduling products.
 
-  ExBooking answers deterministic questions — what slots are valid, does this
-  request conflict, which resource takes it, what side effects must happen
-  next — as pure functions over immutable inputs. No database, no processes,
-  no I/O, no clock: `:now` is always a caller-supplied option.
+  `ExBooking` is the facade for availability search, request validation,
+  assignment, lifecycle transitions, and small calendar-data normalizers. The
+  caller owns state and effects; this library only returns facts, events, and
+  intents from explicit inputs.
 
-  This module is the supported entry point; `ExBooking.Interval` and
-  `ExBooking.Slotting` are public for lower-level needs. The normative
-  specification lives in `docs/specs/` — start with spec 00 (overview) and
-  spec 02 (public API).
+  The important rule is that time is always supplied. Functions that depend on
+  "now" require it in options, which makes decisions repeatable in tests,
+  background jobs, and replayed workflows.
 
-  The implemented surface covers availability assembly, slot validation,
-  alternatives, assignment strategies, lifecycle transitions, and narrow
-  dependency-free RRULE/ICS/JSCalendar helpers per `docs/specs/`.
+  ## Example
+
+      iex> meeting_type = %ExBooking.MeetingType{
+      ...>   id: "intro",
+      ...>   duration_min: 30,
+      ...>   slot_interval_min: 15
+      ...> }
+      ...>
+      ...> resource = %ExBooking.Resource{id: "host_1", timezone: "Etc/UTC"}
+      ...>
+      ...> rule = %ExBooking.AvailabilityRule{
+      ...>   timezone: "Etc/UTC",
+      ...>   windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[10:00:00]}]
+      ...> }
+      ...>
+      ...> {:ok, slots} =
+      ...>   ExBooking.available_slots(meeting_type, [resource], [rule],
+      ...>     now: ~U[2026-07-08 12:00:00Z],
+      ...>     from: ~U[2026-07-13 00:00:00Z],
+      ...>     until: ~U[2026-07-13 23:59:59Z]
+      ...>   )
+      ...>
+      ...> Enum.map(slots, & &1.start_at)
+      [~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:15:00Z], ~U[2026-07-13 09:30:00Z]]
+
   """
 
   alias ExBooking.Assignment
@@ -83,8 +104,7 @@ defmodule ExBooking do
               )
 
   @doc """
-  Runs the full availability pipeline (spec 03 §3) and returns bookable
-  slots sorted ascending by start.
+  Runs availability search and returns bookable slots sorted ascending by start.
 
   ## Options
 
@@ -299,7 +319,6 @@ defmodule ExBooking do
   @spec import_jscalendar_busy(map()) :: {:ok, [Interval.t()]} | {:error, term()}
   defdelegate import_jscalendar_busy(object), to: JSCalendar, as: :busy_intervals
 
-  # `reschedule` is nil for decide/5, or `{existing, new}` for reschedule/6.
   defp decision(request, meeting_type, resources, rules, opts, reschedule) do
     case Availability.eligible(request, meeting_type, resources, rules, opts[:now]) do
       {:ok, free} ->
@@ -362,7 +381,6 @@ defmodule ExBooking do
   defp event_data(nil), do: %{}
   defp event_data({existing, new}), do: %{from: existing, to: new}
 
-  # Intents are ordered persist-first: reserve/release before calendar/emit (SP.05).
   defp intents(event, opts, nil, resource_ids, meeting_type) do
     case opts[:hold] do
       %Hold{} = hold ->

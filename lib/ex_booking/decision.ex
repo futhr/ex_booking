@@ -1,11 +1,18 @@
 defmodule ExBooking.Decision do
   @moduledoc """
-  The kernel's answer to `ExBooking.decide/5` and `ExBooking.reschedule/6`.
+  The result of a booking decision.
 
-  A decision is returned even for rejections (`status: :conflict` or
-  `:policy_reject`) so consumers can present `alternatives` and
-  machine-readable `reasons`. `intents` describe the side effects the
-  consumer must execute; the kernel performs none of them.
+  A decision is returned for both accepted and rejected booking attempts. For
+  rejections, `reasons` explain what failed and `alternatives` can be shown to
+  the invitee. For accepted transitions, `events` and `intents` tell the
+  consuming application what to persist, publish, or execute.
+
+  ## Example
+
+      iex> decision = %ExBooking.Decision{status: :ok, resource_ids: ["host_1"]}
+      ...> {decision.status, decision.resource_ids}
+      {:ok, ["host_1"]}
+
   """
 
   alias ExBooking.Event
@@ -26,7 +33,7 @@ defmodule ExBooking.Decision do
   @typedoc "Decision outcome."
   @type status :: :ok | :conflict | :policy_reject | :needs_routing
 
-  @typedoc "Machine-readable rejection reason (see spec 02 error vocabulary)."
+  @typedoc "Machine-readable rejection reason."
   @type reason :: tuple() | atom()
 
   @typedoc "A side effect for the consumer to execute, in order."

@@ -77,9 +77,9 @@ defmodule ExBooking.MixProject do
   end
 
   defp description do
-    "Pure booking kernel for sales scheduling: timezone-safe availability, " <>
-      "slot generation, conflict detection, assignment strategies, and " <>
-      "deterministic booking decisions. No database, no processes, no side effects."
+    "Deterministic booking logic for Elixir apps: timezone-safe availability, " <>
+      "slot generation, conflict detection, assignment strategies, lifecycle " <>
+      "decisions, and calendar-data normalization. No database, no processes, no side effects."
   end
 
   defp package do
@@ -92,14 +92,12 @@ defmodule ExBooking.MixProject do
       },
       files: ~w[
         lib
-        docs
         .formatter.exs
         mix.exs
         README.md
         LICENSE
         CONTRIBUTING.md
-        AGENTS.md
-        CLAUDE.md
+        bench/output/benchmarks.md
         CHANGELOG.md
       ],
       maintainers: ["Refpath Maintainers"]
@@ -108,32 +106,18 @@ defmodule ExBooking.MixProject do
 
   defp docs do
     [
-      main: "readme-1",
+      main: "readme",
       extras: [
         "README.md": [title: "Overview"],
-        "docs/README.md": [title: "Docs Index"],
-        "docs/research/README.md": [title: "Research Index"],
-        "docs/research/R.01-booking-space-and-kernel-rationale.md": [title: "Research"],
-        "docs/research/R.02-standards-spike.md": [title: "Research: Standards Spike"],
-        "docs/research/R.03-post-build-kernel-audit.md": [title: "Research: Kernel Audit"],
-        "docs/specs/SP.00-overview.md": [title: "Spec: Overview"],
-        "docs/specs/SP.01-data-model.md": [title: "Spec: Data Model"],
-        "docs/specs/SP.02-public-api.md": [title: "Spec: Public API"],
-        "docs/specs/SP.03-algorithms.md": [title: "Spec: Algorithms"],
-        "docs/specs/SP.04-assignment.md": [title: "Spec: Assignment"],
-        "docs/specs/SP.05-lifecycle-and-events.md": [title: "Spec: Lifecycle & Events"],
-        "docs/specs/SP.06-standards-interop.md": [title: "Spec: Standards Interop"],
-        "docs/specs/SP.07-validation.md": [title: "Spec: Validation"],
+        "bench/output/benchmarks.md": [title: "Benchmarks"],
         "CHANGELOG.md": [title: "Changelog"],
         "CONTRIBUTING.md": [title: "Contributing"],
-        "CLAUDE.md": [title: "Agent Guide"],
         LICENSE: [title: "License"]
       ],
       groups_for_extras: [
-        "Getting Started": ~r/(^README\.md|docs\/README\.md)/,
-        Research: ~r/research/,
-        Specification: ~r/specs/,
-        Reference: ~r/CHANGELOG|CONTRIBUTING|CLAUDE|LICENSE/
+        "Getting Started": ~r/^README\.md/,
+        Performance: ~r/benchmarks/,
+        Reference: ~r/CHANGELOG|CONTRIBUTING|LICENSE/
       ],
       groups_for_modules: [
         "Core API": [
@@ -187,6 +171,7 @@ defmodule ExBooking.MixProject do
       lint: ["format --check-formatted", "credo --strict", "dialyzer"],
       "test.cover": ["coveralls"],
       bench: ["run bench/run.exs"],
+      "bench.smoke": ["run bench/run.exs --smoke"],
       ci: ["setup", "lint", "test.cover"],
 
       # Release

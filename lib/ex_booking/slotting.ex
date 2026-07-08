@@ -1,11 +1,18 @@
 defmodule ExBooking.Slotting do
   @moduledoc """
-  Slot-grid generation over free intervals.
+  Candidate slot generation.
 
-  The grid step is independent of the meeting duration by design: a 30-minute
-  meeting can sit on a 15-minute grid. By default the grid is anchored to each
-  free interval's start; `align: :clock` anchors starts to UTC clock boundaries.
-  See `docs/specs/SP.03-algorithms.md` §4.
+  Slotting cuts free intervals into bookable starts. Duration controls how
+  long each slot is; step controls how often starts are offered. The default
+  grid starts at the free interval boundary, while `align: :clock` snaps to
+  UTC clock boundaries such as `:00`, `:15`, `:30`, and `:45`.
+
+  ## Example
+
+      iex> free = ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z])
+      ...> free |> ExBooking.Slotting.generate_slots(30, 15) |> Enum.map(& &1.start_at)
+      [~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:15:00Z], ~U[2026-07-13 09:30:00Z]]
+
   """
 
   alias ExBooking.Interval

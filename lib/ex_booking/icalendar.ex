@@ -1,12 +1,19 @@
 defmodule ExBooking.ICalendar do
   @moduledoc """
-  Dependency-free iCalendar free/busy normalization helpers.
+  iCalendar free/busy normalization.
 
-  The supported surface is intentionally narrow: unfolded RFC 5545 content is
-  scanned for `FREEBUSY` properties, whose period values are normalized into
-  UTC `ExBooking.Interval` structs with `kind: :busy`. Vendor parameters such as
-  `FBTYPE` are accepted and ignored; unsupported date/time forms fail
-  explicitly.
+  `ExBooking.ICalendar` extracts `FREEBUSY` periods from caller-supplied ICS
+  text and returns merged UTC busy intervals. It intentionally does not fetch
+  calendars, understand provider auth, or implement a full calendar sync
+  adapter.
+
+  ## Example
+
+      iex> ics = "FREEBUSY:20260713T090000Z/20260713T093000Z"
+      ...> {:ok, [busy]} = ExBooking.ICalendar.free_busy(ics)
+      ...> {busy.kind, busy.start_at, busy.end_at}
+      {:busy, ~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z]}
+
   """
 
   alias ExBooking.Interval
