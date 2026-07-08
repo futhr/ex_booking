@@ -153,7 +153,18 @@ The expander emits UTC `Interval` values sorted by start and clipped to the
 horizon. Unsupported rule parts fail as `{:unsupported, :rrule, part}` rather
 than being ignored.
 
-## 7. Conflict detection
+## 7. ICS free/busy normalization
+
+`ExBooking.ICalendar` scans unfolded iCalendar text for `FREEBUSY` properties
+and normalizes comma-separated period values into UTC busy intervals. Supported
+period forms are `start/end` and `start/duration`; date-times must be UTC
+(`YYYYMMDDTHHMMSSZ`). Parameters such as `FBTYPE` are accepted and ignored
+because the kernel only needs normalized busy time.
+
+The helper returns merged, sorted `Interval` values with `kind: :busy`.
+Unsupported local date-times or malformed periods fail explicitly.
+
+## 8. Conflict detection
 
 A requested slot conflicts iff, for a required resource, the slot inflated by
 effective buffers overlaps any busy interval:
@@ -166,7 +177,7 @@ Note the asymmetry with §3.5: at assembly time buffers inflate busy; at validat
 time inflating the slot is equivalent and cheaper (one inflation instead of many).
 Both directions must agree — property-tested.
 
-## 8. Complexity targets
+## 9. Complexity targets
 
 With `n` busy intervals per resource, `w` expanded windows, `r` resources:
 assembly is `O(r · (n log n + w log w))` (sort-merge based subtraction, no

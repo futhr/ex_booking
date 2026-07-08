@@ -35,12 +35,13 @@ to the first occurrence and snaps through spring-forward gaps
 | M1 | v0.1 — temporal core | 7 | 7 | 100% | Complete |
 | M2 | v0.2 — assignment and policy | 6 | 6 | 100% | Complete |
 | M3 | v0.3 — lifecycle, events, multi-party | 7 | 7 | 100% | Complete |
-| M4 | v0.4 — standards spike | 2 | 4 | 50% | In progress |
-| — | **Total** | **30** | **32** | **94%** | |
+| M4 | v0.4 — standards spike | 3 | 4 | 75% | In progress |
+| — | **Total** | **31** | **32** | **97%** | |
 
 > M3 is complete. M3.07 is validated in the separate `host application` consumer
 > repository with a documented walkthrough and integration test. M4.01 chose a
-> dependency-free RRULE subset after package evaluation; M4.02–M4.03 remain.
+> dependency-free RRULE subset after package evaluation; M4.02 adds pure ICS
+> free/busy normalization; M4.03 remains.
 
 ## Operating Rules
 
@@ -240,7 +241,7 @@ to the first occurrence and snaps through spring-forward gaps
 - [x] M4.01 RRULE expansion spike: evaluate `ical` vs `rrule` vs a minimal
   in-house RFC 5545 subset; keep any dep optional. (`cocktail` excluded on
   protocol alignment — `R.01` §4.)
-- [ ] M4.02 ICS free/busy import helpers (normalize into `Interval` lists).
+- [x] M4.02 ICS free/busy import helpers (normalize into `Interval` lists).
 - [ ] M4.03 JSCalendar (RFC 8984) mapping scope for any JSON interop surface.
 - [x] M4.04 Optional grid alignment to clock boundaries (`:align` option).
 

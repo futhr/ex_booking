@@ -24,6 +24,7 @@ defmodule ExBooking do
   alias ExBooking.Decision
   alias ExBooking.Event
   alias ExBooking.Hold
+  alias ExBooking.ICalendar
   alias ExBooking.Interval
   alias ExBooking.MeetingType
   alias ExBooking.Policy
@@ -197,6 +198,15 @@ defmodule ExBooking do
       RRule.expand(rrule, dtstart, duration_min, opts[:from], opts[:until])
     end
   end
+
+  @doc """
+  Normalizes iCalendar `FREEBUSY` periods into busy intervals.
+
+  This is a pure parser over caller-supplied iCalendar text. It performs no file
+  or network I/O.
+  """
+  @spec import_ics_free_busy(String.t()) :: {:ok, [Interval.t()]} | {:error, term()}
+  defdelegate import_ics_free_busy(ics), to: ICalendar, as: :free_busy
 
   # `reschedule` is nil for decide/5, or `{existing, new}` for reschedule/6.
   defp decision(request, meeting_type, resources, rules, opts, reschedule) do

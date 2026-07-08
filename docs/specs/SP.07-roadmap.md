@@ -48,7 +48,7 @@ ex_booking:
   `cocktail` is excluded on protocol alignment: its README documents
   unresolved DST bugs, incomplete RRULE options, and no WKST/EXRULE — DST
   correctness is this kernel's defining property (R.01 §4).
-- [ ] ICS free/busy import helpers (normalization into `Interval` lists)
+- [x] ICS free/busy import helpers (normalization into `Interval` lists)
 - [ ] JSCalendar (RFC 8984 / the 2.0 draft) mapping scope for any JSON
   interop surface — do not invent a JSON calendar shape
 - [x] Optional grid alignment to clock boundaries (`:align` option)

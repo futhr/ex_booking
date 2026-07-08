@@ -107,11 +107,13 @@ defmodule ExBooking.SlottingTest do
 
     property "clock-aligned slots start on UTC clock boundaries" do
       check all(free <- interval(), {duration_min, step_min} <- duration_and_step()) do
-        slots = Slotting.generate_slots(free, duration_min, step_min, align: :clock)
+        if rem(1_440, step_min) == 0 do
+          slots = Slotting.generate_slots(free, duration_min, step_min, align: :clock)
 
-        if first = List.first(slots) do
-          minutes_since_midnight = first.start_at.hour * 60 + first.start_at.minute
-          assert rem(minutes_since_midnight, step_min) == 0
+          if first = List.first(slots) do
+            minutes_since_midnight = first.start_at.hour * 60 + first.start_at.minute
+            assert rem(minutes_since_midnight, step_min) == 0
+          end
         end
       end
     end

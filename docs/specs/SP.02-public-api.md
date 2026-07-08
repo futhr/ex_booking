@@ -130,6 +130,14 @@ Expands the supported RFC 5545 RRULE subset over `:from`/`:until`. Supported
 parts are `FREQ=DAILY`, `FREQ=WEEKLY`, `INTERVAL`, `COUNT`, `UNTIL`, and weekly
 `BYDAY`. Unsupported parts fail explicitly.
 
+```elixir
+@spec import_ics_free_busy(String.t()) ::
+        {:ok, [ExBooking.Interval.t()]} | {:error, term()}
+```
+
+Normalizes RFC 5545 iCalendar `FREEBUSY` periods from caller-supplied text into
+UTC busy intervals. No file or network I/O is performed.
+
 ## Error vocabulary
 
 `{:error, _}` payloads and `Decision.reasons` entries are tagged tuples, stable
