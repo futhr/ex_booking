@@ -62,9 +62,26 @@ defmodule ExBooking.ICalendarTest do
                ICalendar.free_busy("FREEBUSY:20260713T090000Z")
     end
 
+    test "rejects invalid UTC dates and times" do
+      assert {:error, {:invalid, :freebusy, :date}} =
+               ICalendar.free_busy("FREEBUSY:20261313T090000Z/20260713T093000Z")
+
+      assert {:error, {:invalid, :freebusy, :time}} =
+               ICalendar.free_busy("FREEBUSY:20260713T250000Z/20260713T253000Z")
+    end
+
     test "rejects empty durations" do
       assert {:error, {:invalid, :freebusy, :duration}} =
                ICalendar.free_busy("FREEBUSY:20260713T090000Z/P")
+    end
+
+    test "ignores non-FREEBUSY lines" do
+      assert {:ok, []} =
+               ICalendar.free_busy("""
+               BEGIN:VCALENDAR
+               DTSTART:20260713T090000Z
+               END:VCALENDAR
+               """)
     end
 
     test "supports day durations" do

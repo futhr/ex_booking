@@ -137,8 +137,9 @@ defmodule ExBooking.ICalendar do
   defp parse_date(<<year::binary-size(4), month::binary-size(2), day::binary-size(2)>>) do
     with {year, ""} <- Integer.parse(year),
          {month, ""} <- Integer.parse(month),
-         {day, ""} <- Integer.parse(day) do
-      Date.new(year, month, day)
+         {day, ""} <- Integer.parse(day),
+         {:ok, date} <- Date.new(year, month, day) do
+      {:ok, date}
     else
       _ -> {:error, {:invalid, :freebusy, :date}}
     end
@@ -147,8 +148,9 @@ defmodule ExBooking.ICalendar do
   defp parse_time(<<hour::binary-size(2), minute::binary-size(2), second::binary-size(2)>>) do
     with {hour, ""} <- Integer.parse(hour),
          {minute, ""} <- Integer.parse(minute),
-         {second, ""} <- Integer.parse(second) do
-      Time.new(hour, minute, second)
+         {second, ""} <- Integer.parse(second),
+         {:ok, time} <- Time.new(hour, minute, second) do
+      {:ok, time}
     else
       _ -> {:error, {:invalid, :freebusy, :time}}
     end
