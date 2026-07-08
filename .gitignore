@@ -1,0 +1,12 @@
+/_build/
+/cover/
+/deps/
+/doc/
+/tmp/
+erl_crash.dump
+*.ez
+ex_booking-*.tar
+.elixir_ls/
+.cache/
+.vscode/
+priv/plts/

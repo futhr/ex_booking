@@ -1,0 +1,9 @@
+{
+  "skip_files": ["test/support/.*"],
+  "skip_file_reasons": {
+    "test/support/.*": "Test-only builders and helpers are compiled through test elixirc_paths; they are not runtime or public API coverage surfaces."
+  },
+  "coverage_options": {
+    "minimum_coverage": 95
+  }
+}
