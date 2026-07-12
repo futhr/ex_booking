@@ -117,7 +117,10 @@ defmodule ExBooking do
   @spec available_slots(MeetingType.t(), [Resource.t()], [AvailabilityRule.t()], keyword()) ::
           {:ok, [Interval.t()]} | {:error, term()}
   def available_slots(%MeetingType{} = meeting_type, resources, rules, opts) do
-    with {:ok, opts} <- validate_opts(opts, @search_opts) do
+    with :ok <- validate_horizon(opts, :required),
+         {:ok, opts} <- validate_opts(opts, @search_opts),
+         :ok <- Availability.validate_inputs(meeting_type, resources, rules),
+         :ok <- Assignment.validate(resources, opts) do
       Availability.assemble(meeting_type, resources, rules, opts)
     end
   end
@@ -141,7 +144,11 @@ defmodule ExBooking do
         rules,
         opts
       ) do
-    with {:ok, opts} <- validate_opts(opts, @decide_opts) do
+    with :ok <- validate_horizon(opts, :optional),
+         {:ok, opts} <- validate_opts(opts, @decide_opts),
+         :ok <- Availability.validate_request_shape(request, meeting_type),
+         :ok <- Availability.validate_inputs(meeting_type, resources, rules),
+         :ok <- Assignment.validate(resources, opts) do
       Availability.validate(request, meeting_type, resources, rules, opts)
     end
   end
@@ -156,15 +163,20 @@ defmodule ExBooking do
   @spec decide(Request.t(), MeetingType.t(), [Resource.t()], [AvailabilityRule.t()], keyword()) ::
           {:ok, Decision.t()} | {:error, term()}
   def decide(%Request{} = request, %MeetingType{} = meeting_type, resources, rules, opts) do
-    with {:ok, opts} <- validate_opts(opts, @decide_opts) do
-      {:ok, decision(request, meeting_type, {resources, rules}, opts, nil)}
+    with :ok <- validate_horizon(opts, :optional),
+         {:ok, opts} <- validate_opts(opts, @decide_opts),
+         :ok <- Availability.validate_request_shape(request, meeting_type),
+         :ok <- Availability.validate_inputs(meeting_type, resources, rules),
+         :ok <- Assignment.validate(resources, opts) do
+      decision(request, meeting_type, {resources, rules}, opts, nil)
     end
   end
 
   @doc """
-  Like `decide/5`, but evaluates the reschedule policy against `existing`,
-  treats the existing slot's busy time as released, and emits
-  `:booking_rescheduled` semantics.
+  Like `decide/5`, but evaluates the reschedule policy against `existing` and
+  emits `:booking_rescheduled` semantics. The caller must remove only the
+  identified booking's own claims from `resources`; the kernel never subtracts
+  generic busy intervals by timestamp.
   """
   @spec reschedule(
           Interval.t(),
@@ -176,26 +188,29 @@ defmodule ExBooking do
         ) :: {:ok, Decision.t()} | {:error, term()}
   # credo:disable-for-next-line Credo.Check.Refactor.FunctionArity
   def reschedule(
-        %Interval{} = existing,
+        existing,
         %Request{} = request,
         %MeetingType{} = meeting_type,
         resources,
         rules,
         opts
       ) do
-    with {:ok, opts} <- validate_opts(opts, @decide_opts) do
+    with :ok <- validate_horizon(opts, :optional),
+         {:ok, opts} <- validate_opts(opts, @decide_opts),
+         :ok <- validate_existing(existing),
+         :ok <- Availability.validate_request_shape(request, meeting_type),
+         :ok <- Availability.validate_inputs(meeting_type, resources, rules),
+         :ok <- Assignment.validate(resources, opts) do
       case Policy.notice_ok(existing, meeting_type.reschedule_policy, opts[:now]) do
         :ok ->
-          released = Enum.map(resources, &release_busy(&1, existing))
-
-          {:ok,
-           decision(request, meeting_type, {released, rules}, opts, {existing, request.slot})}
+          decision(request, meeting_type, {resources, rules}, opts, {existing, request.slot})
 
         {:error, reason} ->
           {:ok,
            %Decision{
              status: :policy_reject,
              slot: request.slot,
+             meeting_type_id: meeting_type.id,
              reasons: [{:policy, :reschedule, reason}]
            }}
       end
@@ -208,8 +223,10 @@ defmodule ExBooking do
   """
   @spec evaluate_cancellation(Interval.t(), MeetingType.t(), keyword()) ::
           {:ok, %{allowed?: boolean(), reason: atom() | nil}} | {:error, term()}
-  def evaluate_cancellation(%Interval{} = existing, %MeetingType{} = meeting_type, opts) do
-    with {:ok, opts} <- validate_opts(opts, @now_opts) do
+  def evaluate_cancellation(existing, %MeetingType{} = meeting_type, opts) do
+    with {:ok, opts} <- validate_opts(opts, @now_opts),
+         :ok <- validate_existing(existing),
+         :ok <- Availability.validate_meeting_type(meeting_type) do
       result =
         case Policy.notice_ok(existing, meeting_type.cancellation_policy, opts[:now]) do
           :ok -> %{allowed?: true, reason: nil}
@@ -228,11 +245,16 @@ defmodule ExBooking do
   existing hold, and leaves persistence/publishing to the consumer.
   """
   @spec cancel(Interval.t(), MeetingType.t(), keyword()) :: {:ok, Decision.t()} | {:error, term()}
-  def cancel(%Interval{} = existing, %MeetingType{} = meeting_type, opts) do
-    with {:ok, opts} <- validate_opts(opts, @cancel_opts) do
+  def cancel(existing, %MeetingType{} = meeting_type, opts) do
+    with {:ok, opts} <- validate_opts(opts, @cancel_opts),
+         :ok <- validate_existing(existing),
+         :ok <- Availability.validate_meeting_type(meeting_type) do
       case Policy.notice_ok(existing, meeting_type.cancellation_policy, opts[:now]) do
-        :ok -> {:ok, cancel_decision(existing, meeting_type, opts)}
-        {:error, reason} -> {:ok, policy_reject(existing, [{:policy, :cancellation, reason}])}
+        :ok ->
+          {:ok, cancel_decision(existing, meeting_type, opts)}
+
+        {:error, reason} ->
+          {:ok, policy_reject(existing, meeting_type.id, [{:policy, :cancellation, reason}])}
       end
     end
   end
@@ -245,7 +267,8 @@ defmodule ExBooking do
   """
   @spec expire_hold(Hold.t(), keyword()) :: {:ok, Decision.t()} | {:error, term()}
   def expire_hold(%Hold{} = hold, opts) do
-    with {:ok, opts} <- validate_opts(opts, @routing_context_opts) do
+    with {:ok, opts} <- validate_opts(opts, @routing_context_opts),
+         :ok <- validate_hold_shape(hold) do
       event = %Event{
         type: :booking_expired,
         slot: hold.slot,
@@ -259,6 +282,7 @@ defmodule ExBooking do
        %Decision{
          status: :ok,
          slot: hold.slot,
+         meeting_type_id: hold.meeting_type_id,
          resource_ids: hold.resource_ids,
          events: [event],
          intents: [{:release, hold.id}, {:emit, event}]
@@ -275,8 +299,10 @@ defmodule ExBooking do
   """
   @spec mark_no_show(Interval.t(), MeetingType.t(), keyword()) ::
           {:ok, Decision.t()} | {:error, term()}
-  def mark_no_show(%Interval{} = existing, %MeetingType{} = meeting_type, opts) do
-    with {:ok, opts} <- validate_opts(opts, @transition_opts) do
+  def mark_no_show(existing, %MeetingType{} = meeting_type, opts) do
+    with {:ok, opts} <- validate_opts(opts, @transition_opts),
+         :ok <- validate_existing(existing),
+         :ok <- Availability.validate_meeting_type(meeting_type) do
       event = transition_event(:booking_no_show, existing, meeting_type, opts)
       {:ok, transition_decision(existing, opts[:resource_ids], event, [{:emit, event}])}
     end
@@ -287,7 +313,8 @@ defmodule ExBooking do
   run their own availability search. See `ExBooking.Assignment`.
   """
   @spec assign([Resource.t()], Interval.t(), keyword()) ::
-          {:ok, [Resource.t()]} | {:error, :no_eligible_resource}
+          {:ok, [Resource.t()]}
+          | {:error, :no_eligible_resource | {:invalid, atom(), term()}}
   defdelegate assign(resources, slot, opts), to: Assignment
 
   @doc """
@@ -299,7 +326,8 @@ defmodule ExBooking do
   @spec expand_rrule(String.t() | RRule.t(), DateTime.t(), pos_integer(), keyword()) ::
           {:ok, [Interval.t()]} | {:error, term()}
   def expand_rrule(rrule, %DateTime{} = dtstart, duration_min, opts) do
-    with {:ok, opts} <- validate_opts(opts, @rrule_opts) do
+    with :ok <- validate_horizon(opts, :required),
+         {:ok, opts} <- validate_opts(opts, @rrule_opts) do
       RRule.expand(rrule, dtstart, duration_min, opts[:from], opts[:until])
     end
   end
@@ -327,8 +355,11 @@ defmodule ExBooking do
       {:ok, free} ->
         assign_decision(request, meeting_type, free, opts, reschedule)
 
+      {:error, {:invalid, _, _} = reason} ->
+        {:error, reason}
+
       {:error, reasons} ->
-        rejected_decision(request, reasons, meeting_type, {resources, rules}, opts)
+        {:ok, rejected_decision(request, reasons, meeting_type, {resources, rules}, opts)}
     end
   end
 
@@ -346,35 +377,117 @@ defmodule ExBooking do
         success_decision(request, meeting_type, winners, opts, reschedule)
 
       {:error, :no_eligible_resource} ->
-        rejected_decision(
-          request,
-          [{:no_eligible_resource, request.slot}],
-          meeting_type,
-          {free, []},
-          opts
-        )
+        {:ok,
+         rejected_decision(
+           request,
+           [{:no_eligible_resource, request.slot}],
+           meeting_type,
+           {free, []},
+           opts
+         )}
+
+      {:error, {:invalid, _, _} = reason} ->
+        {:error, reason}
     end
   end
 
   defp success_decision(request, meeting_type, winners, opts, reschedule) do
     resource_ids = Enum.map(winners, & &1.id)
+    seat_allocations = seat_allocations(winners, meeting_type)
 
-    event = %Event{
-      type: event_type(opts, reschedule),
-      slot: request.slot,
-      resource_ids: resource_ids,
-      meeting_type_id: meeting_type.id,
-      routing_context: request.routing_context,
-      data: event_data(reschedule)
-    }
+    with :ok <- validate_hold(opts[:hold], request, meeting_type, resource_ids, reschedule) do
+      event = %Event{
+        type: event_type(opts, reschedule),
+        slot: request.slot,
+        resource_ids: resource_ids,
+        meeting_type_id: meeting_type.id,
+        routing_context: request.routing_context,
+        data: event_data(reschedule)
+      }
 
-    %Decision{
-      status: :ok,
-      slot: request.slot,
-      resource_ids: resource_ids,
-      events: [event],
-      intents: intents(event, opts, reschedule, resource_ids, meeting_type)
-    }
+      {:ok,
+       %Decision{
+         status: :ok,
+         slot: request.slot,
+         meeting_type_id: meeting_type.id,
+         resource_ids: resource_ids,
+         seat_allocations: seat_allocations,
+         events: [event],
+         intents: intents(event, opts, reschedule, resource_ids, meeting_type)
+       }}
+    end
+  end
+
+  defp validate_hold(_, _, _, _, {_, _}), do: :ok
+  defp validate_hold(nil, _, _, _, nil), do: :ok
+
+  defp validate_hold(
+         %Hold{} = hold,
+         %Request{} = request,
+         %MeetingType{} = meeting_type,
+         resource_ids,
+         nil
+       ) do
+    with :ok <- validate_hold_shape(hold),
+         true <- hold.meeting_type_id == meeting_type.id,
+         true <- hold.resource_ids == resource_ids,
+         true <- same_interval?(hold.slot, request.slot) do
+      :ok
+    else
+      false -> hold_mismatch(hold, request, meeting_type, resource_ids)
+      {:error, _} = error -> error
+    end
+  end
+
+  defp validate_hold_shape(%Hold{id: id}) when not is_binary(id) or id == "",
+    do: {:error, {:invalid, :hold, {:invalid, :id}}}
+
+  defp validate_hold_shape(%Hold{} = hold) do
+    with :ok <- validate_hold_interval(hold.slot),
+         :ok <- validate_hold_resource_ids(hold.resource_ids),
+         :ok <- validate_hold_meeting_type_id(hold.meeting_type_id) do
+      validate_hold_expiry(hold.expires_at)
+    end
+  end
+
+  defp validate_hold_interval(slot) do
+    case Interval.validate(slot) do
+      :ok ->
+        :ok
+
+      {:error, {:invalid, :interval, detail}} ->
+        {:error, {:invalid, :hold, {:invalid, :slot, detail}}}
+    end
+  end
+
+  defp validate_hold_resource_ids(ids) when is_list(ids) do
+    if Enum.all?(ids, &(is_binary(&1) and &1 != "")),
+      do: :ok,
+      else: {:error, {:invalid, :hold, {:invalid, :resource_ids}}}
+  end
+
+  defp validate_hold_resource_ids(_),
+    do: {:error, {:invalid, :hold, {:invalid, :resource_ids}}}
+
+  defp validate_hold_meeting_type_id(id) when is_binary(id) and id != "", do: :ok
+
+  defp validate_hold_meeting_type_id(_),
+    do: {:error, {:invalid, :hold, {:invalid, :meeting_type_id}}}
+
+  defp validate_hold_expiry(%DateTime{}), do: :ok
+  defp validate_hold_expiry(_), do: {:error, {:invalid, :hold, {:invalid, :expires_at}}}
+
+  defp hold_mismatch(hold, request, meeting_type, resource_ids) do
+    cond do
+      hold.meeting_type_id != meeting_type.id ->
+        {:error, {:invalid, :hold, {:mismatch, :meeting_type_id}}}
+
+      hold.resource_ids != resource_ids ->
+        {:error, {:invalid, :hold, {:mismatch, :resource_ids}}}
+
+      not same_interval?(hold.slot, request.slot) ->
+        {:error, {:invalid, :hold, {:mismatch, :slot}}}
+    end
   end
 
   defp event_type(_, {_, _}), do: :booking_rescheduled
@@ -389,8 +502,11 @@ defmodule ExBooking do
         [{:reserve, hold}, {:emit, event}]
 
       nil ->
+        payload = calendar_payload(event, resource_ids, meeting_type)
+
         [
-          {:calendar_event, :create, calendar_payload(event, resource_ids, meeting_type)},
+          {:calendar_event, :create, payload},
+          {:notify, :booking_confirmation, payload},
           {:emit, event}
         ]
     end
@@ -403,9 +519,12 @@ defmodule ExBooking do
         hold_id -> [{:release, hold_id}]
       end
 
+    payload = calendar_payload(event, resource_ids, meeting_type)
+
     release ++
       [
-        {:calendar_event, :move, calendar_payload(event, resource_ids, meeting_type)},
+        {:calendar_event, :move, payload},
+        {:notify, :booking_rescheduled, payload},
         {:emit, event}
       ]
   end
@@ -418,6 +537,7 @@ defmodule ExBooking do
     %Decision{
       status: rejection_status(reasons),
       slot: request.slot,
+      meeting_type_id: meeting_type.id,
       reasons: reasons,
       alternatives: alternatives(request, meeting_type, resources, rules, opts)
     }
@@ -431,8 +551,19 @@ defmodule ExBooking do
     end
   end
 
-  defp release_busy(resource, existing) do
-    %{resource | busy: Interval.subtract_all(resource.busy, [existing])}
+  defp seat_allocations(_, %MeetingType{participants: participants}) when participants != :pool,
+    do: []
+
+  defp seat_allocations(winners, %MeetingType{capacity_required: required}) do
+    {allocations, _} =
+      Enum.reduce(winners, {[], required}, fn resource, {allocations, remaining} ->
+        consumed = min(resource.capacity, remaining)
+
+        allocation = %{resource_id: resource.id, capacity_consumed: consumed}
+        {[allocation | allocations], remaining - consumed}
+      end)
+
+    Enum.reverse(allocations)
   end
 
   defp alternatives(
@@ -457,7 +588,20 @@ defmodule ExBooking do
 
   defp alternatives(_, _, _, _, _), do: []
 
-  defp same_interval?(a, b), do: a.start_at == b.start_at and a.end_at == b.end_at
+  defp same_interval?(%Interval{} = a, %Interval{} = b),
+    do: a.start_at == b.start_at and a.end_at == b.end_at
+
+  defp same_interval?(_, _), do: false
+
+  defp validate_existing(existing) do
+    case Interval.validate(existing) do
+      :ok ->
+        :ok
+
+      {:error, {:invalid, :interval, detail}} ->
+        {:error, {:invalid, :existing, detail}}
+    end
+  end
 
   defp alternative_key(slot, requested) do
     distance = abs(DateTime.diff(slot.start_at, requested.start_at, :second))
@@ -473,10 +617,13 @@ defmodule ExBooking do
         hold_id -> [{:release, hold_id}]
       end
 
+    payload = calendar_payload(event, opts[:resource_ids], meeting_type)
+
     intents =
       release ++
         [
-          {:calendar_event, :cancel, calendar_payload(event, opts[:resource_ids], meeting_type)},
+          {:calendar_event, :cancel, payload},
+          {:notify, :booking_canceled, payload},
           {:emit, event}
         ]
 
@@ -497,20 +644,57 @@ defmodule ExBooking do
     %Decision{
       status: :ok,
       slot: slot,
+      meeting_type_id: event.meeting_type_id,
       resource_ids: resource_ids,
       events: [event],
       intents: intents
     }
   end
 
-  defp policy_reject(slot, reasons) do
-    %Decision{status: :policy_reject, slot: slot, reasons: reasons}
+  defp policy_reject(slot, meeting_type_id, reasons) do
+    %Decision{
+      status: :policy_reject,
+      slot: slot,
+      meeting_type_id: meeting_type_id,
+      reasons: reasons
+    }
   end
 
   defp validate_opts(opts, schema) do
     case NimbleOptions.validate(opts, schema) do
       {:ok, validated} -> {:ok, validated}
       {:error, error} -> {:error, {:invalid, :opts, Exception.message(error)}}
+    end
+  end
+
+  defp validate_horizon(opts, requirement) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      validate_keyword_horizon(opts, requirement)
+    else
+      {:error, {:invalid, :opts, :not_a_keyword_list}}
+    end
+  end
+
+  defp validate_horizon(_, _), do: {:error, {:invalid, :opts, :not_a_keyword_list}}
+
+  defp validate_keyword_horizon(opts, requirement) do
+    from? = Keyword.has_key?(opts, :from)
+    until? = Keyword.has_key?(opts, :until)
+
+    case {from?, until?, Keyword.get(opts, :from), Keyword.get(opts, :until), requirement} do
+      {false, false, _, _, :optional} ->
+        :ok
+
+      {true, true, %DateTime{} = from, %DateTime{} = until, _} ->
+        if DateTime.compare(from, until) == :lt,
+          do: :ok,
+          else: {:error, {:invalid, :horizon, :not_increasing}}
+
+      {true, true, _, _, _} ->
+        :ok
+
+      _ ->
+        {:error, {:invalid, :horizon, :requires_from_and_until}}
     end
   end
 end

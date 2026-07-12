@@ -32,6 +32,31 @@ defmodule ExBooking.IntervalTest do
         Interval.new!(~U[2026-07-13 10:00:00Z], ~U[2026-07-13 10:00:00Z])
       end
     end
+
+    test "normalizes zoned endpoints to UTC and rejects non-datetimes" do
+      start_at = DateTime.shift_zone!(~U[2026-07-13 09:00:00Z], "Europe/Stockholm")
+      end_at = DateTime.shift_zone!(~U[2026-07-13 10:00:00Z], "Europe/Stockholm")
+
+      assert {:ok,
+              %Interval{start_at: ~U[2026-07-13 09:00:00Z], end_at: ~U[2026-07-13 10:00:00Z]}} =
+               Interval.new(start_at, end_at)
+
+      assert {:error, {:invalid, :interval, :datetime_required}} =
+               Interval.new(~N[2026-07-13 09:00:00], end_at)
+    end
+
+    test "validate/1 rejects caller-built non-UTC and reversed structs" do
+      zoned = DateTime.shift_zone!(~U[2026-07-13 09:00:00Z], "Europe/Stockholm")
+
+      assert {:error, {:invalid, :interval, :not_utc}} =
+               Interval.validate(%Interval{start_at: zoned, end_at: ~U[2026-07-13 10:00:00Z]})
+
+      assert {:error, {:invalid, :interval, :empty_or_reversed}} =
+               Interval.validate(%Interval{
+                 start_at: ~U[2026-07-13 10:00:00Z],
+                 end_at: ~U[2026-07-13 09:00:00Z]
+               })
+    end
   end
 
   describe "subtract/2" do
@@ -97,7 +122,37 @@ defmodule ExBooking.IntervalTest do
     end
   end
 
+  describe "intersect/2" do
+    test "handles touching, nested, disjoint, and equal-end intervals in deterministic order" do
+      left = [
+        Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 11:00:00Z],
+          kind: :available,
+          meta: %{source: "left"}
+        ),
+        Interval.new!(~U[2026-07-13 12:00:00Z], ~U[2026-07-13 13:00:00Z])
+      ]
+
+      right = [
+        Interval.new!(~U[2026-07-13 08:00:00Z], ~U[2026-07-13 10:00:00Z]),
+        Interval.new!(~U[2026-07-13 10:00:00Z], ~U[2026-07-13 11:00:00Z]),
+        Interval.new!(~U[2026-07-13 13:00:00Z], ~U[2026-07-13 14:00:00Z])
+      ]
+
+      assert [common] = Interval.intersect(left, right)
+      assert common.start_at == ~U[2026-07-13 09:00:00Z]
+      assert common.end_at == ~U[2026-07-13 11:00:00Z]
+      assert common.kind == :available
+      assert common.meta == %{source: "left"}
+    end
+  end
+
   describe "algebra properties" do
+    property "generated UTC intervals satisfy the public invariant" do
+      check all(value <- interval()) do
+        assert :ok = Interval.validate(value)
+      end
+    end
+
     property "overlaps?/2 is symmetric" do
       check all(a <- interval(), b <- interval()) do
         assert Interval.overlaps?(a, b) == Interval.overlaps?(b, a)
@@ -167,6 +222,19 @@ defmodule ExBooking.IntervalTest do
             assert Interval.contains?(a, clipped)
             assert Interval.contains?(bounds, clipped)
         end
+      end
+    end
+
+    property "linear intersection equals the Cartesian reference on normalized sets" do
+      check all(left <- intervals(), right <- intervals()) do
+        reference =
+          for a <- Interval.merge(left),
+              b <- Interval.merge(right),
+              clipped = Interval.clip(a, b),
+              clipped != nil,
+              do: clipped
+
+        assert Interval.intersect(left, right) == Interval.merge(reference)
       end
     end
 

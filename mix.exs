@@ -137,6 +137,7 @@ defmodule ExBooking.MixProject do
         "Domain Model": [
           ExBooking.AvailabilityRule,
           ExBooking.MeetingType,
+          ExBooking.Reservation,
           ExBooking.Resource
         ],
         "Assignment & Policy": [

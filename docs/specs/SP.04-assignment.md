@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-07-08"
-  updated: "2026-07-08"
+  updated: "2026-07-12"
   tags: ["assignment", "fairness", "round-robin", "scoring-hook"]
   depends_on: ["R.01", "SP.01"]
 ---
@@ -33,6 +33,26 @@ Selected via the `:strategy` option (`atom()` or `{atom(), keyword()}`):
 
 All tie-breaks are total and deterministic (SP.00).
 
+The accepted selectors are exactly `:first_available`, `:round_robin`,
+`:least_recently_booked`, `:weighted`, `:priority`, and
+`{:owner_first, owner_id: id, fallback: strategy}` (with `fallback` optional and
+defaulting to `:round_robin`). The owner id must be a non-empty string and the
+fallback must be one of the non-owner strategies. Any other atom, tuple, option
+shape, or fallback returns `{:error, {:invalid, :strategy, supplied}}` before a
+sort key is computed.
+
+For `:weighted`, every participating resource's effective weight must be a
+number greater than zero; missing fairness data uses the documented default
+weight `1.0`. Zero, negative, or non-numeric supplied weights return
+`{:error, {:invalid, :resource_weight, {resource.id, weight}}}` before division.
+Here, participating means every resource in the caller-supplied pool: validation
+precedes availability filtering so malformed resource data cannot be hidden by
+the resource being busy or otherwise ineligible for this particular slot.
+
+All strategies validate resource ids and every supplied fairness field before
+sorting. `assignments_count` is a non-negative integer, `last_assigned_at` is a
+`DateTime` or `nil`, `weight` is positive numeric, and `priority` is an integer.
+
 ## Scoring hook
 
 GTM context (lead score, territory, campaign, account ownership) influences
@@ -45,6 +65,9 @@ scorer :: (ExBooking.Resource.t(), routing_context :: map() -> number())
 The kernel never inspects `routing_context` itself — it flows from
 `Request.routing_context` through the hook and out into events untouched. This is
 the boundary that keeps CRM/GTM semantics in the orchestration layer (R.01 §6.5).
+Every scorer invocation must return a number. A non-numeric result or an
+exception/throw returns `{:error, {:invalid, :scorer_result, detail}}`; it never
+escapes the kernel or reaches sorting.
 
 ### Selection algorithm (normative)
 
@@ -60,7 +83,8 @@ select(resources, slot, opts) =
                3. strategy tie-break         (table above)
                4. resource id                ascending (final, total order)
   take 1 for :one · all required for :collective ·
-  capacity_required for :pool (from the front of the ranking)
+  for :pool, walk the ranking and consume min(resource remaining capacity,
+  seats still required) until capacity_required seats are allocated
 ```
 
 Missing fairness data ranks last within its comparison (a `nil`
@@ -73,12 +97,15 @@ deterministic order (spec 00).
 
 ```elixir
 @spec assign([Resource.t()], Interval.t(), keyword()) ::
-        {:ok, [Resource.t()]} | {:error, :no_eligible_resource}
+        {:ok, [Resource.t()]}
+        | {:error, :no_eligible_resource | {:invalid, atom(), term()}}
 ```
 
 - Input resources are pre-filtered for freeness by the caller or by `decide/5`.
 - Returns a list: one resource for `:one` mode, all required for `:collective`,
-  `capacity_required` resources for `:pool`.
+  or the smallest ranked resource prefix whose remaining capacities satisfy
+  `capacity_required` for `:pool`. The full decision exposes the exact seat
+  consumption in `Decision.seat_allocations` (SP.01).
 - An empty eligible set returns `{:error, :no_eligible_resource}`; `decide/5`
   translates that into `Decision{status: :needs_routing}` so orchestration can
   apply fallback pools.

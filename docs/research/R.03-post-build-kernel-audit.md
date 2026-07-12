@@ -5,7 +5,7 @@ ex_booking:
   category: research
   status: complete
   created: "2026-07-08"
-  updated: "2026-07-08"
+  updated: "2026-07-11"
   decision: adopted
   tags: ["audit", "lifecycle", "alternatives", "kernel-boundary"]
 ---
@@ -59,8 +59,9 @@ side-effect-free booking semantics belong here.
 ### Deliberately Not Adopted
 
 - **Payment state semantics** — the research repeatedly notes payments and billing
-  as adjacent to scheduling, but `R.01` and `SP.05` choose event-driven billing
-  outside the kernel. The kernel emits booking events; billing consumes them.
+  as adjacent to scheduling, but `R.01` and `SP.05` keep them outside the kernel.
+  The kernel emits commercially neutral booking facts; consumers may derive
+  analytics or versioned contract meters from their own evidence.
 - **Provider behaviors** — calendar, CRM, conferencing, notification, analytics,
   and billing providers require I/O, credentials, retries, and operational state.
 - **Ash wrapper** — useful for consumers, but it is an application-model layer and

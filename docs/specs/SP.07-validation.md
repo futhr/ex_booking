@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-07-08"
-  updated: "2026-07-08"
+  updated: "2026-07-11"
   tags: ["tests", "quality-gates", "coverage", "properties"]
   depends_on: ["SP.03"]
 ---
@@ -34,12 +34,24 @@ test/support/dst_fixtures.ex          pinned DST transition corpus
 - **DST fixtures** for timezone-sensitive behavior in `Europe/Stockholm` and
   `America/New_York`.
 - **Determinism checks** for stable ordering and total tie-breaks.
+- **Malformed-input checks** proving invalid request identity/duration,
+  incomplete or reversed horizons, invalid strategies, non-positive weights,
+  inconsistent holds, malformed nested availability facts, lifecycle policies,
+  fairness values, scorer results, and non-UTC/type-invalid intervals return the
+  SP.02 tagged errors without raising.
+- **Requested-slot containment checks** proving validation requires the whole
+  slot to fit expanded offerability, including overrides and blackouts, before
+  applying current busy and policy inputs.
+- **Standards fixtures** proving iCalendar `FBTYPE=FREE` periods do not become
+  busy while absent, recognized busy, and unknown `FBTYPE` values do.
 
 ## Required Properties
 
 The property suite must cover:
 
 - `Interval.overlaps?/2` symmetry;
+- `Interval.new/3` UTC normalization and `Interval.validate/1` acceptance of
+  generated valid UTC intervals;
 - `Interval.subtract/2` containment and disjointness;
 - `Interval.merge/1` idempotence and normal form;
 - `Interval.clip/2` containment;

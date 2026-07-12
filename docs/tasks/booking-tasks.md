@@ -64,8 +64,12 @@ Spec: `docs/specs/SP.01-data-model.md`
 ```text
 [x] ExBooking.Interval struct and interval metadata.
 [x] ExBooking.AvailabilityRule windows, overrides, blackouts, and policy fields.
-[x] ExBooking.Resource busy intervals, capacity, fairness, and metadata.
+[x] ExBooking.Resource generic busy intervals, capacity reservations,
+    booking-specific daily counts, fairness, and metadata.
+[x] ExBooking.Reservation explicit interval and capacity consumption.
 [x] ExBooking.MeetingType duration, grid step, buffers, participants, policies.
+[x] Validate availability-facing meeting fields and resource capacities/timezones
+    before temporal or capacity work.
 [x] ExBooking.Request slot, preferred resources, routing context, metadata.
 [x] ExBooking.Decision status, alternatives, reasons, events, intents.
 [x] ExBooking.Hold consumer-supplied temporary reservation data.
@@ -91,6 +95,10 @@ File: `lib/ex_booking.ex`
 [x] import_ics_free_busy/1 delegates ICS FREEBUSY normalization.
 [x] import_jscalendar_busy/1 delegates decoded JSCalendar busy mapping.
 [x] Unknown options are rejected with stable malformed-input errors.
+[x] Validate request meeting-type identity, exact slot duration, and horizon
+    shape before decision work; return SP.02 tagged errors without raising.
+[x] Preflight availability inputs with stable errors before assignment,
+    timezone conversion, arithmetic, or slot generation.
 ```
 
 ## SP.03 — Temporal Availability Algorithms
@@ -106,6 +114,8 @@ Files: `interval.ex`, `schedule.ex`, `slotting.ex`, `availability.ex`, `policy.e
 [x] Schedule.expand/3 snaps spring-forward gaps forward.
 [x] Schedule.expand/3 handles cross-midnight windows.
 [x] Schedule.expand/3 applies date overrides and blackouts.
+[x] Schedule.expand/3 rejects invalid timezones and malformed weekly/override
+    windows with stable tagged errors.
 [x] Slotting.generate_slots/4 keeps slot interval independent of duration.
 [x] Slotting.generate_slots/4 supports :free_start and :clock alignment.
 [x] Availability.assemble/4 builds deterministic available slots.
@@ -113,6 +123,8 @@ Files: `interval.ex`, `schedule.ex`, `slotting.ex`, `availability.ex`, `policy.e
 [x] Availability.validate/5 returns all policy/conflict reasons.
 [x] Policy.violations/4 covers lead time, booking window, and daily cap.
 [x] Policy.notice_ok/3 covers cancellation/reschedule notice rules.
+[x] Require requested slots to be wholly contained in expanded rule
+    offerability, including overrides and blackout subtraction.
 ```
 
 ## SP.04 — Assignment
@@ -131,6 +143,10 @@ File: `lib/ex_booking/assignment.ex`
 [x] Routing context is passed to scorer and never inspected by the kernel.
 [x] Final tie-break is resource id ascending.
 [x] Empty eligible resource pool returns :no_eligible_resource.
+[x] Reject unsupported strategy shapes/fallbacks and non-positive weighted
+    strategy weights with SP.02 tagged errors before sorting or division.
+[x] Validate all supplied fairness fields and convert invalid/raised scorer
+    results into SP.02 tagged errors before sorting.
 ```
 
 ## SP.05 — Lifecycle Events And Intents
@@ -151,6 +167,10 @@ Files: `decision.ex`, `event.ex`, `hold.ex`, `lib/ex_booking.ex`
 [x] mark_no_show/3 emits no-show event.
 [x] Intents are ordered persist-first.
 [x] Consumers stamp event ids and occurred_at outside the kernel.
+[x] Validate supplied holds against the canonical meeting type, requested slot,
+    and deterministic assigned resource ids before emitting reservation output.
+[x] Preflight lifecycle intervals, notice policies, and hold fields before
+    policy arithmetic or event construction.
 ```
 
 ## SP.06 — Standards Interop Helpers
@@ -167,6 +187,10 @@ Files: `rrule.ex`, `icalendar.ex`, `jscalendar.ex`
 [x] ICalendar normalizes UTC FREEBUSY start/duration periods.
 [x] ICalendar unfolds folded lines and merges busy intervals.
 [x] ICalendar rejects unsupported local date-times.
+[x] ICalendar treats FBTYPE=FREE as free and applies RFC 5545 defaults and
+    unknown-token behavior without weakening malformed-period errors.
+[x] ICalendar accepts RFC 5545 week durations and rejects invalid duration
+    mixtures, empty time components, and zero durations.
 [x] JSCalendar maps decoded Event objects to busy intervals.
 [x] JSCalendar maps decoded Group entries to busy intervals.
 [x] JSCalendar ignores free/cancelled events.
@@ -187,12 +211,43 @@ Files: `test/**`, `mix.exs`, `.doctor.exs`, `.credo.exs`, `.formatter.exs`
 [x] Coverage gate stays >= 95% excluding test/support.
 [x] Doctor keeps moduledoc and public specs complete.
 [x] mix check --no-retry is the final local gate.
+[x] Add regression tests for request/offerability/hold validation, malformed
+    strategy/horizon/weight inputs, and iCalendar FBTYPE behavior.
+[x] Add facade and Schedule regressions for malformed meeting fields,
+    capacities, timezones, and schedule windows.
+[x] Add nested availability/resource/reservation/count/rule/request validation,
+    UTC interval invariants, lifecycle-policy validation, and scorer regressions.
 ```
 
-## Open Roadmap
+## Completed Hardening Decisions
 
 ```text
-[-] No in-repo tasks are currently open.
+[x] Redesign reschedule release inputs so only the identified booking/resource
+    claims are removed; interval equality alone must not erase unrelated busy
+    time (SP.02/SP.05, breaking API work).
+[x] Add capacity-consumption facts to booking reservations; overlapping interval
+    count is not a sufficient capacity model (SP.01/SP.03, breaking data-model
+    work).
+[x] Return an explicit seat allocation for :pool decisions (SP.01/SP.04,
+    breaking decision-model work).
+[x] Supply booking-specific daily-count facts instead of deriving daily caps
+    from every generic :busy calendar interval (SP.01/SP.03).
+[x] Complete public-input hardening for temporal structs and timezones across
+    availability/lifecycle entry points (SP.01/SP.02/SP.03).
+[x] Validate hand-built RRULE values before stream construction, preserve zoned
+    wall time across DST, and normalize recurrence output to UTC (SP.02/SP.06).
+[x] Reject malformed FREEBUSY properties without a value separator
+    (SP.02/SP.06).
+[x] Align JSCalendar Group entries and duration/local-date-time parsing with RFC
+    8984 arrays and fractional seconds; remove the invented id-keyed shape from
+    the normative contract (SP.02/SP.06).
+[x] Profile availability hot paths; replace Cartesian collective interval
+    intersection with an equivalent linear two-pointer walk and quadratic
+    rejection-reason appends with order-preserving reverse accumulation.
+[x] Profile RRULE walking from distant DTSTART and retain the sequential walk:
+    even a 100-year offset stayed below 35 ms, while a correct jump must retain
+    absolute COUNT ordinals and DST wall-time behavior. This is not material to
+    production booking horizons and is intentionally not speculative work.
 ```
 
 ## Delegated Outside This Repo

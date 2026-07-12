@@ -81,6 +81,23 @@ defmodule ExBooking.AssignmentTest do
 
       assert {:ok, [%Resource{id: "b"}]} = winner(resources, strategy: :weighted)
     end
+
+    test "rejects zero, negative, and non-numeric weights before division" do
+      for weight <- [0, -1, "heavy"] do
+        assert {:error, {:invalid, :resource_weight, {"a", ^weight}}} =
+                 winner([resource("a", fairness(weight: weight))], strategy: :weighted)
+      end
+    end
+
+    test "validates every supplied resource before eligibility or sorting" do
+      resources = [
+        resource("valid", fairness(weight: 1)),
+        resource("malformed", fairness(weight: 0))
+      ]
+
+      assert {:error, {:invalid, :resource_weight, {"malformed", 0}}} =
+               winner(resources, strategy: :weighted)
+    end
   end
 
   describe ":priority" do
@@ -133,13 +150,15 @@ defmodule ExBooking.AssignmentTest do
       assert {:ok, [%Resource{id: "a"}]} = winner([without, with_fairness], strategy: :priority)
     end
 
-    test "a {strategy, opts} tuple selects that strategy" do
-      resources = [
-        resource("a", fairness(assignments_count: 5)),
-        resource("b", fairness(assignments_count: 1))
-      ]
+    test "unsupported atoms and tuple shapes return tagged errors" do
+      assert {:error, {:invalid, :strategy, :random}} =
+               winner([resource("a")], strategy: :random)
 
-      assert {:ok, [%Resource{id: "b"}]} = winner(resources, strategy: {:round_robin, []})
+      assert {:error, {:invalid, :strategy, {:round_robin, []}}} =
+               winner([resource("a")], strategy: {:round_robin, []})
+
+      assert {:error, {:invalid, :strategy, {:owner_first, []}}} =
+               winner([resource("a")], strategy: {:owner_first, []})
     end
 
     test "round-robin ties break by earliest last_assigned_at" do
@@ -149,6 +168,26 @@ defmodule ExBooking.AssignmentTest do
       ]
 
       assert {:ok, [%Resource{id: "b"}]} = winner(resources, strategy: :round_robin)
+    end
+
+    test "rejects malformed resource containers, ids, fairness, scorer, and opts" do
+      assert {:error, {:invalid, :opts, :not_a_keyword_list}} = Assignment.validate([], :bad)
+      assert {:error, {:invalid, :resources, :bad}} = Assignment.validate(:bad, [])
+
+      assert {:error, {:invalid, :resource_id, ""}} =
+               winner([resource("")], strategy: :first_available)
+
+      assert {:error, {:invalid, :resources, {0, :bad}}} =
+               winner([:bad], strategy: :first_available)
+
+      assert {:error, {:invalid, :resource_fairness, {"a", :bad}}} =
+               winner([resource("a", :bad)], strategy: :first_available)
+
+      assert {:error, {:invalid, :resource_fairness, {"a", {:unexpected, true}}}} =
+               winner([resource("a", %{unexpected: true})], strategy: :first_available)
+
+      assert {:error, {:invalid, :scorer, :bad}} =
+               Assignment.validate([resource("a")], scorer: :bad)
     end
   end
 
@@ -167,6 +206,22 @@ defmodule ExBooking.AssignmentTest do
                  scorer: scorer,
                  routing_context: %{favourite: "b"}
                )
+    end
+
+    test "returns tagged errors for non-numeric and raised scorer results" do
+      assert {:error, {:invalid, :scorer_result, {"a", :high}}} =
+               winner([resource("a")], scorer: fn _, _ -> :high end)
+
+      assert {:error, {:invalid, :scorer_result, {"a", :raised}}} =
+               winner([resource("a")], scorer: fn _, _ -> raise "boom" end)
+    end
+
+    test "rejects malformed fairness before strategy sorting" do
+      assert {:error, {:invalid, :resource_fairness, {"a", {:priority, "high"}}}} =
+               winner([resource("a", %{priority: "high"})], strategy: :priority)
+
+      assert {:error, {:invalid, :resource_fairness, {"a", {:assignments_count, -1}}}} =
+               winner([resource("a", %{assignments_count: -1})], strategy: :round_robin)
     end
   end
 end

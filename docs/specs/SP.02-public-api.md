@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: critical
   created: "2026-07-08"
-  updated: "2026-07-08"
+  updated: "2026-07-11"
   tags: ["api", "facade", "options", "error-vocabulary"]
   depends_on: ["R.01", "SP.01"]
 ---
@@ -33,6 +33,57 @@ Every time-relative function takes a keyword list with:
 
 Options are validated with `NimbleOptions`; unknown keys are rejected.
 
+When a horizon is accepted, `:from` and `:until` must be supplied together as
+`DateTime`s and `from < until`. An incomplete or non-increasing horizon is
+malformed input. Assignment strategies must be one of the forms defined in
+SP.04. Validation happens before temporal expansion, arithmetic, sorting, or
+strategy dispatch; caller-controlled malformed input returns `{:error, _}` and
+must not raise.
+
+Nested caller-built data is validated with the same rule. Stable tagged errors
+include `{:invalid, :interval, detail}`, meeting/request field errors,
+`{:invalid, :resource_busy | :resource_reservations | :daily_booking_counts, detail}`,
+`{:invalid, :resource_fairness, detail}`, rule field errors, lifecycle policy
+errors, `{:invalid, :hold, detail}`, and `{:invalid, :scorer_result, detail}`.
+The `detail` identifies the offending value or indexed nested field. These tags
+are public vocabulary; malformed nested data never becomes a conflict or gets
+silently ignored.
+
+The nested-validation vocabulary is exactly:
+
+```text
+{:invalid, :interval, :datetime_required | :empty_or_reversed | :not_utc}
+{:invalid, :meeting_type_id | :invitee_timezone | :preferred_resource_ids |
+           :routing_context | :meeting_buffers | :cancellation_policy |
+           :reschedule_policy, detail}
+{:invalid, :resource_id, value}
+{:invalid, :resource_busy | :resource_reservations | :daily_booking_counts,
+           detail}
+{:invalid, :resource_fairness, detail}
+{:invalid, :blackouts | :lead_time_min | :booking_window_days | :max_per_day |
+           :rule_buffers, detail}
+{:invalid, :existing, :datetime_required | :empty_or_reversed | :not_utc}
+{:invalid, :hold, detail}
+{:invalid, :scorer_result, {resource_id, value | :raised}}
+```
+
+## Request invariants
+
+`validate_request/5`, `decide/5`, and `reschedule/6` first establish these
+structural invariants:
+
+```text
+request.meeting_type_id == meeting_type.id
+request.slot is a valid Interval
+DateTime.diff(request.slot.end_at, request.slot.start_at, :second)
+  == meeting_type.duration_min * 60
+```
+
+Failure returns a tagged `{:invalid, _, _}` error. These failures are not
+availability reasons and do not produce a `Decision`. A structurally valid slot
+can still be rejected because it is not contained by expanded offerability or is
+otherwise unavailable; those are normal decision/validation reasons (SP.03).
+
 ## Functions
 
 ```elixir
@@ -48,6 +99,11 @@ Full availability pipeline (SP.03): expand rules → subtract busy (buffer-infla
 → snap to slot grid → filter lead time/window/caps → apply participant mode.
 Returns slots sorted ascending by `start_at`.
 
+Before assignment, timezone conversion, temporal arithmetic, or slot generation,
+the facade validates the complete nested meeting, request, resource, reservation,
+daily-count, fairness, and rule shapes. `validate_request/5`, `decide/5`, and
+`reschedule/6` use the same preflight contract.
+
 Supported options:
 
 - `:now`, `:from`, `:until` — required `DateTime` inputs supplied by the caller.
@@ -60,11 +116,15 @@ Supported options:
         [ExBooking.Resource.t()],
         [ExBooking.AvailabilityRule.t()],
         keyword()
-      ) :: :ok | {:error, [reason :: term()]}
+      ) ::
+        :ok
+        | {:error, [reason :: term()] | {:invalid, field :: atom(), detail :: term()}}
 ```
 
-Checks a specific requested slot without committing to an assignment. Returns all
-failing reasons, not just the first.
+Checks a specific requested slot without committing to an assignment. A
+well-formed request returns all availability and policy reasons, not just the
+first. A structurally malformed request returns one tagged `{:invalid, _, _}`
+error rather than a reason list.
 
 ```elixir
 @spec decide(
@@ -102,8 +162,9 @@ Supported options:
 ```
 
 Like `decide/5`, but evaluates the meeting type's reschedule policy against the
-existing slot, treats the existing slot's busy time as released, and emits
-`:booking_rescheduled` semantics.
+existing slot and emits `:booking_rescheduled` semantics. Callers must remove
+the identified booking's own holds/reservations from the supplied resource
+facts. The kernel never subtracts generic busy time by interval equality.
 
 ```elixir
 @spec evaluate_cancellation(
@@ -171,7 +232,9 @@ Supported options:
         [ExBooking.Resource.t()],
         ExBooking.Interval.t(),
         keyword()
-      ) :: {:ok, [ExBooking.Resource.t()]} | {:error, :no_eligible_resource}
+      ) ::
+        {:ok, [ExBooking.Resource.t()]}
+        | {:error, :no_eligible_resource | {:invalid, atom(), term()}}
 ```
 
 Standalone assignment (SP.04) for consumers that run their own availability
@@ -221,6 +284,38 @@ across patch versions:
 {:policy, :cancellation | :reschedule, :not_allowed | :min_notice}
 {:no_eligible_resource, ExBooking.Interval.t()}
 ```
+
+The following malformed-input details are normative for this correctness batch:
+
+```elixir
+{:invalid, :meeting_type_id, {:mismatch, request_id, meeting_type_id}}
+{:invalid, :slot, :required | :invalid_interval}
+{:invalid, :slot_duration, {:expected, expected_seconds, :actual, actual_seconds}}
+{:invalid, :horizon, :requires_from_and_until | :not_increasing}
+{:invalid, :strategy, supplied_strategy}
+{:invalid, :resource_weight, {resource_id, supplied_weight}}
+{:invalid, :rule_timezone, supplied_timezone}
+{:invalid, :resource_timezone, {resource_id, supplied_timezone}}
+{:invalid, :duration_min, supplied_duration}
+{:invalid, :slot_interval_min, supplied_interval}
+{:invalid, :capacity_required, supplied_capacity}
+{:invalid, :participants, supplied_participants}
+{:invalid, :resource_capacity, {resource_id, supplied_capacity}}
+{:invalid, :windows, {:weekly, index, supplied_window}}
+{:invalid, :windows, {:weekly, :not_a_list, supplied_windows}}
+{:invalid, :overrides, {:entry, index, supplied_override}}
+{:invalid, :overrides, {:window, override_index, window_index, supplied_window}}
+{:invalid, :overrides, {:not_a_list, supplied_overrides}}
+{:invalid, :hold, {:mismatch, :meeting_type_id | :slot | :resource_ids}}
+{:invalid, :hold, {:invalid, :id | :expires_at}}
+{:invalid, :rrule, :arguments | :interval | :count | :until | :byday}
+{:invalid, :freebusy, :property}
+{:invalid, :jscalendar, :entries | :start | :duration}
+```
+
+The outer `{:error, reason}` wrapper is used for these values. Implementations
+may add more `{:invalid, field, detail}` cases for other malformed fields, but
+must not collapse the cases above into exceptions or untagged strings.
 
 ## Stability
 

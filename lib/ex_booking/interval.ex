@@ -46,14 +46,53 @@ defmodule ExBooking.Interval do
 
   """
   @spec new(DateTime.t(), DateTime.t(), keyword()) ::
-          {:ok, t()} | {:error, {:invalid, :interval, :empty_or_reversed}}
-  def new(start_at, end_at, opts \\ []) do
+          {:ok, t()} | {:error, {:invalid, :interval, :datetime_required | :empty_or_reversed}}
+  def new(start_at, end_at, opts \\ [])
+
+  def new(%DateTime{} = start_at, %DateTime{} = end_at, opts) do
+    start_at = DateTime.shift_zone!(start_at, "Etc/UTC")
+    end_at = DateTime.shift_zone!(end_at, "Etc/UTC")
+
     if DateTime.compare(start_at, end_at) == :lt do
       {:ok, %__MODULE__{start_at: start_at, end_at: end_at, kind: opts[:kind], meta: opts[:meta]}}
     else
       {:error, {:invalid, :interval, :empty_or_reversed}}
     end
   end
+
+  def new(_, _, _), do: {:error, {:invalid, :interval, :datetime_required}}
+
+  @doc """
+  Validates a caller-built interval has increasing UTC `DateTime` endpoints.
+
+  Constructors normalize zones, while this boundary validator rejects structs
+  that bypassed them so downstream algebra has one temporal invariant.
+
+  ## Examples
+
+      iex> interval = ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z])
+      ...> ExBooking.Interval.validate(interval)
+      :ok
+
+  """
+  @spec validate(t()) ::
+          :ok
+          | {:error, {:invalid, :interval, :datetime_required | :empty_or_reversed | :not_utc}}
+  def validate(%__MODULE__{start_at: %DateTime{} = start_at, end_at: %DateTime{} = end_at}) do
+    cond do
+      not utc?(start_at) or not utc?(end_at) ->
+        {:error, {:invalid, :interval, :not_utc}}
+
+      DateTime.compare(start_at, end_at) != :lt ->
+        {:error, {:invalid, :interval, :empty_or_reversed}}
+
+      true ->
+        :ok
+    end
+  end
+
+  def validate(%__MODULE__{}), do: {:error, {:invalid, :interval, :datetime_required}}
+  def validate(_), do: {:error, {:invalid, :interval, :datetime_required}}
 
   @doc """
   Like `new/3`, but raises `ArgumentError` on invalid bounds.
@@ -71,6 +110,9 @@ defmodule ExBooking.Interval do
       {:error, reason} -> raise ArgumentError, "invalid interval: #{inspect(reason)}"
     end
   end
+
+  defp utc?(%DateTime{time_zone: "Etc/UTC", utc_offset: 0, std_offset: 0}), do: true
+  defp utc?(_), do: false
 
   @doc """
   Whether two intervals share any instant. Touching intervals do not overlap.
@@ -221,6 +263,31 @@ defmodule ExBooking.Interval do
   end
 
   @doc """
+  Intersects two interval sets in normal form.
+
+  Inputs are normalized before a two-pointer walk, so the result is sorted and
+  merged without constructing the Cartesian product. Clipping keeps the left
+  interval's `kind` and `meta`, consistently with `clip/2`.
+
+  ## Examples
+
+      iex> available = [ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 12:00:00Z])]
+      ...> staffed = [ExBooking.Interval.new!(~U[2026-07-13 10:00:00Z], ~U[2026-07-13 11:00:00Z])]
+      ...> [common] = ExBooking.Interval.intersect(available, staffed)
+      ...> {common.start_at, common.end_at}
+      {~U[2026-07-13 10:00:00Z], ~U[2026-07-13 11:00:00Z]}
+
+  """
+  @spec intersect([t()], [t()]) :: [t()]
+  def intersect(left, right) do
+    left
+    |> merge()
+    |> intersect_normalized(merge(right), [])
+    |> Enum.reverse()
+    |> merge()
+  end
+
+  @doc """
   Widens an interval by minutes on each side. Used to apply buffers to busy
   time and requested booking time.
 
@@ -265,6 +332,23 @@ defmodule ExBooking.Interval do
       [interval | acc]
     else
       [%{previous | end_at: max_dt(previous.end_at, interval.end_at)} | rest]
+    end
+  end
+
+  defp intersect_normalized([], _, acc), do: acc
+  defp intersect_normalized(_, [], acc), do: acc
+
+  defp intersect_normalized([left | left_rest] = lefts, [right | right_rest] = rights, acc) do
+    acc =
+      case clip(left, right) do
+        nil -> acc
+        clipped -> [clipped | acc]
+      end
+
+    case DateTime.compare(left.end_at, right.end_at) do
+      :lt -> intersect_normalized(left_rest, rights, acc)
+      :gt -> intersect_normalized(lefts, right_rest, acc)
+      :eq -> intersect_normalized(left_rest, right_rest, acc)
     end
   end
 

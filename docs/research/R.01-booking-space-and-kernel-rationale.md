@@ -5,7 +5,7 @@ ex_booking:
   category: research
   status: complete
   created: "2026-07-08"
-  updated: "2026-07-08"
+  updated: "2026-07-11"
   decision: adopted
   tags:
     [
@@ -176,8 +176,9 @@ orchestration layer            persistence, booking state machine, APIs, tenancy
 ```
 
 Booking lifecycle events (`booking_reserved`, `booking_confirmed`,
-`booking_canceled`, `booking_no_show`, …) form the contract that billing meters
-and analytics consume. Multiple product surfaces can book through one shared
+`booking_canceled`, `booking_no_show`, …) form a commercially neutral fact contract
+that analytics consumes and hosts may use as evidence for separately defined meters.
+Multiple product surfaces can book through one shared
 system instead of rebuilding scheduling per product. Extension specifications for
 those layers live with their own codebases, not here.
 

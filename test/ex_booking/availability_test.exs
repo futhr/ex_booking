@@ -11,6 +11,7 @@ defmodule ExBooking.AvailabilityTest do
   alias ExBooking.Interval
   alias ExBooking.MeetingType
   alias ExBooking.Request
+  alias ExBooking.Reservation
   alias ExBooking.Resource
 
   doctest ExBooking.Availability
@@ -38,6 +39,13 @@ defmodule ExBooking.AvailabilityTest do
 
   defp busy(start_at, end_at, kind \\ :busy) do
     %Interval{start_at: start_at, end_at: end_at, kind: kind}
+  end
+
+  defp reservation(start_at, end_at, capacity_consumed) do
+    %Reservation{
+      interval: busy(start_at, end_at),
+      capacity_consumed: capacity_consumed
+    }
   end
 
   defp starts(slots), do: Enum.map(slots, & &1.start_at)
@@ -105,6 +113,38 @@ defmodule ExBooking.AvailabilityTest do
                )
     end
 
+    test "a conflict-free slot outside expanded offerability is rejected" do
+      slot = Interval.new!(~U[2026-07-13 08:30:00Z], ~U[2026-07-13 09:00:00Z])
+
+      assert {:error, [{:outside_window, ~D[2026-07-13]}]} =
+               Availability.validate(request(slot), meeting_type(), [resource()], [rule()],
+                 now: @now
+               )
+    end
+
+    test "overrides and blackouts participate in requested-slot offerability" do
+      slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+      blackout = Interval.new!(~U[2026-07-13 09:15:00Z], ~U[2026-07-13 09:20:00Z])
+
+      assert {:error, [{:outside_window, ~D[2026-07-13]}]} =
+               Availability.validate(
+                 request(slot),
+                 meeting_type(),
+                 [resource()],
+                 [rule(blackouts: [blackout])],
+                 now: @now
+               )
+
+      assert {:error, [{:outside_window, ~D[2026-07-13]}]} =
+               Availability.validate(
+                 request(slot),
+                 meeting_type(),
+                 [resource()],
+                 [rule(overrides: [%{date: ~D[2026-07-13], windows: []}])],
+                 now: @now
+               )
+    end
+
     test "a conflicting slot reports the conflicting interval" do
       slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
       conflict = busy(~U[2026-07-13 09:15:00Z], ~U[2026-07-13 09:45:00Z])
@@ -117,6 +157,31 @@ defmodule ExBooking.AvailabilityTest do
                  [rule()],
                  now: @now
                )
+    end
+
+    test "large candidate sets preserve resource reason order" do
+      slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+
+      resources =
+        for index <- 1..1_000 do
+          %{
+            resource([busy(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z])])
+            | id: "res_#{index}"
+          }
+        end
+
+      assert {:error, reasons} =
+               Availability.validate(
+                 request(slot),
+                 meeting_type(),
+                 resources,
+                 List.duplicate(rule(), length(resources)),
+                 now: @now
+               )
+
+      assert {:conflict, "res_1", _} = hd(reasons)
+      assert {:conflict, "res_1000", _} = List.last(reasons)
+      assert length(reasons) == 1_000
     end
 
     test "preferred_resource_ids restricts the candidate pool" do
@@ -133,7 +198,7 @@ defmodule ExBooking.AvailabilityTest do
     end
 
     test "a missing slot is rejected" do
-      assert {:error, [{:invalid, :slot, :missing}]} =
+      assert {:error, {:invalid, :slot, :required}} =
                Availability.validate(request(nil), meeting_type(), [resource()], [rule()],
                  now: @now
                )
@@ -142,7 +207,7 @@ defmodule ExBooking.AvailabilityTest do
     test "mismatched resources and rules is a malformed input error" do
       slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
 
-      assert {:error, [{:invalid, :rules, :length_mismatch}]} =
+      assert {:error, {:invalid, :rules, :length_mismatch}} =
                Availability.validate(request(slot), meeting_type(), [resource()], [], now: @now)
     end
   end
@@ -198,6 +263,50 @@ defmodule ExBooking.AvailabilityTest do
       starts = starts(slots)
       refute ~U[2026-07-13 09:00:00Z] in starts
       assert ~U[2026-07-13 09:30:00Z] in starts
+    end
+
+    test "subtracts explicit reservation consumption instead of overlap count" do
+      window = rule(windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[10:00:00]}])
+
+      resource = %{
+        resource()
+        | capacity: 5,
+          reservations: [
+            reservation(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z], 3)
+          ]
+      }
+
+      assert {:ok, slots} =
+               Availability.assemble(
+                 meeting_type(participants: :pool, capacity_required: 3, slot_interval_min: 30),
+                 [resource],
+                 [window],
+                 @horizon
+               )
+
+      refute ~U[2026-07-13 09:00:00Z] in starts(slots)
+      assert ~U[2026-07-13 09:30:00Z] in starts(slots)
+    end
+
+    test "generic busy time blocks all seats while reservations consume partial capacity" do
+      slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+      meeting_type = meeting_type(participants: :pool, capacity_required: 1)
+
+      generic_busy = %{resource([busy(slot.start_at, slot.end_at)]) | capacity: 10}
+
+      partial = %{
+        resource()
+        | capacity: 10,
+          reservations: [reservation(slot.start_at, slot.end_at, 9)]
+      }
+
+      assert {:error, _} =
+               Availability.validate(request(slot), meeting_type, [generic_busy], [rule()],
+                 now: @now
+               )
+
+      assert :ok =
+               Availability.validate(request(slot), meeting_type, [partial], [rule()], now: @now)
     end
   end
 
@@ -277,6 +386,54 @@ defmodule ExBooking.AvailabilityTest do
       inflate_busy = Interval.overlaps?(slot, Interval.inflate(busy, after_min, before_min))
 
       assert inflate_slot == inflate_busy
+    end
+  end
+
+  property "every assembled slot is contained by requested-slot offerability" do
+    check all({duration, step} <- duration_and_step(), max_runs: 40) do
+      meeting_type = meeting_type(duration_min: duration, slot_interval_min: step)
+
+      assert {:ok, slots} =
+               Availability.assemble(meeting_type, [resource()], [rule()], @horizon)
+
+      Enum.each(slots, fn slot ->
+        assert :ok =
+                 Availability.validate(request(slot), meeting_type, [resource()], [rule()],
+                   now: @now
+                 )
+      end)
+    end
+  end
+
+  property "increasing overlapping reservation consumption never increases pool slots" do
+    check all(
+            first_consumption <- integer(1..5),
+            added_consumption <- integer(1..5),
+            max_runs: 40
+          ) do
+      interval = {~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z]}
+
+      resource = %{
+        resource()
+        | capacity: 10,
+          reservations: [reservation(elem(interval, 0), elem(interval, 1), first_consumption)]
+      }
+
+      more_consumed = %{
+        resource
+        | reservations: [
+            reservation(elem(interval, 0), elem(interval, 1), added_consumption)
+            | resource.reservations
+          ]
+      }
+
+      pool = meeting_type(participants: :pool, capacity_required: 5)
+      assert {:ok, base_slots} = Availability.assemble(pool, [resource], [rule()], @horizon)
+
+      assert {:ok, reduced_slots} =
+               Availability.assemble(pool, [more_consumed], [rule()], @horizon)
+
+      assert MapSet.subset?(MapSet.new(starts(reduced_slots)), MapSet.new(starts(base_slots)))
     end
   end
 end

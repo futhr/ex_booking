@@ -61,6 +61,17 @@ defmodule ExBooking.SlottingTest do
       assert starts == [~U[2026-07-13 09:15:00Z], ~U[2026-07-13 09:30:00Z]]
     end
 
+    test "clock alignment removes seconds and microseconds" do
+      free =
+        Interval.new!(
+          ~U[2026-07-13 09:07:30.500000Z],
+          ~U[2026-07-13 10:00:00.000000Z]
+        )
+
+      assert [%Interval{start_at: ~U[2026-07-13 09:15:00Z]} | _] =
+               Slotting.generate_slots(free, 30, 15, align: :clock)
+    end
+
     test "free-start alignment remains the default" do
       free = Interval.new!(~U[2026-07-13 09:07:00Z], ~U[2026-07-13 10:00:00Z])
 
@@ -115,6 +126,8 @@ defmodule ExBooking.SlottingTest do
           if first = List.first(slots) do
             minutes_since_midnight = first.start_at.hour * 60 + first.start_at.minute
             assert rem(minutes_since_midnight, step_min) == 0
+            assert first.start_at.second == 0
+            assert first.start_at.microsecond == {0, 0}
           end
         end
       end

@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-07-08"
-  updated: "2026-07-08"
+  updated: "2026-07-12"
   tags: ["lifecycle", "events", "intents", "holds"]
   depends_on: ["R.01", "SP.01"]
 ---
@@ -32,8 +32,11 @@ pending_payment → confirmed | expired
   `:hold` it *reserves* (`:booking_reserved`, intents `{:reserve, hold}` then
   `{:emit, _}`) — the kernel never fabricates a `Hold` id or `expires_at`.
 - `reschedule/6` — validates policy (`reschedule_policy.min_notice_min` against
-  `:now` and the existing slot), releases the old slot's busy claim in its own
-  computation, and re-runs decision for the new slot. It emits
+  `:now` and the existing slot), and re-runs decision for the new slot against
+  the exact availability facts supplied by the caller. The caller must exclude
+  the identified booking's own holds/reservations before calling; the kernel
+  never subtracts a generic interval by timestamp because that could erase an
+  unrelated overlapping calendar event. It emits
   `:booking_rescheduled` (`data: %{from: old, to: new}`) with intents
   `{:calendar_event, :move, _}` then `{:emit, _}`, optionally prefixed by
   `{:release, hold_id}` when `:release_hold_id` is given. A failed policy check
@@ -50,19 +53,45 @@ pending_payment → confirmed | expired
   `kind: :hold` busy time in subsequent searches, and expire them by comparing
   `expires_at` with their clock. The kernel never expires anything itself.
 
+Every lifecycle entry point preflights its temporal and nested inputs before
+policy arithmetic or event construction. Existing/hold slots must be valid UTC
+intervals, meeting ids and resource ids must be non-empty strings, hold expiry
+must be a `DateTime`, and cancellation/reschedule policies must have an exact
+`%{allowed: boolean(), min_notice_min: non_neg_integer()}` shape. Malformed
+inputs return SP.02 tagged errors and emit no decision, event, or intent.
+
+### Supplied hold consistency
+
+After request validation and deterministic assignment, but before building a
+reservation event or intents, `decide/5` validates a supplied hold against the
+canonical result:
+
+```text
+hold.meeting_type_id == request.meeting_type_id == meeting_type.id
+hold.slot.start_at == request.slot.start_at
+hold.slot.end_at == request.slot.end_at
+hold.resource_ids == assigned resource ids  # same deterministic order
+```
+
+The hold id must be a non-empty string and `expires_at` must be a `DateTime`.
+A mismatch returns the SP.02 tagged malformed-input error and emits no decision,
+event, or intent. Consumer-supplied ids and expiry instants remain opaque; the
+kernel does not invent them or read the clock to decide whether the hold expired.
+
 ## Payment semantics
 
 Payment state is data, not kernel behavior. A meeting type whose consumer requires
 payment moves through `pending_payment` in the consumer's state machine; the kernel
 only re-validates the slot when asked (same `validate_request/5`). Rule inherited
 from market evidence (R.01): *booking confirmation never blocks on a billing
-write* — billing consumes events asynchronously.
+write*. Consumers publish lifecycle facts asynchronously; a product may derive a
+separate contract meter from evidence, but the kernel never declares an event billable.
 
 ## Canonical events
 
 Emitted inside `Decision.events`; the consumer stamps `occurred_at`, assigns ids,
-and publishes. Names are the cross-system contract consumed by orchestration,
-analytics, and billing meters:
+and publishes. Names are commercially neutral lifecycle facts consumed by
+orchestration and analytics and available as evidence to host-defined meters:
 
 | Event `type` | Emitted when |
 |---|---|
@@ -74,8 +103,8 @@ analytics, and billing meters:
 | `:booking_no_show` | `mark_no_show/3` is called by the consumer |
 
 `Event.routing_context` is the untouched `Request.routing_context` — this is how
-UTM/CRM attribution reaches analytics and billing without the kernel knowing what
-it means.
+UTM/CRM attribution reaches analytics and downstream evidence projections without
+the kernel knowing what it means. Its presence never makes an event billable.
 
 ## Side-effect intents
 
@@ -86,17 +115,25 @@ it means.
 {:release, hold_id :: String.t()}              # on reschedule/cancel paths
 {:calendar_event, :create | :cancel | :move, payload :: map()}
 {:notify, template :: atom(), payload :: map()}   # confirmation, reminder seeds
-{:emit, ExBooking.Event.t()}                   # publish to event bus / billing
+{:emit, ExBooking.Event.t()}                   # publish commercially neutral lifecycle fact
 ```
 
 Intents are ordered: consumers execute sequentially, persist-first (`:reserve`
 always precedes `:calendar_event`/`:notify`/`:emit`). Idempotency keys are consumer
 concerns (holds carry consumer-supplied ids for this reason).
 
+An immediately confirmed booking emits calendar create, booking-confirmation
+notification, then lifecycle event. Reschedule emits calendar move,
+booking-rescheduled notification, then lifecycle event; cancellation emits
+calendar cancel, booking-canceled notification, then lifecycle event. A held
+reservation does not notify until confirmation. Notification payloads contain
+only the normalized slot, resource ids, and meeting type id; consumers load
+invitee contact data at execution time rather than persisting it in an intent.
+
 ## Snapshotting
 
 A `Decision` embeds everything in force at decision time (slot, resources,
-meeting type id, reasons). Consumers persist the decision alongside the booking so
+meeting type id, pool seat allocations, reasons). Consumers persist the decision alongside the booking so
 later disputes ("why was this host chosen?") are answerable without replaying
 rules that have since changed.
 

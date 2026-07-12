@@ -25,20 +25,20 @@ defmodule ExBooking.JSCalendarTest do
     test "normalizes group entries and merges overlapping busy intervals" do
       group = %{
         "@type" => "Group",
-        "entries" => %{
-          "b" => %{
+        "entries" => [
+          %{
             "@type" => "Event",
             "start" => "2026-07-13T09:30:00",
             "timeZone" => "Europe/Stockholm",
             "duration" => "PT45M"
           },
-          "a" => %{
+          %{
             "@type" => "Event",
             "start" => "2026-07-13T09:00:00",
             "timeZone" => "Europe/Stockholm",
             "duration" => "PT45M"
           }
-        }
+        ]
       }
 
       assert {:ok, [busy]} = JSCalendar.busy_intervals(group)
@@ -105,6 +105,9 @@ defmodule ExBooking.JSCalendarTest do
     test "rejects invalid group entries" do
       assert {:error, {:invalid, :jscalendar, :entries}} =
                JSCalendar.busy_intervals(%{"@type" => "Group", "entries" => "bad"})
+
+      assert {:error, {:invalid, :jscalendar, :entries}} =
+               JSCalendar.busy_intervals(%{"@type" => "Group", "entries" => %{}})
     end
 
     test "rejects unsupported object types and invalid objects" do
@@ -179,7 +182,60 @@ defmodule ExBooking.JSCalendarTest do
       assert busy.start_at == ~U[2026-11-01 05:30:00Z]
     end
 
-    test "snaps spring-forward gap starts forward" do
+    test "preserves fractional local datetime and duration precision" do
+      event = %{
+        "@type" => "Event",
+        "start" => "2026-07-13T09:00:00.123456",
+        "timeZone" => "Etc/UTC",
+        "duration" => "PT0.5S"
+      }
+
+      assert {:ok, [busy]} = JSCalendar.busy_intervals(event)
+      assert busy.start_at == ~U[2026-07-13 09:00:00.123456Z]
+      assert busy.end_at == ~U[2026-07-13 09:00:00.623456Z]
+    end
+
+    test "rejects fractional precision beyond microseconds" do
+      base = %{
+        "@type" => "Event",
+        "start" => "2026-07-13T09:00:00",
+        "timeZone" => "Etc/UTC",
+        "duration" => "PT1S"
+      }
+
+      assert {:error, {:invalid, :jscalendar, :start}} =
+               base
+               |> Map.put("start", "2026-07-13T09:00:00.1234567")
+               |> JSCalendar.busy_intervals()
+
+      assert {:error, {:invalid, :jscalendar, :duration}} =
+               base
+               |> Map.put("duration", "PT0.1234567S")
+               |> JSCalendar.busy_intervals()
+    end
+
+    test "rejects non-canonical fractions and invalid duration component order" do
+      base = %{
+        "@type" => "Event",
+        "start" => "2026-07-13T09:00:00",
+        "timeZone" => "Etc/UTC",
+        "duration" => "PT1S"
+      }
+
+      assert {:error, {:invalid, :jscalendar, :start}} =
+               base
+               |> Map.put("start", "2026-07-13T09:00:00.120")
+               |> JSCalendar.busy_intervals()
+
+      for duration <- ["PT0.0S", "PT0.500S", "PT1H1S"] do
+        event = Map.put(base, "duration", duration)
+
+        assert {:error, {:invalid, :jscalendar, :duration}} =
+                 JSCalendar.busy_intervals(event)
+      end
+    end
+
+    test "uses the offset before a spring-forward gap" do
       event = %{
         "@type" => "Event",
         "start" => "2026-03-29T02:30:00",
@@ -188,7 +244,20 @@ defmodule ExBooking.JSCalendarTest do
       }
 
       assert {:ok, [busy]} = JSCalendar.busy_intervals(event)
-      assert busy.start_at == ~U[2026-03-29 01:00:00Z]
+      assert busy.start_at == ~U[2026-03-29 01:30:00Z]
+    end
+
+    test "applies calendar days from the requested wall time inside a gap" do
+      event = %{
+        "@type" => "Event",
+        "start" => "2026-03-29T02:30:00",
+        "timeZone" => "Europe/Stockholm",
+        "duration" => "P1D"
+      }
+
+      assert {:ok, [busy]} = JSCalendar.busy_intervals(event)
+      assert busy.start_at == ~U[2026-03-29 01:30:00Z]
+      assert busy.end_at == ~U[2026-03-30 00:30:00Z]
     end
 
     test "drops zero-duration events" do

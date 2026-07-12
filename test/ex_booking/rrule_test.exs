@@ -45,6 +45,7 @@ defmodule ExBooking.RRuleTest do
       assert {:error, {:invalid, :rrule, :until}} = RRule.parse("FREQ=DAILY;UNTIL=20260713")
       assert {:error, {:unsupported, :rrule, :byday}} = RRule.parse("FREQ=DAILY;BYDAY=MO")
       assert {:error, {:invalid, :rrule, :byday}} = RRule.parse("FREQ=WEEKLY;BYDAY=XX")
+      assert {:error, {:invalid, :rrule, :byday}} = RRule.parse("FREQ=WEEKLY;BYDAY=")
     end
   end
 
@@ -112,6 +113,90 @@ defmodule ExBooking.RRuleTest do
       assert Enum.map(intervals, & &1.start_at) == [
                ~U[2026-07-13 09:00:00Z],
                ~U[2026-07-20 09:00:00Z]
+             ]
+    end
+
+    test "rejects malformed hand-built rules before constructing a stream" do
+      assert {:error, {:invalid, :rrule, :interval}} =
+               RRule.expand(%RRule{freq: :daily, interval: 0}, @dtstart, 30, @from, @until)
+
+      assert {:error, {:invalid, :rrule, :count}} =
+               RRule.expand(%RRule{freq: :daily, count: 0}, @dtstart, 30, @from, @until)
+
+      assert {:error, {:invalid, :rrule, :until}} =
+               RRule.expand(%RRule{freq: :daily, until: :invalid}, @dtstart, 30, @from, @until)
+
+      assert {:error, {:invalid, :rrule, :byday}} =
+               RRule.expand(%RRule{freq: :weekly, byday: []}, @dtstart, 30, @from, @until)
+
+      assert {:error, {:unsupported, :rrule, :byday}} =
+               RRule.expand(%RRule{freq: :daily, byday: [1]}, @dtstart, 30, @from, @until)
+
+      assert {:error, {:unsupported, :rrule, {:freq, :monthly}}} =
+               RRule.expand(%RRule{freq: :monthly}, @dtstart, 30, @from, @until)
+
+      assert {:error, {:invalid, :rrule, :byday}} =
+               RRule.expand(%RRule{freq: :weekly, byday: [0, 8]}, @dtstart, 30, @from, @until)
+
+      assert {:error, {:invalid, :rrule, :arguments}} =
+               RRule.expand(:invalid, @dtstart, 30, @from, @until)
+
+      assert {:error, {:invalid, :rrule, :arguments}} =
+               RRule.expand(%RRule{freq: :daily}, @dtstart, 0, @from, @until)
+    end
+
+    test "preserves Stockholm wall time across spring-forward and returns UTC" do
+      {:ok, dtstart} = DateTime.new(~D[2026-03-28], ~T[09:00:00], "Europe/Stockholm")
+
+      assert {:ok, intervals} =
+               RRule.expand(
+                 "FREQ=DAILY;COUNT=3",
+                 dtstart,
+                 30,
+                 ~U[2026-03-27 00:00:00Z],
+                 ~U[2026-04-01 00:00:00Z]
+               )
+
+      assert Enum.map(intervals, & &1.start_at) == [
+               ~U[2026-03-28 08:00:00Z],
+               ~U[2026-03-29 07:00:00Z],
+               ~U[2026-03-30 07:00:00Z]
+             ]
+    end
+
+    test "uses the first New York fall-back occurrence for an ambiguous recurrence" do
+      {:ok, dtstart} = DateTime.new(~D[2026-10-31], ~T[01:30:00], "America/New_York")
+
+      assert {:ok, intervals} =
+               RRule.expand(
+                 "FREQ=DAILY;COUNT=2",
+                 dtstart,
+                 30,
+                 ~U[2026-10-30 00:00:00Z],
+                 ~U[2026-11-03 00:00:00Z]
+               )
+
+      assert Enum.map(intervals, & &1.start_at) == [
+               ~U[2026-10-31 05:30:00Z],
+               ~U[2026-11-01 05:30:00Z]
+             ]
+    end
+
+    test "snaps a Stockholm spring-forward recurrence out of the gap" do
+      {:ok, dtstart} = DateTime.new(~D[2026-03-28], ~T[02:30:00], "Europe/Stockholm")
+
+      assert {:ok, intervals} =
+               RRule.expand(
+                 "FREQ=DAILY;COUNT=2",
+                 dtstart,
+                 30,
+                 ~U[2026-03-27 00:00:00Z],
+                 ~U[2026-03-31 00:00:00Z]
+               )
+
+      assert Enum.map(intervals, & &1.start_at) == [
+               ~U[2026-03-28 01:30:00Z],
+               ~U[2026-03-29 01:00:00Z]
              ]
     end
   end

@@ -23,7 +23,9 @@ defmodule ExBooking.Decision do
   defstruct [
     :status,
     :slot,
+    :meeting_type_id,
     resource_ids: [],
+    seat_allocations: [],
     alternatives: [],
     reasons: [],
     events: [],
@@ -48,7 +50,11 @@ defmodule ExBooking.Decision do
   @type t :: %__MODULE__{
           status: status(),
           slot: Interval.t() | nil,
+          meeting_type_id: String.t() | nil,
           resource_ids: [String.t()],
+          seat_allocations: [
+            %{resource_id: String.t(), capacity_consumed: pos_integer()}
+          ],
           alternatives: [Interval.t()],
           reasons: [reason()],
           events: [Event.t()],

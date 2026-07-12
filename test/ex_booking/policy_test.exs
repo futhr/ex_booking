@@ -16,8 +16,12 @@ defmodule ExBooking.PolicyTest do
     struct!(AvailabilityRule, Map.merge(%{timezone: "Etc/UTC", windows: []}, Map.new(overrides)))
   end
 
-  defp resource(busy \\ []) do
-    %Resource{id: "res_1", timezone: "Etc/UTC", busy: busy}
+  defp resource(daily_booking_counts \\ %{}) do
+    %Resource{
+      id: "res_1",
+      timezone: "Etc/UTC",
+      daily_booking_counts: daily_booking_counts
+    }
   end
 
   defp slot(start_at) do
@@ -88,65 +92,55 @@ defmodule ExBooking.PolicyTest do
     end
 
     test "under the cap is allowed" do
-      busy = [
-        %Interval{
-          start_at: ~U[2026-07-13 09:00:00Z],
-          end_at: ~U[2026-07-13 09:30:00Z],
-          kind: :busy
-        }
-      ]
-
       assert Policy.violations(
                slot(~U[2026-07-13 11:00:00Z]),
                rule(max_per_day: 2),
-               resource(busy),
+               resource(%{~D[2026-07-13] => 1}),
                @now
              ) == []
     end
 
     test "at the cap is rejected" do
-      busy = [
-        %Interval{
-          start_at: ~U[2026-07-13 09:00:00Z],
-          end_at: ~U[2026-07-13 09:30:00Z],
-          kind: :busy
-        },
-        %Interval{
-          start_at: ~U[2026-07-13 10:00:00Z],
-          end_at: ~U[2026-07-13 10:30:00Z],
-          kind: :busy
-        }
-      ]
-
       assert [{:daily_cap, "res_1", ~D[2026-07-13]}] =
                Policy.violations(
                  slot(~U[2026-07-13 11:00:00Z]),
                  rule(max_per_day: 2),
-                 resource(busy),
+                 resource(%{~D[2026-07-13] => 2}),
                  @now
                )
     end
 
-    test "holds do not count toward the cap" do
-      busy = [
-        %Interval{
-          start_at: ~U[2026-07-13 09:00:00Z],
-          end_at: ~U[2026-07-13 09:30:00Z],
-          kind: :busy
-        },
-        %Interval{
-          start_at: ~U[2026-07-13 10:00:00Z],
-          end_at: ~U[2026-07-13 10:30:00Z],
-          kind: :hold
-        }
-      ]
+    test "generic calendar busy intervals do not become booking counts" do
+      resource = %{
+        resource()
+        | busy: [
+            %Interval{
+              start_at: ~U[2026-07-13 09:00:00Z],
+              end_at: ~U[2026-07-13 09:30:00Z],
+              kind: :busy
+            }
+          ]
+      }
 
       assert Policy.violations(
                slot(~U[2026-07-13 11:00:00Z]),
-               rule(max_per_day: 2),
-               resource(busy),
+               rule(max_per_day: 1),
+               resource,
                @now
              ) == []
+    end
+
+    test "counts use the slot date in the rule timezone" do
+      stockholm_rule =
+        rule(timezone: "Europe/Stockholm", max_per_day: 1)
+
+      assert [{:daily_cap, "res_1", ~D[2026-07-14]}] =
+               Policy.violations(
+                 slot(~U[2026-07-13 22:30:00Z]),
+                 stockholm_rule,
+                 resource(%{~D[2026-07-14] => 1}),
+                 @now
+               )
     end
   end
 

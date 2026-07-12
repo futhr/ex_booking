@@ -14,17 +14,31 @@ defmodule ExBookingTest do
   doctest ExBooking.Hold
   doctest ExBooking.MeetingType
   doctest ExBooking.Request
+  doctest ExBooking.Reservation
   doctest ExBooking.Resource
 
   @now ~U[2026-07-08 12:00:00Z]
   @horizon [now: @now, from: ~U[2026-07-13 00:00:00Z], until: ~U[2026-07-17 23:59:59Z]]
 
   describe "option validation" do
-    test "available_slots/4 requires :now, :from, :until" do
-      assert {:error, {:invalid, :opts, message}} =
+    test "available_slots/4 requires a complete horizon" do
+      assert {:error, {:invalid, :horizon, :requires_from_and_until}} =
                ExBooking.available_slots(build(:meeting_type), [], [], now: @now)
+    end
 
-      assert message =~ ":from"
+    test "horizons must be increasing and optional horizons must be paired" do
+      assert {:error, {:invalid, :horizon, :not_increasing}} =
+               ExBooking.available_slots(build(:meeting_type), [], [],
+                 now: @now,
+                 from: ~U[2026-07-14 00:00:00Z],
+                 until: ~U[2026-07-13 00:00:00Z]
+               )
+
+      assert {:error, {:invalid, :horizon, :requires_from_and_until}} =
+               ExBooking.decide(build(:request), build(:meeting_type), [], [],
+                 now: @now,
+                 from: ~U[2026-07-13 00:00:00Z]
+               )
     end
 
     test "unknown options are rejected" do
@@ -150,7 +164,7 @@ defmodule ExBookingTest do
     test "a request without a slot is rejected" do
       request = build(:request, slot: nil)
 
-      assert {:error, [{:invalid, :slot, :missing}]} =
+      assert {:error, {:invalid, :slot, :required}} =
                ExBooking.validate_request(
                  request,
                  build(:meeting_type),
@@ -158,6 +172,45 @@ defmodule ExBookingTest do
                  [build(:rule)],
                  now: @now
                )
+    end
+
+    test "request identity and exact elapsed duration are structural invariants" do
+      slot = build(:interval, end_at: ~U[2026-07-13 09:45:00Z])
+
+      assert {:error, {:invalid, :meeting_type_id, {:mismatch, "other", "demo_30"}}} =
+               ExBooking.validate_request(
+                 build(:request, meeting_type_id: "other", slot: monday_slot(~T[09:00:00])),
+                 build(:meeting_type),
+                 [build(:resource)],
+                 [build(:rule)],
+                 now: @now
+               )
+
+      assert {:error, {:invalid, :slot_duration, {:expected, 1800, :actual, 2700}}} =
+               ExBooking.validate_request(
+                 build(:request, slot: slot),
+                 build(:meeting_type),
+                 [build(:resource)],
+                 [build(:rule)],
+                 now: @now
+               )
+    end
+
+    test "exact duration rejects subsecond overflow" do
+      start_at = ~U[2026-07-13 09:00:00.000000Z]
+      end_at = DateTime.add(start_at, 1_800_000_001, :microsecond)
+      slot = build(:interval, start_at: start_at, end_at: end_at)
+
+      assert {:error, {:invalid, :slot_duration, {:expected, 1800, :actual, actual_seconds}}} =
+               ExBooking.validate_request(
+                 build(:request, slot: slot),
+                 build(:meeting_type),
+                 [build(:resource)],
+                 [build(:rule)],
+                 now: @now
+               )
+
+      assert_in_delta actual_seconds, 1800.000001, 0.0000001
     end
   end
 
@@ -176,8 +229,27 @@ defmodule ExBookingTest do
       assert decision.resource_ids == ["res_1"]
       assert [%ExBooking.Event{type: :booking_confirmed}] = decision.events
 
-      assert [{:calendar_event, :create, _}, {:emit, %ExBooking.Event{}}] =
+      assert [
+               {:calendar_event, :create, _},
+               {:notify, :booking_confirmation, _},
+               {:emit, %ExBooking.Event{}}
+             ] =
                decision.intents
+    end
+
+    test "a pool decision exposes exact seat consumption on one capable resource", %{
+      request: request
+    } do
+      meeting_type = build(:meeting_type, participants: :pool, capacity_required: 5)
+      resource = build(:resource, capacity: 10)
+
+      assert {:ok, decision} =
+               ExBooking.decide(request, meeting_type, [resource], [build(:rule)], now: @now)
+
+      assert decision.status == :ok
+      assert decision.resource_ids == ["res_1"]
+      assert decision.seat_allocations == [%{resource_id: "res_1", capacity_consumed: 5}]
+      assert decision.meeting_type_id == "demo_30"
     end
 
     test "returns a :conflict decision when the slot is busy", %{request: request} do
@@ -268,6 +340,13 @@ defmodule ExBookingTest do
       assert decision.status == :needs_routing
     end
 
+    test "returns malformed rule pairing directly instead of building a decision", %{
+      request: request
+    } do
+      assert {:error, {:invalid, :rules, :length_mismatch}} =
+               ExBooking.decide(request, build(:meeting_type), [build(:resource)], [], now: @now)
+    end
+
     test "produces a reserve decision when a hold is supplied", %{request: request} do
       hold = %ExBooking.Hold{
         id: "h1",
@@ -286,6 +365,46 @@ defmodule ExBookingTest do
       assert decision.status == :ok
       assert [%ExBooking.Event{type: :booking_reserved}] = decision.events
       assert [{:reserve, ^hold}, {:emit, _}] = decision.intents
+    end
+
+    test "rejects a supplied hold that differs from the canonical decision", %{request: request} do
+      hold = %ExBooking.Hold{
+        id: "h1",
+        slot: request.slot,
+        resource_ids: ["wrong"],
+        meeting_type_id: "demo_30",
+        expires_at: ~U[2026-07-13 08:00:00Z]
+      }
+
+      assert {:error, {:invalid, :hold, {:mismatch, :resource_ids}}} =
+               ExBooking.decide(request, build(:meeting_type), [build(:resource)], [build(:rule)],
+                 now: @now,
+                 hold: hold
+               )
+
+      assert {:error, {:invalid, :hold, {:mismatch, :slot}}} =
+               ExBooking.decide(request, build(:meeting_type), [build(:resource)], [build(:rule)],
+                 now: @now,
+                 hold: %{hold | resource_ids: ["res_1"], slot: monday_slot(~T[10:00:00])}
+               )
+
+      assert {:error, {:invalid, :hold, {:mismatch, :meeting_type_id}}} =
+               ExBooking.decide(request, build(:meeting_type), [build(:resource)], [build(:rule)],
+                 now: @now,
+                 hold: %{hold | resource_ids: ["res_1"], meeting_type_id: "other"}
+               )
+
+      assert {:error, {:invalid, :hold, {:invalid, :id}}} =
+               ExBooking.decide(request, build(:meeting_type), [build(:resource)], [build(:rule)],
+                 now: @now,
+                 hold: %{hold | id: "", resource_ids: ["res_1"]}
+               )
+
+      assert {:error, {:invalid, :hold, {:invalid, :expires_at}}} =
+               ExBooking.decide(request, build(:meeting_type), [build(:resource)], [build(:rule)],
+                 now: @now,
+                 hold: %{hold | expires_at: nil, resource_ids: ["res_1"]}
+               )
     end
   end
 
@@ -319,6 +438,7 @@ defmodule ExBookingTest do
       assert [
                {:release, "hold_1"},
                {:calendar_event, :cancel, %{resource_ids: ["res_1"]}},
+               {:notify, :booking_canceled, %{resource_ids: ["res_1"]}},
                {:emit, %ExBooking.Event{type: :booking_canceled}}
              ] = decision.intents
     end
@@ -385,6 +505,30 @@ defmodule ExBookingTest do
     test "an empty pool has no eligible resource" do
       assert {:error, :no_eligible_resource} =
                ExBooking.assign([], build(:interval), strategy: :round_robin)
+    end
+
+    test "pool assignment consumes capacity rather than counting resources" do
+      resources = [build(:resource, id: "a", capacity: 2), build(:resource, id: "b", capacity: 3)]
+
+      assert {:ok, [%ExBooking.Resource{id: "a"}, %ExBooking.Resource{id: "b"}]} =
+               ExBooking.assign(resources, build(:interval),
+                 participants: :pool,
+                 capacity_required: 5
+               )
+
+      assert {:error, :no_eligible_resource} =
+               ExBooking.assign(resources, build(:interval),
+                 participants: :pool,
+                 capacity_required: 6
+               )
+
+      assert {:ok, [%ExBooking.Resource{id: "b"}]} =
+               ExBooking.assign(
+                 [build(:resource, id: "a", capacity: 0), build(:resource, id: "b", capacity: 3)],
+                 build(:interval),
+                 participants: :pool,
+                 capacity_required: 3
+               )
     end
   end
 
@@ -479,6 +623,58 @@ defmodule ExBookingTest do
 
       assert decision.status == :policy_reject
       assert [{:policy, :reschedule, :not_allowed}] = decision.reasons
+    end
+
+    test "does not erase an unrelated busy interval that overlaps the old slot" do
+      existing = monday_slot(~T[08:00:00])
+      request = build(:request, slot: monday_slot(~T[08:15:00]))
+      unrelated = %{existing | end_at: ~U[2026-07-13 09:00:00Z]}
+
+      resource = build(:resource, busy: [unrelated])
+      meeting_type = build(:meeting_type, reschedule_policy: %{min_notice_min: 0, allowed: true})
+
+      assert {:ok, %ExBooking.Decision{status: :conflict}} =
+               ExBooking.reschedule(
+                 existing,
+                 request,
+                 meeting_type,
+                 [resource],
+                 [build(:rule)],
+                 now: @now
+               )
+    end
+  end
+
+  describe "lifecycle input validation" do
+    test "lifecycle entry points reject malformed temporal and policy input" do
+      invalid = %Interval{
+        start_at: ~U[2026-07-13 10:00:00Z],
+        end_at: ~U[2026-07-13 09:00:00Z]
+      }
+
+      malformed_policy = build(:meeting_type, cancellation_policy: %{allowed: true})
+
+      assert {:error, {:invalid, :existing, :empty_or_reversed}} =
+               ExBooking.mark_no_show(invalid, build(:meeting_type), [])
+
+      assert {:error, {:invalid, :cancellation_policy, %{allowed: true}}} =
+               ExBooking.evaluate_cancellation(build(:interval), malformed_policy, now: @now)
+    end
+
+    test "hold expiry rejects malformed hold fields before emitting events" do
+      hold = %ExBooking.Hold{
+        id: "hold_1",
+        slot: %Interval{start_at: nil, end_at: nil},
+        resource_ids: ["res_1"],
+        meeting_type_id: "demo_30",
+        expires_at: ~U[2026-07-13 08:55:00Z]
+      }
+
+      assert {:error, {:invalid, :hold, {:invalid, :slot, :datetime_required}}} =
+               ExBooking.expire_hold(hold, [])
+
+      assert {:error, {:invalid, :hold, {:invalid, :resource_ids}}} =
+               ExBooking.expire_hold(%{hold | slot: build(:interval), resource_ids: [""]}, [])
     end
   end
 

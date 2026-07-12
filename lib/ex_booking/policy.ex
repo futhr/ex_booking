@@ -27,6 +27,33 @@ defmodule ExBooking.Policy do
           | {:daily_cap, String.t(), Date.t()}
 
   @doc """
+  Validates a lifecycle notice policy before temporal arithmetic.
+
+  `nil` is an allowed inherited policy. Non-nil policies must contain exactly
+  `:allowed` and `:min_notice_min` with their documented types.
+
+  ## Examples
+
+      iex> ExBooking.Policy.validate(%{allowed: true, min_notice_min: 60}, :cancellation_policy)
+      :ok
+
+  """
+  @spec validate(map() | nil, atom()) :: :ok | {:error, {:invalid, atom(), term()}}
+  def validate(nil, _), do: :ok
+
+  def validate(policy, field) when is_map(policy) do
+    if Map.keys(policy) |> Enum.sort() == [:allowed, :min_notice_min] and
+         is_boolean(policy.allowed) and is_integer(policy.min_notice_min) and
+         policy.min_notice_min >= 0 do
+      :ok
+    else
+      {:error, {:invalid, field, policy}}
+    end
+  end
+
+  def validate(policy, field), do: {:error, {:invalid, field, policy}}
+
+  @doc """
   Returns every policy violation for `slot` against a resource's rule, evaluated
   relative to the caller-supplied `now`. An empty list means the slot is
   allowed.
@@ -120,11 +147,7 @@ defmodule ExBooking.Policy do
 
   defp daily_cap_violation(slot, rule, resource) do
     slot_date = local_date(slot.start_at, rule.timezone)
-
-    count =
-      resource.busy
-      |> Enum.filter(&(&1.kind == :busy))
-      |> Enum.count(&(local_date(&1.start_at, rule.timezone) == slot_date))
+    count = Map.get(resource.daily_booking_counts, slot_date, 0)
 
     if count >= rule.max_per_day, do: {:daily_cap, resource.id, slot_date}
   end

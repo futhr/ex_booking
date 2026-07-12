@@ -83,11 +83,22 @@ defmodule ExBooking.Slotting do
   defp first_start(free, _, :free_start), do: free.start_at
 
   defp first_start(free, step_min, :clock) do
-    case rem(minutes_since_midnight(free.start_at), step_min) do
-      0 -> free.start_at
-      offset -> DateTime.add(free.start_at, step_min - offset, :minute)
-    end
+    start_at = truncate_to_minute(free.start_at)
+    offset = rem(minutes_since_midnight(start_at), step_min)
+
+    candidate =
+      if offset == 0,
+        do: start_at,
+        else: DateTime.add(start_at, step_min - offset, :minute)
+
+    if DateTime.compare(candidate, free.start_at) == :lt,
+      do: DateTime.add(candidate, step_min, :minute),
+      else: candidate
   end
 
   defp minutes_since_midnight(datetime), do: datetime.hour * 60 + datetime.minute
+
+  defp truncate_to_minute(datetime) do
+    %{datetime | second: 0, microsecond: {0, 0}}
+  end
 end

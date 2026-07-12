@@ -71,12 +71,14 @@ defmodule ExBooking.RRule do
   """
   @spec expand(String.t() | t(), DateTime.t(), pos_integer(), DateTime.t(), DateTime.t()) ::
           {:ok, [Interval.t()]} | {:error, term()}
-  def expand(rrule, %DateTime{} = dtstart, duration_min, %DateTime{} = from, %DateTime{} = until)
-      when is_integer(duration_min) and duration_min > 0 do
-    with {:ok, rule} <- coerce_rule(rrule) do
+  def expand(rrule, %DateTime{} = dtstart, duration_min, %DateTime{} = from, %DateTime{} = until) do
+    with :ok <- validate_expand_inputs(duration_min, from, until),
+         {:ok, rule} <- coerce_rule(rrule) do
       {:ok, expand_rule(rule, dtstart, duration_min, from, until)}
     end
   end
+
+  def expand(_, _, _, _, _), do: {:error, {:invalid, :rrule, :arguments}}
 
   defp normalize("RRULE:" <> value), do: value
   defp normalize(value), do: value
@@ -151,48 +153,117 @@ defmodule ExBooking.RRule do
       |> String.split(",", trim: true)
       |> Enum.map(&Map.get(@weekdays, &1))
 
-    if Enum.all?(days, &is_integer/1) do
-      {:ok, Enum.sort(days)}
+    if days != [] and Enum.all?(days, &is_integer/1) do
+      unique_days = Enum.uniq(days)
+      {:ok, Enum.sort(unique_days)}
     else
       {:error, {:invalid, :rrule, :byday}}
     end
   end
 
-  defp coerce_rule(%__MODULE__{} = rule), do: {:ok, rule}
+  defp coerce_rule(%__MODULE__{} = rule), do: validate_rule(rule)
   defp coerce_rule(value) when is_binary(value), do: parse(value)
+  defp coerce_rule(_), do: {:error, {:invalid, :rrule, :arguments}}
+
+  defp validate_rule(%__MODULE__{} = rule) do
+    with :ok <- validate_frequency(rule.freq),
+         :ok <- validate_positive(rule.interval, :interval),
+         :ok <- validate_optional_positive(rule.count, :count),
+         :ok <- validate_optional_datetime(rule.until),
+         {:ok, byday} <- validate_rule_byday(rule.byday, rule.freq) do
+      {:ok, %{rule | byday: byday}}
+    end
+  end
+
+  defp validate_frequency(freq) when freq in [:daily, :weekly], do: :ok
+  defp validate_frequency(freq), do: {:error, {:unsupported, :rrule, {:freq, freq}}}
+
+  defp validate_positive(value, _) when is_integer(value) and value > 0, do: :ok
+  defp validate_positive(_, field), do: {:error, {:invalid, :rrule, field}}
+
+  defp validate_optional_positive(nil, _), do: :ok
+  defp validate_optional_positive(value, field), do: validate_positive(value, field)
+
+  defp validate_optional_datetime(nil), do: :ok
+  defp validate_optional_datetime(%DateTime{}), do: :ok
+  defp validate_optional_datetime(_), do: {:error, {:invalid, :rrule, :until}}
+
+  defp validate_rule_byday(nil, _), do: {:ok, nil}
+  defp validate_rule_byday(_, :daily), do: {:error, {:unsupported, :rrule, :byday}}
+
+  defp validate_rule_byday(byday, :weekly) when is_list(byday) and byday != [] do
+    if Enum.all?(byday, &(is_integer(&1) and &1 in 1..7)) do
+      unique_days = Enum.uniq(byday)
+      {:ok, Enum.sort(unique_days)}
+    else
+      {:error, {:invalid, :rrule, :byday}}
+    end
+  end
+
+  defp validate_rule_byday(_, :weekly), do: {:error, {:invalid, :rrule, :byday}}
+
+  defp validate_expand_inputs(duration_min, from, until) do
+    cond do
+      not is_integer(duration_min) or duration_min <= 0 ->
+        {:error, {:invalid, :rrule, :arguments}}
+
+      DateTime.compare(from, until) != :lt ->
+        {:error, {:invalid, :horizon, :not_increasing}}
+
+      true ->
+        :ok
+    end
+  end
 
   defp expand_rule(rule, dtstart, duration_min, from, until) do
+    utc_from = DateTime.shift_zone!(from, "Etc/UTC")
+    utc_until = DateTime.shift_zone!(until, "Etc/UTC")
+
     rule
     |> occurrence_stream(dtstart)
     |> Stream.take_while(&within_rule_bounds?(&1, rule, until))
     |> Stream.with_index(1)
     |> Stream.take_while(fn {_, index} -> rule.count == nil or index <= rule.count end)
     |> Stream.map(fn {start_at, _} ->
+      start_at = DateTime.shift_zone!(start_at, "Etc/UTC")
       Interval.new!(start_at, DateTime.add(start_at, duration_min, :minute), kind: :available)
     end)
-    |> Stream.map(&Interval.clip(&1, Interval.new!(from, until)))
+    |> Stream.map(&Interval.clip(&1, Interval.new!(utc_from, utc_until)))
     |> Enum.reject(&is_nil/1)
+    |> Enum.sort_by(& &1.start_at, DateTime)
   end
 
   defp occurrence_stream(%__MODULE__{freq: :daily, interval: interval}, dtstart) do
-    Stream.iterate(dtstart, &DateTime.add(&1, interval, :day))
+    Stream.iterate(0, &(&1 + interval))
+    |> Stream.map(&calendar_occurrence(dtstart, &1))
   end
 
   defp occurrence_stream(%__MODULE__{freq: :weekly, byday: nil, interval: interval}, dtstart) do
-    Stream.iterate(dtstart, &DateTime.add(&1, interval * 7, :day))
+    Stream.iterate(0, &(&1 + interval * 7))
+    |> Stream.map(&calendar_occurrence(dtstart, &1))
   end
 
   defp occurrence_stream(%__MODULE__{freq: :weekly, byday: byday, interval: interval}, dtstart) do
-    dtstart
-    |> Stream.iterate(&DateTime.add(&1, 1, :day))
+    Stream.iterate(0, &(&1 + 1))
     |> Stream.filter(
-      &(week_in_interval?(dtstart, &1, interval) and Date.day_of_week(&1) in byday)
+      &(week_in_interval?(&1, interval) and
+          Date.day_of_week(Date.add(DateTime.to_date(dtstart), &1)) in byday)
     )
+    |> Stream.map(&calendar_occurrence(dtstart, &1))
   end
 
-  defp week_in_interval?(dtstart, datetime, interval) do
-    weeks = div(Date.diff(DateTime.to_date(datetime), DateTime.to_date(dtstart)), 7)
-    rem(weeks, interval) == 0
+  defp week_in_interval?(day_offset, interval), do: rem(div(day_offset, 7), interval) == 0
+
+  defp calendar_occurrence(dtstart, 0), do: dtstart
+
+  defp calendar_occurrence(dtstart, day_offset) do
+    date = Date.add(DateTime.to_date(dtstart), day_offset)
+
+    case DateTime.new(date, DateTime.to_time(dtstart), dtstart.time_zone) do
+      {:ok, datetime} -> datetime
+      {:ambiguous, first, _} -> first
+      {:gap, _, after_gap} -> after_gap
+    end
   end
 
   defp within_rule_bounds?(start_at, rule, horizon_until) do

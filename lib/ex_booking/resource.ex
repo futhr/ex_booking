@@ -3,8 +3,9 @@ defmodule ExBooking.Resource do
   A bookable resource.
 
   A resource is usually a host, but can also represent a pooled seat. Busy
-  intervals, capacity, and fairness counters are explicit inputs maintained by
-  the consuming application, which keeps assignment stateless and repeatable.
+  intervals, booking reservations, daily booking counts, capacity, and fairness
+  counters are explicit inputs maintained by the consuming application, which
+  keeps assignment stateless and repeatable.
 
   ## Example
 
@@ -15,9 +16,19 @@ defmodule ExBooking.Resource do
   """
 
   alias ExBooking.Interval
+  alias ExBooking.Reservation
 
   @enforce_keys [:id, :timezone]
-  defstruct [:id, :timezone, :fairness, :meta, capacity: 1, busy: []]
+  defstruct [
+    :id,
+    :timezone,
+    :fairness,
+    :meta,
+    capacity: 1,
+    busy: [],
+    reservations: [],
+    daily_booking_counts: %{}
+  ]
 
   @typedoc "Explicit fairness inputs for assignment strategies."
   @type fairness :: %{
@@ -33,6 +44,8 @@ defmodule ExBooking.Resource do
           timezone: String.t(),
           capacity: pos_integer(),
           busy: [Interval.t()],
+          reservations: [Reservation.t()],
+          daily_booking_counts: %{optional(Date.t()) => non_neg_integer()},
           fairness: fairness() | nil,
           meta: map() | nil
         }
