@@ -7,8 +7,10 @@ defmodule ExBooking.TestBuilders do
   alias ExBooking.Request
   alias ExBooking.Resource
 
+  @type builder_name :: :interval | :meeting_type | :request | :resource | :rule
+
   @doc "Builds a kernel struct by name with optional overrides."
-  @spec build(atom(), Enumerable.t()) :: struct()
+  @spec build(builder_name(), Enumerable.t()) :: struct()
   def build(name, overrides \\ [])
 
   def build(:interval, overrides) do
