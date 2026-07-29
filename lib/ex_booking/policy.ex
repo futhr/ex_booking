@@ -9,7 +9,7 @@ defmodule ExBooking.Policy do
   ## Example
 
       iex> rule = %ExBooking.AvailabilityRule{timezone: "Etc/UTC", windows: [], lead_time_min: 60}
-      ...> resource = %ExBooking.Resource{id: "host_1", timezone: "Etc/UTC"}
+      ...> resource = %ExBooking.Resource{id: "resource_1", timezone: "Etc/UTC"}
       ...> slot = ExBooking.Interval.new!(~U[2026-07-13 09:30:00Z], ~U[2026-07-13 10:00:00Z])
       ...> ExBooking.Policy.violations(slot, rule, resource, ~U[2026-07-13 09:00:00Z])
       [{:lead_time, 30}]

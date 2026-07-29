@@ -13,7 +13,7 @@ defmodule ExBooking.Availability do
   ## Example
 
       iex> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
-      ...> resource = %ExBooking.Resource{id: "host_1", timezone: "Etc/UTC"}
+      ...> resource = %ExBooking.Resource{id: "resource_1", timezone: "Etc/UTC"}
       ...>
       ...> rule = %ExBooking.AvailabilityRule{
       ...>   timezone: "Etc/UTC",
@@ -49,6 +49,18 @@ defmodule ExBooking.Availability do
 
   Requires `:now`, `:from`, and `:until` in `opts`. Returns slots sorted
   ascending by `start_at`, deduplicated across resources.
+
+  ## Example
+
+      iex> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
+      ...>
+      ...> ExBooking.Availability.assemble(meeting_type, [], [],
+      ...>   now: ~U[2026-07-08 12:00:00Z],
+      ...>   from: ~U[2026-07-13 00:00:00Z],
+      ...>   until: ~U[2026-07-14 00:00:00Z]
+      ...> )
+      {:ok, []}
+
   """
   @spec assemble(MeetingType.t(), [Resource.t()], [AvailabilityRule.t()], keyword()) ::
           {:ok, [Interval.t()]} | {:error, term()}
@@ -72,7 +84,7 @@ defmodule ExBooking.Availability do
   ## Example
 
       iex> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
-      ...> resource = %ExBooking.Resource{id: "host_1", timezone: "Etc/UTC"}
+      ...> resource = %ExBooking.Resource{id: "resource_1", timezone: "Etc/UTC"}
       ...> rule = %ExBooking.AvailabilityRule{timezone: "Etc/UTC", windows: []}
       ...> ExBooking.Availability.validate_inputs(meeting_type, [resource], [rule])
       :ok
@@ -93,6 +105,39 @@ defmodule ExBooking.Availability do
   Checks a specific requested slot against conflict and policy for a meeting
   type, without committing to an assignment. Returns `:ok`, or
   `{:error, reasons}` with every failing reason.
+
+  ## Example
+
+      iex> slot =
+      ...>   ExBooking.Interval.new!(
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     ~U[2026-07-13 09:30:00Z]
+      ...>   )
+      ...>
+      ...> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
+      ...>
+      ...> request = %ExBooking.Request{
+      ...>   meeting_type_id: "intro",
+      ...>   invitee_timezone: "Etc/UTC",
+      ...>   slot: slot
+      ...> }
+      ...>
+      ...> resource = %ExBooking.Resource{id: "resource_1", timezone: "Etc/UTC"}
+      ...>
+      ...> rule = %ExBooking.AvailabilityRule{
+      ...>   timezone: "Etc/UTC",
+      ...>   windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[10:00:00]}]
+      ...> }
+      ...>
+      ...> ExBooking.Availability.validate(
+      ...>   request,
+      ...>   meeting_type,
+      ...>   [resource],
+      ...>   [rule],
+      ...>   now: ~U[2026-07-08 12:00:00Z]
+      ...> )
+      :ok
+
   """
   @spec validate(Request.t(), MeetingType.t(), [Resource.t()], [AvailabilityRule.t()], keyword()) ::
           :ok | {:error, [term()] | {:invalid, atom(), term()}}
@@ -177,6 +222,42 @@ defmodule ExBooking.Availability do
   and policy violations, and satisfying the participant mode — or
   `{:error, reasons}` aggregating every failing reason. Drives both
   `validate/5` and `ExBooking.decide/5`.
+
+  ## Example
+
+      iex> slot =
+      ...>   ExBooking.Interval.new!(
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     ~U[2026-07-13 09:30:00Z]
+      ...>   )
+      ...>
+      ...> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
+      ...>
+      ...> request = %ExBooking.Request{
+      ...>   meeting_type_id: "intro",
+      ...>   invitee_timezone: "Etc/UTC",
+      ...>   slot: slot
+      ...> }
+      ...>
+      ...> resource = %ExBooking.Resource{id: "resource_1", timezone: "Etc/UTC"}
+      ...>
+      ...> rule = %ExBooking.AvailabilityRule{
+      ...>   timezone: "Etc/UTC",
+      ...>   windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[10:00:00]}]
+      ...> }
+      ...>
+      ...> {:ok, [eligible]} =
+      ...>   ExBooking.Availability.eligible(
+      ...>     request,
+      ...>     meeting_type,
+      ...>     [resource],
+      ...>     [rule],
+      ...>     ~U[2026-07-08 12:00:00Z]
+      ...>   )
+      ...>
+      ...> eligible.id
+      "resource_1"
+
   """
   @spec eligible(
           Request.t(),

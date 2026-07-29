@@ -95,6 +95,8 @@ File: `lib/ex_booking.ex`
 [x] import_ics_free_busy/1 delegates ICS FREEBUSY normalization.
 [x] import_jscalendar_busy/1 delegates decoded JSCalendar busy mapping.
 [x] Unknown options are rejected with stable malformed-input errors.
+[x] Function-specific option schemas reject options that have no meaning at
+    that entry point.
 [x] Validate request meeting-type identity, exact slot duration, and horizon
     shape before decision work; return SP.02 tagged errors without raising.
 [x] Preflight availability inputs with stable errors before assignment,

@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-07-08"
-  updated: "2026-07-12"
+  updated: "2026-07-29"
   tags: ["lifecycle", "events", "intents", "holds"]
   depends_on: ["R.01", "SP.01"]
 ---
@@ -28,9 +28,10 @@ pending_payment → confirmed | expired
 
 - `decide/5` — produces the `held`/`confirmed` intent set for a valid request.
   With no `:hold` option it *confirms* (`:booking_confirmed`, intents
-  `{:calendar_event, :create, _}` then `{:emit, _}`). With a consumer-supplied
-  `:hold` it *reserves* (`:booking_reserved`, intents `{:reserve, hold}` then
-  `{:emit, _}`) — the kernel never fabricates a `Hold` id or `expires_at`.
+  `{:calendar_event, :create, _}`, `{:notify, :booking_confirmation, _}`, then
+  `{:emit, _}`). With a consumer-supplied `:hold` it *reserves*
+  (`:booking_reserved`, intents `{:reserve, hold}` then `{:emit, _}`) — the
+  kernel never fabricates a `Hold` id or `expires_at`.
 - `reschedule/6` — validates policy (`reschedule_policy.min_notice_min` against
   `:now` and the existing slot), and re-runs decision for the new slot against
   the exact availability facts supplied by the caller. The caller must exclude
@@ -38,13 +39,15 @@ pending_payment → confirmed | expired
   never subtracts a generic interval by timestamp because that could erase an
   unrelated overlapping calendar event. It emits
   `:booking_rescheduled` (`data: %{from: old, to: new}`) with intents
-  `{:calendar_event, :move, _}` then `{:emit, _}`, optionally prefixed by
-  `{:release, hold_id}` when `:release_hold_id` is given. A failed policy check
-  yields `Decision{status: :policy_reject, reasons: [{:policy, :reschedule, _}]}`.
+  `{:calendar_event, :move, _}`, `{:notify, :booking_rescheduled, _}`, then
+  `{:emit, _}`, optionally prefixed by `{:release, hold_id}` when
+  `:release_hold_id` is given. A failed policy check yields
+  `Decision{status: :policy_reject, reasons: [{:policy, :reschedule, _}]}`.
 - `evaluate_cancellation/3` — pure policy answer `%{allowed?: _, reason: _}`.
 - `cancel/3` — evaluates cancellation policy and, when allowed, emits
   `:booking_canceled` with persist-first intents (`{:release, hold_id}` when
-  supplied, `{:calendar_event, :cancel, _}`, then `{:emit, _}`).
+  supplied, `{:calendar_event, :cancel, _}`,
+  `{:notify, :booking_canceled, _}`, then `{:emit, _}`).
 - `expire_hold/2` — pure template for consumer-driven hold expiry. It emits
   `:booking_expired` and returns `{:release, hold.id}` before `{:emit, _}`.
 - `mark_no_show/3` — pure no-show transition. It emits `:booking_no_show`;
@@ -91,7 +94,7 @@ separate contract meter from evidence, but the kernel never declares an event bi
 
 Emitted inside `Decision.events`; the consumer stamps `occurred_at`, assigns ids,
 and publishes. Names are commercially neutral lifecycle facts consumed by
-orchestration and analytics and available as evidence to host-defined meters:
+orchestration and analytics and available as evidence to consumer-defined meters:
 
 | Event `type` | Emitted when |
 |---|---|
@@ -133,9 +136,9 @@ invitee contact data at execution time rather than persisting it in an intent.
 ## Snapshotting
 
 A `Decision` embeds everything in force at decision time (slot, resources,
-meeting type id, pool seat allocations, reasons). Consumers persist the decision alongside the booking so
-later disputes ("why was this host chosen?") are answerable without replaying
-rules that have since changed.
+meeting type id, pool seat allocations, reasons). Consumers persist the
+decision alongside the booking so later disputes ("why was this resource
+chosen?") are answerable without replaying rules that have since changed.
 
 ## Alternatives
 

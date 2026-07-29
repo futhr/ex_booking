@@ -50,6 +50,13 @@ defmodule ExBooking.Assignment do
 
   Validation is separate from selection so callers can reject malformed input
   before performing availability work.
+
+  ## Example
+
+      iex> resource = %ExBooking.Resource{id: "resource_1", timezone: "Etc/UTC"}
+      ...> ExBooking.Assignment.validate([resource], strategy: :round_robin)
+      :ok
+
   """
   @spec validate([Resource.t()], keyword()) ::
           :ok | {:error, {:invalid, :opts | :strategy | :resource_weight, term()}}

@@ -19,7 +19,7 @@ defmodule ExBooking do
       ...>   slot_interval_min: 15
       ...> }
       ...>
-      ...> resource = %ExBooking.Resource{id: "host_1", timezone: "Etc/UTC"}
+      ...> resource = %ExBooking.Resource{id: "resource_1", timezone: "Etc/UTC"}
       ...>
       ...> rule = %ExBooking.AvailabilityRule{
       ...>   timezone: "Etc/UTC",
@@ -65,6 +65,17 @@ defmodule ExBooking do
                  align: [type: {:in, [:free_start, :clock]}, default: :free_start]
                )
 
+  @validate_request_opts NimbleOptions.new!(
+                           now: [type: {:struct, DateTime}, required: true],
+                           strategy: [
+                             type: {:or, [:atom, {:tuple, [:atom, :keyword_list]}]},
+                             default: :first_available
+                           ],
+                           scorer: [type: {:fun, 2}],
+                           from: [type: {:struct, DateTime}],
+                           until: [type: {:struct, DateTime}]
+                         )
+
   @decide_opts NimbleOptions.new!(
                  now: [type: {:struct, DateTime}, required: true],
                  strategy: [
@@ -73,12 +84,25 @@ defmodule ExBooking do
                  ],
                  scorer: [type: {:fun, 2}],
                  hold: [type: {:struct, ExBooking.Hold}],
-                 release_hold_id: [type: :string],
                  from: [type: {:struct, DateTime}],
                  until: [type: {:struct, DateTime}],
                  align: [type: {:in, [:free_start, :clock]}, default: :free_start],
                  alternatives_limit: [type: :non_neg_integer, default: 3]
                )
+
+  @reschedule_opts NimbleOptions.new!(
+                     now: [type: {:struct, DateTime}, required: true],
+                     strategy: [
+                       type: {:or, [:atom, {:tuple, [:atom, :keyword_list]}]},
+                       default: :first_available
+                     ],
+                     scorer: [type: {:fun, 2}],
+                     release_hold_id: [type: :string],
+                     from: [type: {:struct, DateTime}],
+                     until: [type: {:struct, DateTime}],
+                     align: [type: {:in, [:free_start, :clock]}, default: :free_start],
+                     alternatives_limit: [type: :non_neg_integer, default: 3]
+                   )
 
   @now_opts NimbleOptions.new!(now: [type: {:struct, DateTime}, required: true])
 
@@ -113,6 +137,17 @@ defmodule ExBooking do
     * `:align` — `:free_start` (default) or `:clock`
     * `:strategy`, `:scorer` — see `ExBooking.Assignment`
 
+  ## Example
+
+      iex> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
+      ...>
+      ...> ExBooking.available_slots(meeting_type, [], [],
+      ...>   now: ~U[2026-07-08 12:00:00Z],
+      ...>   from: ~U[2026-07-13 00:00:00Z],
+      ...>   until: ~U[2026-07-14 00:00:00Z]
+      ...> )
+      {:ok, []}
+
   """
   @spec available_slots(MeetingType.t(), [Resource.t()], [AvailabilityRule.t()], keyword()) ::
           {:ok, [Interval.t()]} | {:error, term()}
@@ -129,6 +164,35 @@ defmodule ExBooking do
   Checks a specific requested slot against availability and policy without
   committing to an assignment. Returns every failing reason, not just the
   first.
+
+  ## Example
+
+      iex> slot =
+      ...>   ExBooking.Interval.new!(
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     ~U[2026-07-13 09:30:00Z]
+      ...>   )
+      ...>
+      ...> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
+      ...>
+      ...> request = %ExBooking.Request{
+      ...>   meeting_type_id: "intro",
+      ...>   invitee_timezone: "Etc/UTC",
+      ...>   slot: slot
+      ...> }
+      ...>
+      ...> resource = %ExBooking.Resource{id: "resource_1", timezone: "Etc/UTC"}
+      ...>
+      ...> rule = %ExBooking.AvailabilityRule{
+      ...>   timezone: "Etc/UTC",
+      ...>   windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[10:00:00]}]
+      ...> }
+      ...>
+      ...> ExBooking.validate_request(request, meeting_type, [resource], [rule],
+      ...>   now: ~U[2026-07-08 12:00:00Z]
+      ...> )
+      :ok
+
   """
   @spec validate_request(
           Request.t(),
@@ -145,7 +209,7 @@ defmodule ExBooking do
         opts
       ) do
     with :ok <- validate_horizon(opts, :optional),
-         {:ok, opts} <- validate_opts(opts, @decide_opts),
+         {:ok, opts} <- validate_opts(opts, @validate_request_opts),
          :ok <- Availability.validate_request_shape(request, meeting_type),
          :ok <- Availability.validate_inputs(meeting_type, resources, rules),
          :ok <- Assignment.validate(resources, opts) do
@@ -159,6 +223,38 @@ defmodule ExBooking do
 
   A decision is returned even for rejections (`status: :conflict` or
   `:policy_reject`); `{:error, _}` is reserved for malformed input.
+
+  ## Example
+
+      iex> slot =
+      ...>   ExBooking.Interval.new!(
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     ~U[2026-07-13 09:30:00Z]
+      ...>   )
+      ...>
+      ...> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
+      ...>
+      ...> request = %ExBooking.Request{
+      ...>   meeting_type_id: "intro",
+      ...>   invitee_timezone: "Etc/UTC",
+      ...>   slot: slot
+      ...> }
+      ...>
+      ...> resource = %ExBooking.Resource{id: "resource_1", timezone: "Etc/UTC"}
+      ...>
+      ...> rule = %ExBooking.AvailabilityRule{
+      ...>   timezone: "Etc/UTC",
+      ...>   windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[10:00:00]}]
+      ...> }
+      ...>
+      ...> {:ok, decision} =
+      ...>   ExBooking.decide(request, meeting_type, [resource], [rule],
+      ...>     now: ~U[2026-07-08 12:00:00Z]
+      ...>   )
+      ...>
+      ...> {decision.status, decision.resource_ids}
+      {:ok, ["resource_1"]}
+
   """
   @spec decide(Request.t(), MeetingType.t(), [Resource.t()], [AvailabilityRule.t()], keyword()) ::
           {:ok, Decision.t()} | {:error, term()}
@@ -177,6 +273,44 @@ defmodule ExBooking do
   emits `:booking_rescheduled` semantics. The caller must remove only the
   identified booking's own claims from `resources`; the kernel never subtracts
   generic busy intervals by timestamp.
+
+  ## Example
+
+      iex> existing =
+      ...>   ExBooking.Interval.new!(
+      ...>     ~U[2026-07-13 08:00:00Z],
+      ...>     ~U[2026-07-13 08:30:00Z]
+      ...>   )
+      ...>
+      ...> requested =
+      ...>   ExBooking.Interval.new!(
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     ~U[2026-07-13 09:30:00Z]
+      ...>   )
+      ...>
+      ...> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
+      ...>
+      ...> request = %ExBooking.Request{
+      ...>   meeting_type_id: "intro",
+      ...>   invitee_timezone: "Etc/UTC",
+      ...>   slot: requested
+      ...> }
+      ...>
+      ...> resource = %ExBooking.Resource{id: "resource_1", timezone: "Etc/UTC"}
+      ...>
+      ...> rule = %ExBooking.AvailabilityRule{
+      ...>   timezone: "Etc/UTC",
+      ...>   windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[10:00:00]}]
+      ...> }
+      ...>
+      ...> {:ok, decision} =
+      ...>   ExBooking.reschedule(existing, request, meeting_type, [resource], [rule],
+      ...>     now: ~U[2026-07-08 12:00:00Z]
+      ...>   )
+      ...>
+      ...> hd(decision.events).type
+      :booking_rescheduled
+
   """
   @spec reschedule(
           Interval.t(),
@@ -196,7 +330,7 @@ defmodule ExBooking do
         opts
       ) do
     with :ok <- validate_horizon(opts, :optional),
-         {:ok, opts} <- validate_opts(opts, @decide_opts),
+         {:ok, opts} <- validate_opts(opts, @reschedule_opts),
          :ok <- validate_existing(existing),
          :ok <- Availability.validate_request_shape(request, meeting_type),
          :ok <- Availability.validate_inputs(meeting_type, resources, rules),
@@ -220,6 +354,19 @@ defmodule ExBooking do
   @doc """
   Pure cancellation-policy check for an existing booking against `:now`.
   Refund and fee semantics are consumer concerns layered on the result.
+
+  ## Example
+
+      iex> existing =
+      ...>   ExBooking.Interval.new!(
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     ~U[2026-07-13 09:30:00Z]
+      ...>   )
+      ...>
+      ...> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
+      ...> ExBooking.evaluate_cancellation(existing, meeting_type, now: ~U[2026-07-13 08:00:00Z])
+      {:ok, %{allowed?: true, reason: nil}}
+
   """
   @spec evaluate_cancellation(Interval.t(), MeetingType.t(), keyword()) ::
           {:ok, %{allowed?: boolean(), reason: atom() | nil}} | {:error, term()}
@@ -243,6 +390,23 @@ defmodule ExBooking do
   When cancellation policy allows the action, the returned decision emits
   `:booking_canceled`, requests calendar cancellation, optionally releases an
   existing hold, and leaves persistence/publishing to the consumer.
+
+  ## Example
+
+      iex> existing =
+      ...>   ExBooking.Interval.new!(
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     ~U[2026-07-13 09:30:00Z]
+      ...>   )
+      ...>
+      ...> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
+      ...>
+      ...> {:ok, decision} =
+      ...>   ExBooking.cancel(existing, meeting_type, now: ~U[2026-07-13 08:00:00Z])
+      ...>
+      ...> hd(decision.events).type
+      :booking_canceled
+
   """
   @spec cancel(Interval.t(), MeetingType.t(), keyword()) :: {:ok, Decision.t()} | {:error, term()}
   def cancel(existing, %MeetingType{} = meeting_type, opts) do
@@ -264,6 +428,28 @@ defmodule ExBooking do
 
   Consumers decide when a hold is expired by comparing `expires_at` with their
   own clock. This helper only returns the canonical event and release intent.
+
+  ## Example
+
+      iex> slot =
+      ...>   ExBooking.Interval.new!(
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     ~U[2026-07-13 09:30:00Z]
+      ...>   )
+      ...>
+      ...> hold = %ExBooking.Hold{
+      ...>   id: "hold_1",
+      ...>   slot: slot,
+      ...>   resource_ids: ["resource_1"],
+      ...>   meeting_type_id: "intro",
+      ...>   expires_at: ~U[2026-07-13 08:55:00Z]
+      ...> }
+      ...>
+      ...> {:ok, decision} = ExBooking.expire_hold(hold, [])
+      ...> [{:release, "hold_1"}, {:emit, event}] = decision.intents
+      ...> event.type
+      :booking_expired
+
   """
   @spec expire_hold(Hold.t(), keyword()) :: {:ok, Decision.t()} | {:error, term()}
   def expire_hold(%Hold{} = hold, opts) do
@@ -296,6 +482,20 @@ defmodule ExBooking do
   No-show detection, fees, and notifications are consumer concerns. The kernel
   returns the canonical event so analytics and billing layers can consume a
   stable vocabulary.
+
+  ## Example
+
+      iex> existing =
+      ...>   ExBooking.Interval.new!(
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     ~U[2026-07-13 09:30:00Z]
+      ...>   )
+      ...>
+      ...> meeting_type = %ExBooking.MeetingType{id: "intro", duration_min: 30}
+      ...> {:ok, decision} = ExBooking.mark_no_show(existing, meeting_type, [])
+      ...> hd(decision.events).type
+      :booking_no_show
+
   """
   @spec mark_no_show(Interval.t(), MeetingType.t(), keyword()) ::
           {:ok, Decision.t()} | {:error, term()}
@@ -311,6 +511,24 @@ defmodule ExBooking do
   @doc """
   Standalone assignment over pre-filtered free resources, for consumers that
   run their own availability search. See `ExBooking.Assignment`.
+
+  ## Example
+
+      iex> slot =
+      ...>   ExBooking.Interval.new!(
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     ~U[2026-07-13 09:30:00Z]
+      ...>   )
+      ...>
+      ...> resources = [
+      ...>   %ExBooking.Resource{id: "b", timezone: "Etc/UTC"},
+      ...>   %ExBooking.Resource{id: "a", timezone: "Etc/UTC"}
+      ...> ]
+      ...>
+      ...> {:ok, [winner]} = ExBooking.assign(resources, slot, [])
+      ...> winner.id
+      "a"
+
   """
   @spec assign([Resource.t()], Interval.t(), keyword()) ::
           {:ok, [Resource.t()]}
@@ -322,6 +540,21 @@ defmodule ExBooking do
   supplied horizon.
 
   Supported rule parts are documented in `ExBooking.RRule`.
+
+  ## Example
+
+      iex> {:ok, [first]} =
+      ...>   ExBooking.expand_rrule(
+      ...>     "FREQ=DAILY;COUNT=1",
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     30,
+      ...>     from: ~U[2026-07-13 00:00:00Z],
+      ...>     until: ~U[2026-07-14 00:00:00Z]
+      ...>   )
+      ...>
+      ...> first.start_at
+      ~U[2026-07-13 09:00:00Z]
+
   """
   @spec expand_rrule(String.t() | RRule.t(), DateTime.t(), pos_integer(), keyword()) ::
           {:ok, [Interval.t()]} | {:error, term()}
@@ -337,6 +570,15 @@ defmodule ExBooking do
 
   This is a pure parser over caller-supplied iCalendar text. It performs no file
   or network I/O.
+
+  ## Example
+
+      iex> {:ok, [busy]} =
+      ...>   ExBooking.import_ics_free_busy("FREEBUSY:20260713T090000Z/20260713T093000Z")
+      ...>
+      ...> busy.kind
+      :busy
+
   """
   @spec import_ics_free_busy(String.t()) :: {:ok, [Interval.t()]} | {:error, term()}
   defdelegate import_ics_free_busy(ics), to: ICalendar, as: :free_busy
@@ -346,6 +588,20 @@ defmodule ExBooking do
 
   This is a pure mapper over caller-supplied maps. JSON decoding and recurrence
   expansion remain consumer concerns.
+
+  ## Example
+
+      iex> {:ok, [busy]} =
+      ...>   ExBooking.import_jscalendar_busy(%{
+      ...>     "@type" => "Event",
+      ...>     "start" => "2026-07-13T09:00:00",
+      ...>     "timeZone" => "Etc/UTC",
+      ...>     "duration" => "PT30M"
+      ...>   })
+      ...>
+      ...> busy.kind
+      :busy
+
   """
   @spec import_jscalendar_busy(map()) :: {:ok, [Interval.t()]} | {:error, term()}
   defdelegate import_jscalendar_busy(object), to: JSCalendar, as: :busy_intervals

@@ -9,7 +9,7 @@ defmodule ExBooking.Event do
 
   ## Example
 
-      iex> event = %ExBooking.Event{type: :booking_confirmed, resource_ids: ["host_1"]}
+      iex> event = %ExBooking.Event{type: :booking_confirmed, resource_ids: ["resource_1"]}
       ...> event.type
       :booking_confirmed
 

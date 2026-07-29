@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: critical
   created: "2026-07-08"
-  updated: "2026-07-08"
+  updated: "2026-07-29"
   tags: ["scope", "boundary", "purity", "determinism"]
   depends_on: ["R.01"]
 ---
@@ -19,7 +19,7 @@ repo navigation and `docs/tasks/booking-tasks.md` for roadmap state.
 
 ## Purpose
 
-`ex_booking` is a pure booking decision engine. It answers deterministic
+`ex_booking` is a pure booking decision kernel. It answers deterministic
 questions over immutable inputs:
 
 - what slots are valid;

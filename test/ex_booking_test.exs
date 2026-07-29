@@ -67,6 +67,45 @@ defmodule ExBookingTest do
                  scorer: fn _ -> 1 end
                )
     end
+
+    test "entry points reject options that have no meaning for them" do
+      hold = %ExBooking.Hold{
+        id: "hold_1",
+        slot: build(:interval),
+        resource_ids: ["res_1"],
+        meeting_type_id: "demo_30",
+        expires_at: ~U[2026-07-13 08:55:00Z]
+      }
+
+      assert {:error, {:invalid, :opts, validation_message}} =
+               ExBooking.validate_request(build(:request), build(:meeting_type), [], [],
+                 now: @now,
+                 hold: hold
+               )
+
+      assert validation_message =~ ":hold"
+
+      assert {:error, {:invalid, :opts, decision_message}} =
+               ExBooking.decide(build(:request), build(:meeting_type), [], [],
+                 now: @now,
+                 release_hold_id: "hold_1"
+               )
+
+      assert decision_message =~ ":release_hold_id"
+
+      assert {:error, {:invalid, :opts, reschedule_message}} =
+               ExBooking.reschedule(
+                 build(:interval),
+                 build(:request),
+                 build(:meeting_type),
+                 [],
+                 [],
+                 now: @now,
+                 hold: hold
+               )
+
+      assert reschedule_message =~ ":hold"
+    end
   end
 
   describe "available_slots/4" do

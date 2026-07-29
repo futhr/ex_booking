@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-07-08"
-  updated: "2026-07-12"
+  updated: "2026-07-29"
   tags: ["assignment", "fairness", "round-robin", "scoring-hook"]
   depends_on: ["R.01", "SP.01"]
 ---
@@ -28,7 +28,7 @@ Selected via the `:strategy` option (`atom()` or `{atom(), keyword()}`):
 | `:least_recently_booked` | Earliest `fairness.last_assigned_at` (nil = never = first) | id |
 | `:weighted` | Lowest `assignments_count / weight` ratio | id |
 | `:priority` | Highest `fairness.priority`, free wins | round_robin among equals |
-| `:owner_first` | `{: owner_first, owner_id: id}` — the owner if free, else fall back to a configurable strategy (default `:round_robin`) over the pool | per fallback |
+| `:owner_first` | `{:owner_first, owner_id: id}` — the owner if free, else fall back to a configurable strategy (default `:round_robin`) over the pool | per fallback |
 | `:collective` | All required resources (participants `:collective`); not a choice, a constraint | — |
 
 All tie-breaks are total and deterministic (SP.00).

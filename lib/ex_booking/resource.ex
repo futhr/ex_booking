@@ -2,16 +2,16 @@ defmodule ExBooking.Resource do
   @moduledoc """
   A bookable resource.
 
-  A resource is usually a host, but can also represent a pooled seat. Busy
-  intervals, booking reservations, daily booking counts, capacity, and fairness
-  counters are explicit inputs maintained by the consuming application, which
-  keeps assignment stateless and repeatable.
+  A resource is usually a bookable person, but can also represent a pooled seat.
+  Busy intervals, booking reservations, daily booking counts, capacity, and
+  fairness counters are explicit inputs maintained by the consuming
+  application, which keeps assignment stateless and repeatable.
 
   ## Example
 
-      iex> resource = %ExBooking.Resource{id: "host_1", timezone: "Etc/UTC", capacity: 2}
+      iex> resource = %ExBooking.Resource{id: "resource_1", timezone: "Etc/UTC", capacity: 2}
       ...> {resource.id, resource.capacity}
-      {"host_1", 2}
+      {"resource_1", 2}
 
   """
 

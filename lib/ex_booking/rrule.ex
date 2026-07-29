@@ -53,6 +53,13 @@ defmodule ExBooking.RRule do
 
   @doc """
   Parses an RFC 5545 `RRULE` line or value into the supported subset.
+
+  ## Example
+
+      iex> {:ok, rule} = ExBooking.RRule.parse("FREQ=WEEKLY;BYDAY=MO,WE")
+      ...> {rule.freq, rule.byday}
+      {:weekly, [1, 3]}
+
   """
   @spec parse(String.t()) :: {:ok, t()} | {:error, term()}
   def parse(value) when is_binary(value) do
@@ -68,6 +75,21 @@ defmodule ExBooking.RRule do
 
   `dtstart` supplies the first occurrence start. `duration_min` supplies each
   occurrence duration. The returned intervals are sorted ascending.
+
+  ## Example
+
+      iex> {:ok, [first]} =
+      ...>   ExBooking.RRule.expand(
+      ...>     "FREQ=DAILY;COUNT=1",
+      ...>     ~U[2026-07-13 09:00:00Z],
+      ...>     30,
+      ...>     ~U[2026-07-13 00:00:00Z],
+      ...>     ~U[2026-07-14 00:00:00Z]
+      ...>   )
+      ...>
+      ...> first.end_at
+      ~U[2026-07-13 09:30:00Z]
+
   """
   @spec expand(String.t() | t(), DateTime.t(), pos_integer(), DateTime.t(), DateTime.t()) ::
           {:ok, [Interval.t()]} | {:error, term()}

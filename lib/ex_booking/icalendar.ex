@@ -27,6 +27,15 @@ defmodule ExBooking.ICalendar do
   Supports comma-separated period values in either `start/end` or
   `start/duration` form. Date-times must be UTC (`YYYYMMDDTHHMMSSZ`). Periods
   marked `FBTYPE=FREE` are validated and excluded from the busy result.
+
+  ## Example
+
+      iex> {:ok, [busy]} =
+      ...>   ExBooking.ICalendar.free_busy("FREEBUSY:20260713T090000Z/20260713T093000Z")
+      ...>
+      ...> busy.kind
+      :busy
+
   """
   @spec free_busy(ics()) :: {:ok, [Interval.t()]} | {:error, term()}
   def free_busy(ics) when is_binary(ics) do

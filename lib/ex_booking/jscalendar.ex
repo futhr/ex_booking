@@ -33,6 +33,20 @@ defmodule ExBooking.JSCalendar do
   `duration` (default `PT0S`). `freeBusyStatus: "free"` and
   `status: "cancelled"` events are ignored. `Group.entries` is a list of
   objects.
+
+  ## Example
+
+      iex> event = %{
+      ...>   "@type" => "Event",
+      ...>   "start" => "2026-07-13T09:00:00",
+      ...>   "timeZone" => "Etc/UTC",
+      ...>   "duration" => "PT30M"
+      ...> }
+      ...>
+      ...> {:ok, [busy]} = ExBooking.JSCalendar.busy_intervals(event)
+      ...> busy.end_at
+      ~U[2026-07-13 09:30:00Z]
+
   """
   @spec busy_intervals(object()) :: {:ok, [Interval.t()]} | {:error, term()}
   def busy_intervals(%{"@type" => "Event"} = event), do: event_interval(event)

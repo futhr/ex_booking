@@ -5,13 +5,13 @@ defmodule ExBooking.Decision do
   A decision is returned for both accepted and rejected booking attempts. For
   rejections, `reasons` explain what failed and `alternatives` can be shown to
   the invitee. For accepted transitions, `events` and `intents` tell the
-  consuming application what to persist, publish, or execute.
+  consumer application what to persist, publish, or execute.
 
   ## Example
 
-      iex> decision = %ExBooking.Decision{status: :ok, resource_ids: ["host_1"]}
+      iex> decision = %ExBooking.Decision{status: :ok, resource_ids: ["resource_1"]}
       ...> {decision.status, decision.resource_ids}
-      {:ok, ["host_1"]}
+      {:ok, ["resource_1"]}
 
   """
 

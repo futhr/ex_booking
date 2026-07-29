@@ -4,8 +4,8 @@
 
 [![Hex.pm](https://img.shields.io/hexpm/v/ex_booking.svg)](https://hex.pm/packages/ex_booking)
 [![Docs](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/ex_booking)
-[![CI](https://github.com/refpath/ex_booking/actions/workflows/ci.yml/badge.svg)](https://github.com/refpath/ex_booking/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/refpath/ex_booking.svg)](LICENSE)
+[![CI](https://github.com/futhr/ex_booking/actions/workflows/ci.yml/badge.svg)](https://github.com/futhr/ex_booking/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/futhr/ex_booking.svg)](LICENSE)
 
 [Installation](#installation) ·
 [Quick Start](#quick-start) ·
@@ -17,10 +17,10 @@
 ---
 
 ExBooking is the small booking brain you put inside a product that already owns
-users, calendars, CRM records, payments, and workflows. Give it normalized data;
+people, calendars, CRM records, payments, and workflows. Give it normalized data;
 it answers the hard deterministic questions: which slots are valid, whether a
-requested time still works, who should take the booking, and which events or
-intents the host app should execute next.
+requested time still works, which resource should take the booking, and which
+events or intents the consumer app should execute next.
 
 It has no database, no supervision tree, no provider clients, no jobs, and no
 clock reads. If a decision depends on the current time, the caller passes `now`.
@@ -33,7 +33,7 @@ calendar-data normalization easy to test and safe to replay.
 |------------|---------|
 | **Availability assembly** | Expands wall-time rules, applies overrides and blackouts, subtracts buffered busy time, and returns sorted slots. |
 | **DST-safe scheduling** | Resolves ambiguous fall-back times to the first occurrence and snaps spring-forward gaps forward. |
-| **Participant modes** | Supports one-host, collective, and capacity-aware pool booking. |
+| **Participant modes** | Supports one-resource, collective, and capacity-aware pool booking. |
 | **Request validation** | Reports all conflicts and policy failures instead of stopping at the first one. |
 | **Assignment** | Picks resources with deterministic first-available, round-robin, least-recently-booked, weighted, priority, owner-first, and scorer-driven strategies. |
 | **Lifecycle decisions** | Emits pure events and ordered intents for confirmation, reservation, release, reschedule, cancellation, expiry, and no-show. |
@@ -49,7 +49,7 @@ def deps do
 end
 ```
 
-ExBooking uses `tz` for timezone conversion. Configure it once in the host
+ExBooking uses `tz` for timezone conversion. Configure it once in the consumer
 application:
 
 ```elixir
@@ -65,7 +65,7 @@ meeting_type = %ExBooking.MeetingType{
   slot_interval_min: 15
 }
 
-resource = %ExBooking.Resource{id: "host_1", timezone: "Etc/UTC"}
+resource = %ExBooking.Resource{id: "resource_1", timezone: "Etc/UTC"}
 
 rule = %ExBooking.AvailabilityRule{
   timezone: "Etc/UTC",
@@ -97,7 +97,11 @@ request = %ExBooking.Request{
 
 :ok = decision.status
 [%ExBooking.Event{type: :booking_confirmed}] = decision.events
-[{:calendar_event, :create, _payload}, {:emit, _event}] = decision.intents
+[
+  {:calendar_event, :create, _payload},
+  {:notify, :booking_confirmation, _payload},
+  {:emit, _event}
+] = decision.intents
 ```
 
 ## Boundary

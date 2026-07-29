@@ -13,7 +13,7 @@ defmodule ExBooking.Hold do
       ...> hold = %ExBooking.Hold{
       ...>   id: "hold_1",
       ...>   slot: slot,
-      ...>   resource_ids: ["host_1"],
+      ...>   resource_ids: ["resource_1"],
       ...>   meeting_type_id: "intro",
       ...>   expires_at: ~U[2026-07-13 08:45:00Z]
       ...> }

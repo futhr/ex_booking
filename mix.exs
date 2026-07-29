@@ -2,7 +2,7 @@ defmodule ExBooking.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://github.com/refpath/ex_booking"
+  @source_url "https://github.com/futhr/ex_booking"
 
   def project do
     [

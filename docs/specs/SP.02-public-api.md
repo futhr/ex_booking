@@ -6,16 +6,17 @@ ex_booking:
   status: normative
   priority: critical
   created: "2026-07-08"
-  updated: "2026-07-11"
+  updated: "2026-07-29"
   tags: ["api", "facade", "options", "error-vocabulary"]
   depends_on: ["R.01", "SP.01"]
 ---
 
 # SP.02 — Public API
 
-The facade module `ExBooking` is the supported entry point. Submodules
-(`ExBooking.Interval`, `ExBooking.Slotting`) are public for consumers with
-lower-level needs; everything else is internal until listed here.
+The facade module `ExBooking` is the primary supported entry point. The struct
+modules define public data contracts. Lower-level functions documented in
+SP.03, SP.04, and SP.06 are also supported for consumers that need to compose
+the kernel below the facade.
 
 ## Common options
 
@@ -126,6 +127,14 @@ well-formed request returns all availability and policy reasons, not just the
 first. A structurally malformed request returns one tagged `{:invalid, _, _}`
 error rather than a reason list.
 
+Supported options:
+
+- `:now` — required `DateTime` input supplied by the caller.
+- `:from`, `:until` — optional paired horizon inputs; malformed horizon shapes
+  are rejected consistently with decision entry points.
+- `:strategy`, `:scorer` — validated up front so malformed assignment inputs
+  cannot be hidden by current availability.
+
 ```elixir
 @spec decide(
         ExBooking.Request.t(),
@@ -148,7 +157,7 @@ Supported options:
 - `:alternatives_limit` — optional non-negative integer, default `3`.
 - `:align` — optional slot-grid anchoring for alternatives, `:free_start`
   (default) or `:clock`.
-- `:strategy`, `:scorer`, `:hold`, `:release_hold_id` — see SP.04/SP.05.
+- `:strategy`, `:scorer`, `:hold` — see SP.04/SP.05.
 
 ```elixir
 @spec reschedule(
@@ -165,6 +174,18 @@ Like `decide/5`, but evaluates the meeting type's reschedule policy against the
 existing slot and emits `:booking_rescheduled` semantics. Callers must remove
 the identified booking's own holds/reservations from the supplied resource
 facts. The kernel never subtracts generic busy time by interval equality.
+
+Supported options:
+
+- `:now` — required `DateTime` input supplied by the caller.
+- `:from`, `:until`, `:alternatives_limit`, `:align` — optional rejected-decision
+  alternative search controls, as in `decide/5`.
+- `:strategy`, `:scorer` — see SP.04.
+- `:release_hold_id` — optional old hold id released before move intents.
+
+Options scoped to a different entry point are unknown at this boundary and are
+rejected. In particular, `:hold` is accepted only by `decide/5`, while
+`:release_hold_id` is accepted only by `reschedule/6` and `cancel/3`.
 
 ```elixir
 @spec evaluate_cancellation(
