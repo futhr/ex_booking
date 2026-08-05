@@ -1,7 +1,8 @@
 ---
 name: booking-implement
 description: Implement an ExBooking task from docs/tasks/booking-tasks.md or docs/specs. Use for kernel code changes in temporal math, availability, slotting, conflict detection, assignment, policy, or lifecycle.
-allowed-tools: Bash(mix *), Bash(rg *), Bash(git *)
+disable-model-invocation: true
+allowed-tools: Read, Glob, Grep, Edit, Write, Bash(mix *), Bash(rg *), Bash(git *)
 ---
 
 # Booking Implement

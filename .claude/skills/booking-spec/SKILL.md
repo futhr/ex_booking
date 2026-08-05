@@ -1,13 +1,17 @@
 ---
 name: booking-spec
 description: Create or update ExBooking normative specs under docs/specs. Use before implementing temporal, availability, slotting, assignment, policy, or lifecycle changes.
-allowed-tools: Bash(rg *), Bash(sed *)
+disable-model-invocation: true
+allowed-tools: Read, Glob, Grep, Edit, Write, Bash(rg *), Bash(sed *)
 ---
 
 # Booking Spec
 
 Specs live under `docs/specs/` as `SP.NN-slug.md` and start from
 `docs/templates/spec-base.md`.
+
+Write only under `docs/specs/` and `docs/tasks/booking-tasks.md`. Do not modify
+source, tests, config, or quality-ignore files from this skill.
 
 ## Required
 
