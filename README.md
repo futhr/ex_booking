@@ -111,18 +111,21 @@ Six runnable notebooks in [`notebooks/`](https://github.com/futhr/ex_booking/tre
 
 | Notebook | Covers | Run |
 |----------|--------|-----|
-| [A Tour of ExBooking](notebooks/tour.livemd) | The whole library in one sitting: search, decide, holds, reschedule, cancel. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fhexdocs.pm%2Fex_booking%2Ftour.livemd) |
-| [Interval Algebra](notebooks/interval-algebra.livemd) | The half-open temporal math everything sits on. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fhexdocs.pm%2Fex_booking%2Finterval-algebra.livemd) |
-| [Schedules & DST](notebooks/schedules-and-dst.livemd) | Wall time to UTC; spring-forward gaps and fall-back folds. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fhexdocs.pm%2Fex_booking%2Fschedules-and-dst.livemd) |
-| [Availability & Slotting](notebooks/availability-and-slotting.livemd) | Duration vs. step, grid alignment, buffers, participant modes. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fhexdocs.pm%2Fex_booking%2Favailability-and-slotting.livemd) |
-| [Assignment & Policy](notebooks/assignment-and-policy.livemd) | All six strategies, fairness inputs, scorers, policy predicates. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fhexdocs.pm%2Fex_booking%2Fassignment-and-policy.livemd) |
-| [Lifecycle & Calendar Interop](notebooks/lifecycle-and-interop.livemd) | Decision anatomy, events, intents, RRULE/ICS/JSCalendar. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fhexdocs.pm%2Fex_booking%2Flifecycle-and-interop.livemd) |
+| [A Tour of ExBooking](notebooks/tour.livemd) | The whole library in one sitting: search, decide, holds, reschedule, cancel. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Ftour.livemd) |
+| [Interval Algebra](notebooks/interval-algebra.livemd) | The half-open temporal math everything sits on. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Finterval-algebra.livemd) |
+| [Schedules & DST](notebooks/schedules-and-dst.livemd) | Wall time to UTC; spring-forward gaps and fall-back folds. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Fschedules-and-dst.livemd) |
+| [Availability & Slotting](notebooks/availability-and-slotting.livemd) | Duration vs. step, grid alignment, buffers, participant modes. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Favailability-and-slotting.livemd) |
+| [Assignment & Policy](notebooks/assignment-and-policy.livemd) | All six strategies, fairness inputs, scorers, policy predicates. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Fassignment-and-policy.livemd) |
+| [Lifecycle & Calendar Interop](notebooks/lifecycle-and-interop.livemd) | Decision anatomy, events, intents, RRULE/ICS/JSCalendar. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Flifecycle-and-interop.livemd) |
 
 From a local checkout, `livebook server notebooks/tour.livemd` — the setup cell
 detects the checkout and installs ExBooking from source, so the notebook always
 demonstrates the code you have. The run links above launch the notebooks from
 the latest release on [HexDocs](https://hexdocs.pm/ex_booking), where each
 notebook page also carries a "Run in Livebook" badge pinned to its release.
+They point at the `ex-booking.hexdocs.pm` host directly, because the
+`hexdocs.pm/ex_booking` redirect drops the CORS header that Livebook needs to
+render a preview.
 
 Every code cell and its saved output is executed and verified by the test suite;
 after changing library behavior, refresh the outputs with:
