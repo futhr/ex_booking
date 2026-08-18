@@ -1,6 +1,8 @@
 Code.require_file("../scripts/release_ref.exs", __DIR__)
 
 defmodule ExBooking.ReleaseRefTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias ExBooking.ReleaseRef
