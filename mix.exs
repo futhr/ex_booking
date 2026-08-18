@@ -100,7 +100,7 @@ defmodule ExBooking.MixProject do
         bench/output/benchmarks.md
         CHANGELOG.md
       ],
-      maintainers: ["Refpath Maintainers"]
+      maintainers: ["Tobias Bohwalli"]
     ]
   end
 
