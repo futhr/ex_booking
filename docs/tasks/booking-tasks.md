@@ -221,6 +221,16 @@ Files: `test/**`, `mix.exs`, `.doctor.exs`, `.credo.exs`, `.formatter.exs`
     UTC interval invariants, lifecycle-policy validation, and scorer regressions.
 ```
 
+## Documentation — Livebooks
+
+```text
+[x] Publish runnable Livebook tutorials for the full public surface
+    (notebooks/, HexDocs Livebooks group, README Livebooks section).
+[x] Guard notebook drift: evaluate every cell, verify saved outputs, and pin
+    the setup-cell version to mix.exs (test/notebooks_test.exs,
+    scripts/regen_notebook_outputs.exs).
+```
+
 ## Completed Hardening Decisions
 
 ```text

@@ -60,6 +60,11 @@ consumer application (the orchestration layer)
 - `docs/specs/` — normative specification (`SP.NN-slug.md`, numbered `00`–`07`).
 - `docs/tasks/booking-tasks.md` — canonical checkbox task list.
 - `docs/templates/` — base templates for new research, specs, and tasks.
+- `notebooks/` — runnable Livebook tutorials, published to HexDocs (Livebooks
+  group). Cells and saved outputs are executed and verified by
+  `test/notebooks_test.exs`; after behavior changes run
+  `mix run scripts/regen_notebook_outputs.exs` to refresh outputs. Each setup
+  cell's version pin must match `mix.exs` (major.minor).
 - `.claude/skills/` — repo-specific workflows for Claude Code.
 - `.claude/standards/` — stable engineering standards (naming, quality gates).
 
