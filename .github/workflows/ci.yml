@@ -72,7 +72,7 @@ jobs:
 
       - name: Upload coverage reports to Codecov
         if: matrix.elixir == '1.18' && matrix.otp == '28'
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        uses: codecov/codecov-action@e53489f4d376d79066609109e7a95a29eb3740b1 # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
