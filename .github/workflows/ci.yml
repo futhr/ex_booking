@@ -151,6 +151,14 @@ jobs:
       - name: Compile
         run: mix compile
 
+      # PLT construction pulls OTP modules (xmerl et al.) whose sources lack
+      # specs, and setup-beam's erlc-warning matcher promotes each notice to a
+      # job annotation. All first-party source here is Elixir, so this matcher
+      # can only ever fire on third-party code; drop it for this job. Real
+      # Dialyzer findings still fail the step via its exit status.
+      - name: Drop the Erlang-source annotation matcher
+        run: echo "::remove-matcher owner=erlc-warning::"
+
       - name: Run Dialyzer
         run: mix dialyzer
 
