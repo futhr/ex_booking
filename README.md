@@ -5,7 +5,7 @@
 [![Hex.pm](https://img.shields.io/hexpm/v/ex_booking.svg)](https://hex.pm/packages/ex_booking)
 [![Docs](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/ex_booking)
 [![CI](https://github.com/futhr/ex_booking/actions/workflows/ci.yml/badge.svg)](https://github.com/futhr/ex_booking/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/futhr/ex_booking.svg)](LICENSE)
+[![License](https://img.shields.io/github/license/futhr/ex_booking.svg)](https://github.com/futhr/ex_booking/blob/main/LICENSE)
 
 [Installation](#installation) ·
 [Quick Start](#quick-start) ·
@@ -159,4 +159,4 @@ at least 95% test coverage.
 
 ## License
 
-ExBooking is released under the MIT License. See [LICENSE](LICENSE).
+ExBooking is released under the MIT License. See [LICENSE](https://github.com/futhr/ex_booking/blob/main/LICENSE).

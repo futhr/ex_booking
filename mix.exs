@@ -110,14 +110,12 @@ defmodule ExBooking.MixProject do
       extras: [
         "README.md": [title: "Overview"],
         "bench/output/benchmarks.md": [title: "Benchmarks"],
-        "CHANGELOG.md": [title: "Changelog"],
-        "CONTRIBUTING.md": [title: "Contributing"],
-        LICENSE: [title: "License"]
+        "CHANGELOG.md": [title: "Changelog"]
       ],
       groups_for_extras: [
         "Getting Started": ~r/^README\.md/,
         Performance: ~r/benchmarks/,
-        Reference: ~r/CHANGELOG|CONTRIBUTING|LICENSE/
+        Reference: ~r/CHANGELOG/
       ],
       groups_for_modules: [
         "Core API": [
