@@ -109,11 +109,18 @@ defmodule ExBooking.MixProject do
       main: "readme",
       extras: [
         "README.md": [title: "Overview"],
+        "notebooks/tour.livemd": [title: "A Tour of ExBooking"],
+        "notebooks/interval-algebra.livemd": [title: "Interval Algebra"],
+        "notebooks/schedules-and-dst.livemd": [title: "Schedules & DST"],
+        "notebooks/availability-and-slotting.livemd": [title: "Availability & Slotting"],
+        "notebooks/assignment-and-policy.livemd": [title: "Assignment & Policy"],
+        "notebooks/lifecycle-and-interop.livemd": [title: "Lifecycle & Calendar Interop"],
         "bench/output/benchmarks.md": [title: "Benchmarks"],
         "CHANGELOG.md": [title: "Changelog"]
       ],
       groups_for_extras: [
         "Getting Started": ~r/^README\.md/,
+        Livebooks: ~r{^notebooks/},
         Performance: ~r/benchmarks/,
         Reference: ~r/CHANGELOG/
       ],

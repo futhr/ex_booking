@@ -1,0 +1,316 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# Assignment & Policy
+
+```elixir
+app_root = Path.expand("..", __DIR__)
+
+deps =
+  if File.exists?(Path.join(app_root, "mix.exs")) do
+    [{:ex_booking, path: app_root}]
+  else
+    [{:ex_booking, "~> 0.1"}]
+  end
+
+Mix.install(deps)
+Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
+```
+
+## Deterministic assignment
+
+`ExBooking.Assignment.assign/3` picks which resource takes a booking, *after*
+availability has established who can. Two properties make it safe to replay:
+
+1. Fairness state is **explicit caller input** — assignment counts,
+   timestamps, weights, and priorities live in `Resource.fairness`, not in
+   hidden library state.
+2. Every strategy falls back to resource id, so ties are stable.
+
+```elixir
+slot = ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+
+tied = [
+  %ExBooking.Resource{id: "carol", timezone: "Etc/UTC"},
+  %ExBooking.Resource{id: "alice", timezone: "Etc/UTC"},
+  %ExBooking.Resource{id: "bob", timezone: "Etc/UTC"}
+]
+
+{:ok, [winner]} = ExBooking.Assignment.assign(tied, slot, [])
+winner.id
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"alice"
+```
+
+## Round robin
+
+`:round_robin` balances by `assignments_count` — fewest wins:
+
+```elixir
+team = [
+  %ExBooking.Resource{id: "alice", timezone: "Etc/UTC", fairness: %{assignments_count: 31}},
+  %ExBooking.Resource{id: "bob", timezone: "Etc/UTC", fairness: %{assignments_count: 28}},
+  %ExBooking.Resource{id: "carol", timezone: "Etc/UTC", fairness: %{assignments_count: 30}}
+]
+
+{:ok, [winner]} = ExBooking.Assignment.assign(team, slot, strategy: :round_robin)
+winner.id
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"bob"
+```
+
+## Least recently booked
+
+`:least_recently_booked` uses `last_assigned_at`; a resource that has *never*
+been assigned ranks first:
+
+```elixir
+team = [
+  %ExBooking.Resource{
+    id: "alice",
+    timezone: "Etc/UTC",
+    fairness: %{last_assigned_at: ~U[2026-07-10 15:00:00Z]}
+  },
+  %ExBooking.Resource{
+    id: "bob",
+    timezone: "Etc/UTC",
+    fairness: %{last_assigned_at: ~U[2026-07-12 09:00:00Z]}
+  },
+  %ExBooking.Resource{id: "carol", timezone: "Etc/UTC", fairness: %{last_assigned_at: nil}}
+]
+
+{:ok, [winner]} = ExBooking.Assignment.assign(team, slot, strategy: :least_recently_booked)
+winner.id
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"carol"
+```
+
+## Weighted
+
+`:weighted` ranks by `assignments_count / weight` — a weight-2 resource is
+expected to carry twice the load. Alice (30/2.0 = 15) beats Bob (16/1.0 = 16):
+
+```elixir
+team = [
+  %ExBooking.Resource{
+    id: "alice",
+    timezone: "Etc/UTC",
+    fairness: %{assignments_count: 30, weight: 2.0}
+  },
+  %ExBooking.Resource{
+    id: "bob",
+    timezone: "Etc/UTC",
+    fairness: %{assignments_count: 16, weight: 1.0}
+  }
+]
+
+{:ok, [winner]} = ExBooking.Assignment.assign(team, slot, strategy: :weighted)
+winner.id
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"alice"
+```
+
+## Priority
+
+`:priority` ranks by explicit priority (higher first), breaking ties with
+round-robin semantics:
+
+```elixir
+team = [
+  %ExBooking.Resource{
+    id: "senior",
+    timezone: "Etc/UTC",
+    fairness: %{priority: 2, assignments_count: 50}
+  },
+  %ExBooking.Resource{
+    id: "junior",
+    timezone: "Etc/UTC",
+    fairness: %{priority: 1, assignments_count: 3}
+  }
+]
+
+{:ok, [winner]} = ExBooking.Assignment.assign(team, slot, strategy: :priority)
+winner.id
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"senior"
+```
+
+## Owner first
+
+`{:owner_first, owner_id: …}` routes to a specific resource when present —
+"book with the account owner if you can" — and otherwise applies a fallback
+strategy to everyone else:
+
+```elixir
+team = [
+  %ExBooking.Resource{id: "alice", timezone: "Etc/UTC", fairness: %{assignments_count: 9}},
+  %ExBooking.Resource{id: "owner_bob", timezone: "Etc/UTC", fairness: %{assignments_count: 99}}
+]
+
+{:ok, [winner]} =
+  ExBooking.Assignment.assign(team, slot,
+    strategy: {:owner_first, owner_id: "owner_bob", fallback: :round_robin}
+  )
+
+winner.id
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"owner_bob"
+```
+
+```elixir
+without_owner = Enum.reject(team, &(&1.id == "owner_bob"))
+
+{:ok, [winner]} =
+  ExBooking.Assignment.assign(without_owner, slot,
+    strategy: {:owner_first, owner_id: "owner_bob", fallback: :round_robin}
+  )
+
+winner.id
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"alice"
+```
+
+## Scorers: opaque routing context
+
+A scorer ranks resources *before* the strategy key, receiving the request's
+`routing_context` as opaque data. The kernel never interprets CRM fields,
+territories, or enrichment — your scorer does:
+
+```elixir
+scorer = fn resource, routing_context ->
+  if resource.meta[:territory] == routing_context[:territory], do: 100, else: 0
+end
+
+team = [
+  %ExBooking.Resource{id: "alice", timezone: "Etc/UTC", meta: %{territory: "EMEA"}},
+  %ExBooking.Resource{id: "bob", timezone: "Etc/UTC", meta: %{territory: "AMER"}}
+]
+
+{:ok, [winner]} =
+  ExBooking.Assignment.assign(team, slot,
+    scorer: scorer,
+    routing_context: %{territory: "AMER"}
+  )
+
+winner.id
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"bob"
+```
+
+A scorer that raises or returns a non-number is rejected as invalid input
+rather than silently skipped:
+
+```elixir
+ExBooking.Assignment.assign(team, slot, scorer: fn _, _ -> :not_a_number end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:error, {:invalid, :scorer_result, {"alice", :not_a_number}}}
+```
+
+## Policy predicates
+
+`ExBooking.Policy.violations/4` evaluates a candidate slot against a rule and
+returns *every* violation, not just the first. Empty list means allowed.
+
+Lead time — the slot starts 30 minutes from `now`, but the rule requires 60,
+so the booking is 30 minutes short:
+
+```elixir
+rule = %ExBooking.AvailabilityRule{timezone: "Etc/UTC", windows: [], lead_time_min: 60}
+resource = %ExBooking.Resource{id: "alice", timezone: "Etc/UTC"}
+near_slot = ExBooking.Interval.new!(~U[2026-07-13 09:30:00Z], ~U[2026-07-13 10:00:00Z])
+
+ExBooking.Policy.violations(near_slot, rule, resource, ~U[2026-07-13 09:00:00Z])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[lead_time: 30]
+```
+
+Booking window — no bookings more than 7 days out — and daily cap — at most
+2 bookings per local day — stack with lead time; all violations are reported
+together:
+
+```elixir
+strict_rule = %ExBooking.AvailabilityRule{
+  timezone: "Etc/UTC",
+  windows: [],
+  lead_time_min: 60,
+  booking_window_days: 7,
+  max_per_day: 2
+}
+
+busy_resource = %ExBooking.Resource{
+  id: "alice",
+  timezone: "Etc/UTC",
+  daily_booking_counts: %{~D[2026-07-30] => 2}
+}
+
+far_slot = ExBooking.Interval.new!(~U[2026-07-30 09:00:00Z], ~U[2026-07-30 09:30:00Z])
+
+ExBooking.Policy.violations(far_slot, strict_rule, busy_resource, ~U[2026-07-13 09:00:00Z])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[{:outside_window, ~D[2026-07-30]}, {:daily_cap, "alice", ~D[2026-07-30]}]
+```
+
+Notice policies guard lifecycle transitions. `ExBooking.Policy.notice_ok/3`
+answers "may this booking still be canceled/rescheduled at `now`?":
+
+```elixir
+existing = ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+
+[
+  ExBooking.Policy.notice_ok(existing, %{allowed: true, min_notice_min: 60}, ~U[2026-07-13 07:00:00Z]),
+  ExBooking.Policy.notice_ok(existing, %{allowed: true, min_notice_min: 120}, ~U[2026-07-13 08:00:00Z]),
+  ExBooking.Policy.notice_ok(existing, %{allowed: false, min_notice_min: 0}, ~U[2026-07-01 00:00:00Z])
+]
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[:ok, {:error, :min_notice}, {:error, :not_allowed}]
+```
+
+Next: [Lifecycle & calendar interop](lifecycle-and-interop.livemd) — full
+decisions, holds, events, intents, and getting external calendar data in.

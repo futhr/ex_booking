@@ -9,6 +9,7 @@
 
 [Installation](#installation) ·
 [Quick Start](#quick-start) ·
+[Livebooks](#livebooks) ·
 [What It Does](#what-it-does) ·
 [Boundary](#boundary) ·
 [Benchmarks](#benchmarks) ·
@@ -102,6 +103,32 @@ request = %ExBooking.Request{
   {:notify, :booking_confirmation, _payload},
   {:emit, _event}
 ] = decision.intents
+```
+
+## Livebooks
+
+Six runnable notebooks in [`notebooks/`](https://github.com/futhr/ex_booking/tree/main/notebooks) teach the library from the
+temporal math up to lifecycle decisions — boot the tour and you have a talk.
+
+| Notebook | Covers | Run |
+|----------|--------|-----|
+| [A Tour of ExBooking](notebooks/tour.livemd) | The whole library in one sitting: search, decide, holds, reschedule, cancel. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffuthr%2Fex_booking%2Fmain%2Fnotebooks%2Ftour.livemd) |
+| [Interval Algebra](notebooks/interval-algebra.livemd) | The half-open temporal math everything sits on. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffuthr%2Fex_booking%2Fmain%2Fnotebooks%2Finterval-algebra.livemd) |
+| [Schedules & DST](notebooks/schedules-and-dst.livemd) | Wall time to UTC; spring-forward gaps and fall-back folds. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffuthr%2Fex_booking%2Fmain%2Fnotebooks%2Fschedules-and-dst.livemd) |
+| [Availability & Slotting](notebooks/availability-and-slotting.livemd) | Duration vs. step, grid alignment, buffers, participant modes. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffuthr%2Fex_booking%2Fmain%2Fnotebooks%2Favailability-and-slotting.livemd) |
+| [Assignment & Policy](notebooks/assignment-and-policy.livemd) | All six strategies, fairness inputs, scorers, policy predicates. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffuthr%2Fex_booking%2Fmain%2Fnotebooks%2Fassignment-and-policy.livemd) |
+| [Lifecycle & Calendar Interop](notebooks/lifecycle-and-interop.livemd) | Decision anatomy, events, intents, RRULE/ICS/JSCalendar. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Ffuthr%2Fex_booking%2Fmain%2Fnotebooks%2Flifecycle-and-interop.livemd) |
+
+From a local checkout, `livebook server notebooks/tour.livemd` — the setup cell
+detects the checkout and installs ExBooking from source, so the notebook always
+demonstrates the code you have. On [HexDocs](https://hexdocs.pm/ex_booking) each
+notebook page carries a "Run in Livebook" badge pinned to that release.
+
+Every code cell and its saved output is executed and verified by the test suite;
+after changing library behavior, refresh the outputs with:
+
+```bash
+mix run scripts/regen_notebook_outputs.exs
 ```
 
 ## Boundary

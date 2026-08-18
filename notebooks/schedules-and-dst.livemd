@@ -1,0 +1,295 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# Schedules & DST
+
+```elixir
+app_root = Path.expand("..", __DIR__)
+
+deps =
+  if File.exists?(Path.join(app_root, "mix.exs")) do
+    [{:ex_booking, path: app_root}]
+  else
+    [{:ex_booking, "~> 0.1"}]
+  end
+
+Mix.install(deps)
+Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
+```
+
+## Wall time in, UTC out
+
+People think in wall time — "Mondays 09:00 to 17:00 in Stockholm". Math needs
+UTC. `ExBooking.Schedule.expand/3` converts an `ExBooking.AvailabilityRule`
+into concrete UTC intervals over a horizon, handling overrides, blackouts,
+midnight-crossing windows, and both kinds of DST transition.
+
+## Weekly windows
+
+A rule holds weekly windows keyed by ISO weekday (Monday = 1), interpreted in
+the rule's timezone. In July, Stockholm is CEST (UTC+2), so 09:00–12:00 wall
+time lands at 07:00–10:00 UTC:
+
+```elixir
+rule = %ExBooking.AvailabilityRule{
+  timezone: "Europe/Stockholm",
+  windows: [
+    %{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[12:00:00]},
+    %{weekday: 3, start_time: ~T[09:00:00], end_time: ~T[12:00:00]}
+  ]
+}
+
+{:ok, offerable} =
+  ExBooking.Schedule.expand(rule, ~U[2026-07-13 00:00:00Z], ~U[2026-07-19 23:59:59Z])
+
+Enum.map(offerable, &{&1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  {~U[2026-07-13 07:00:00Z], ~U[2026-07-13 10:00:00Z]},
+  {~U[2026-07-15 07:00:00Z], ~U[2026-07-15 10:00:00Z]}
+]
+```
+
+## Overrides: replacing a specific date
+
+An override replaces *all* windows for one date. Here Wednesday 2026-07-15
+becomes an afternoon-only day:
+
+```elixir
+altered = %{
+  rule
+  | overrides: [
+      %{date: ~D[2026-07-15], windows: [%{start_time: ~T[13:00:00], end_time: ~T[15:00:00]}]}
+    ]
+}
+
+{:ok, offerable} =
+  ExBooking.Schedule.expand(altered, ~U[2026-07-13 00:00:00Z], ~U[2026-07-19 23:59:59Z])
+
+Enum.map(offerable, &{&1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  {~U[2026-07-13 07:00:00Z], ~U[2026-07-13 10:00:00Z]},
+  {~U[2026-07-15 11:00:00Z], ~U[2026-07-15 13:00:00Z]}
+]
+```
+
+An override with `windows: []` removes the day entirely — a per-date day off:
+
+```elixir
+day_off = %{rule | overrides: [%{date: ~D[2026-07-15], windows: []}]}
+
+{:ok, offerable} =
+  ExBooking.Schedule.expand(day_off, ~U[2026-07-13 00:00:00Z], ~U[2026-07-19 23:59:59Z])
+
+Enum.map(offerable, &{&1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[{~U[2026-07-13 07:00:00Z], ~U[2026-07-13 10:00:00Z]}]
+```
+
+## Blackouts: absolute UTC carve-outs
+
+Blackouts are `ExBooking.Interval` values subtracted after expansion —
+company holidays, maintenance windows, anything absolute:
+
+```elixir
+blacked_out = %{
+  rule
+  | blackouts: [ExBooking.Interval.new!(~U[2026-07-13 08:00:00Z], ~U[2026-07-13 09:00:00Z])]
+}
+
+{:ok, offerable} =
+  ExBooking.Schedule.expand(blacked_out, ~U[2026-07-13 00:00:00Z], ~U[2026-07-13 23:59:59Z])
+
+Enum.map(offerable, &{&1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  {~U[2026-07-13 07:00:00Z], ~U[2026-07-13 08:00:00Z]},
+  {~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z]}
+]
+```
+
+## Midnight-crossing windows
+
+An `end_time <= start_time` window crosses midnight into the next day — a
+night shift starting Monday 22:00 ends Tuesday 02:00 local:
+
+```elixir
+night_shift = %ExBooking.AvailabilityRule{
+  timezone: "Europe/Stockholm",
+  windows: [%{weekday: 1, start_time: ~T[22:00:00], end_time: ~T[02:00:00]}]
+}
+
+{:ok, offerable} =
+  ExBooking.Schedule.expand(night_shift, ~U[2026-07-13 00:00:00Z], ~U[2026-07-14 23:59:59Z])
+
+Enum.map(offerable, &{&1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[{~U[2026-07-13 20:00:00Z], ~U[2026-07-14 00:00:00Z]}]
+```
+
+## Spring forward: wall times that do not exist
+
+On 2026-03-29 in Stockholm, 02:00 CET jumps to 03:00 CEST — wall times
+02:00–02:59 *never happen*. ExBooking's rule: a start inside the gap **snaps
+to the first valid instant after it**. (These transition dates are pinned as
+test fixtures in `test/support/dst_fixtures.ex`, for both `Europe/Stockholm`
+and `America/New_York`.)
+
+A window that claims to start at the non-existent 02:30 actually starts at
+03:00 CEST, which is 01:00 UTC:
+
+```elixir
+gap_window = %ExBooking.AvailabilityRule{
+  timezone: "Europe/Stockholm",
+  windows: [%{weekday: 7, start_time: ~T[02:30:00], end_time: ~T[04:00:00]}]
+}
+
+{:ok, [gap_day]} =
+  ExBooking.Schedule.expand(gap_window, ~U[2026-03-29 00:00:00Z], ~U[2026-03-29 23:59:59Z])
+
+{gap_day.start_at, gap_day.end_at}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{~U[2026-03-29 01:00:00Z], ~U[2026-03-29 02:00:00Z]}
+```
+
+A window that *spans* the gap simply loses the hour that never happened: a
+01:00–05:00 wall-time window is only three hours of real time that day:
+
+```elixir
+spanning = %ExBooking.AvailabilityRule{
+  timezone: "Europe/Stockholm",
+  windows: [%{weekday: 7, start_time: ~T[01:00:00], end_time: ~T[05:00:00]}]
+}
+
+{:ok, [span_day]} =
+  ExBooking.Schedule.expand(spanning, ~U[2026-03-29 00:00:00Z], ~U[2026-03-29 23:59:59Z])
+
+{span_day.start_at, span_day.end_at, ExBooking.Interval.duration_min(span_day)}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{~U[2026-03-29 00:00:00Z], ~U[2026-03-29 03:00:00Z], 180}
+```
+
+## Fall back: wall times that happen twice
+
+On 2026-10-25 in Stockholm, 03:00 CEST falls back to 02:00 CET — wall times
+02:00–02:59 occur *twice*. ExBooking resolves ambiguity to the **first
+occurrence** (still CEST, UTC+2). The result: a window written as one wall
+hour, 02:30–03:30, covers two real hours, because its start resolves to the
+first 02:30 and its end lands after the fold:
+
+```elixir
+ambiguous = %ExBooking.AvailabilityRule{
+  timezone: "Europe/Stockholm",
+  windows: [%{weekday: 7, start_time: ~T[02:30:00], end_time: ~T[03:30:00]}]
+}
+
+{:ok, [fold_day]} =
+  ExBooking.Schedule.expand(ambiguous, ~U[2026-10-25 00:00:00Z], ~U[2026-10-25 23:59:59Z])
+
+{fold_day.start_at, fold_day.end_at, ExBooking.Interval.duration_min(fold_day)}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{~U[2026-10-25 00:30:00Z], ~U[2026-10-25 02:30:00Z], 120}
+```
+
+## The same rules hold in America/New_York
+
+New York springs forward 2026-03-08 (02:00 → 03:00 EST→EDT) and falls back
+2026-11-01 (02:00 EDT → 01:00 EST, so 01:xx repeats). Same behavior, different
+dates and offsets:
+
+```elixir
+ny_gap = %ExBooking.AvailabilityRule{
+  timezone: "America/New_York",
+  windows: [%{weekday: 7, start_time: ~T[02:30:00], end_time: ~T[04:00:00]}]
+}
+
+{:ok, [ny_gap_day]} =
+  ExBooking.Schedule.expand(ny_gap, ~U[2026-03-08 00:00:00Z], ~U[2026-03-08 23:59:59Z])
+
+{ny_gap_day.start_at, ny_gap_day.end_at}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{~U[2026-03-08 07:00:00Z], ~U[2026-03-08 08:00:00Z]}
+```
+
+```elixir
+ny_fold = %ExBooking.AvailabilityRule{
+  timezone: "America/New_York",
+  windows: [%{weekday: 7, start_time: ~T[01:30:00], end_time: ~T[02:30:00]}]
+}
+
+{:ok, [ny_fold_day]} =
+  ExBooking.Schedule.expand(ny_fold, ~U[2026-11-01 00:00:00Z], ~U[2026-11-01 23:59:59Z])
+
+{ny_fold_day.start_at, ny_fold_day.end_at, ExBooking.Interval.duration_min(ny_fold_day)}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{~U[2026-11-01 05:30:00Z], ~U[2026-11-01 07:30:00Z], 120}
+```
+
+## Watching the offset change across a transition week
+
+The same 09:00 wall-time window maps to different UTC instants before and
+after the transition — which is exactly why storing "09:00" and adding a
+fixed offset is a bug, and why this module exists:
+
+```elixir
+daily = %ExBooking.AvailabilityRule{
+  timezone: "Europe/Stockholm",
+  windows: Enum.map(1..7, &%{weekday: &1, start_time: ~T[09:00:00], end_time: ~T[10:00:00]})
+}
+
+{:ok, week} =
+  ExBooking.Schedule.expand(daily, ~U[2026-03-26 00:00:00Z], ~U[2026-04-01 23:59:59Z])
+
+Enum.map(week, & &1.start_at)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[~U[2026-03-26 08:00:00Z], ~U[2026-03-27 08:00:00Z], ~U[2026-03-28 08:00:00Z],
+ ~U[2026-03-29 07:00:00Z], ~U[2026-03-30 07:00:00Z], ~U[2026-03-31 07:00:00Z],
+ ~U[2026-04-01 07:00:00Z]]
+```
+
+Next: [Availability & slotting](availability-and-slotting.livemd) — turning
+these offerable intervals into bookable slots.

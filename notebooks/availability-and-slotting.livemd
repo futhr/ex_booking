@@ -1,0 +1,300 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# Availability & Slotting
+
+```elixir
+app_root = Path.expand("..", __DIR__)
+
+deps =
+  if File.exists?(Path.join(app_root, "mix.exs")) do
+    [{:ex_booking, path: app_root}]
+  else
+    [{:ex_booking, "~> 0.1"}]
+  end
+
+Mix.install(deps)
+Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
+```
+
+## From free time to bookable slots
+
+Availability assembly is a pipeline: expand rules to offerable UTC intervals,
+subtract buffered busy time, cut the remaining free time into candidate
+slots, filter by policy, and combine per the meeting's participant mode. This
+notebook walks each stage with `ExBooking.Slotting` and
+`ExBooking.Availability`, then the whole pipeline through
+`ExBooking.available_slots/4`.
+
+## Duration and step are independent
+
+The single most common scheduling-library bug is coupling slot stepping to
+meeting duration. ExBooking keeps them orthogonal: `duration_min` is how long
+a meeting lasts, `slot_interval_min` (the *step*) is how often starts are
+offered.
+
+A 30-minute meeting offered every 15 minutes in one free hour:
+
+```elixir
+free = ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z])
+
+free
+|> ExBooking.Slotting.generate_slots(30, 15)
+|> Enum.map(& &1.start_at)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:15:00Z], ~U[2026-07-13 09:30:00Z]]
+```
+
+Same free hour, same duration, hourly starts — a completely different offer
+density. Note every slot must fit *entirely* inside the free interval, which
+is why there is no 09:45 start above and only one slot here:
+
+```elixir
+free
+|> ExBooking.Slotting.generate_slots(30, 60)
+|> Enum.map(& &1.start_at)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[~U[2026-07-13 09:00:00Z]]
+```
+
+## Grid alignment
+
+By default the grid anchors to the free interval's start. A meeting ending at
+09:07 makes every subsequent offer look like 09:07, 09:22, … Real products
+usually want tidy starts — `align: :clock` snaps the grid to UTC clock
+boundaries instead:
+
+```elixir
+ragged = ExBooking.Interval.new!(~U[2026-07-13 09:07:00Z], ~U[2026-07-13 10:07:00Z])
+
+for align <- [:free_start, :clock] do
+  starts =
+    ragged
+    |> ExBooking.Slotting.generate_slots(30, 15, align: align)
+    |> Enum.map(&Calendar.strftime(&1.start_at, "%H:%M"))
+
+  {align, starts}
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[free_start: ["09:07", "09:22", "09:37"], clock: ["09:15", "09:30"]]
+```
+
+`generate_all/4` maps slotting over many free fragments, deduplicates, and
+returns one ascending list:
+
+```elixir
+fragments = [
+  ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z]),
+  ExBooking.Interval.new!(~U[2026-07-13 14:00:00Z], ~U[2026-07-13 15:00:00Z])
+]
+
+fragments
+|> ExBooking.Slotting.generate_all(30, 30)
+|> Enum.map(& &1.start_at)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z], ~U[2026-07-13 14:00:00Z],
+ ~U[2026-07-13 14:30:00Z]]
+```
+
+## The full pipeline, one resource
+
+Now the real thing. One consultant, one 09:00–12:00 UTC window, one existing
+10:00–10:30 booking, and a meeting type demanding a 10-minute buffer on both
+sides of any meeting. The buffer inflates the busy block to 09:50–10:40, so
+free time is 09:00–09:50 and 10:40–12:00 — and slotting can only fit starts
+at 09:00, 10:40, and 11:10:
+
+```elixir
+meeting_type = %ExBooking.MeetingType{
+  id: "consult",
+  duration_min: 30,
+  slot_interval_min: 30,
+  buffers: %{before_min: 10, after_min: 10}
+}
+
+consultant = %ExBooking.Resource{
+  id: "consultant_1",
+  timezone: "Etc/UTC",
+  busy: [ExBooking.Interval.new!(~U[2026-07-13 10:00:00Z], ~U[2026-07-13 10:30:00Z])]
+}
+
+rule = %ExBooking.AvailabilityRule{
+  timezone: "Etc/UTC",
+  windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[12:00:00]}]
+}
+
+{:ok, slots} =
+  ExBooking.available_slots(meeting_type, [consultant], [rule],
+    now: ~U[2026-07-06 09:00:00Z],
+    from: ~U[2026-07-13 00:00:00Z],
+    until: ~U[2026-07-14 00:00:00Z]
+  )
+
+Enum.map(slots, & &1.start_at)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:40:00Z], ~U[2026-07-13 11:10:00Z]]
+```
+
+Policies filter slots relative to `now`. Move `now` to the same morning with
+a two-hour lead-time rule and the 09:00 start disappears:
+
+```elixir
+guarded_rule = %{rule | lead_time_min: 120}
+
+{:ok, slots} =
+  ExBooking.available_slots(meeting_type, [consultant], [guarded_rule],
+    now: ~U[2026-07-13 08:00:00Z],
+    from: ~U[2026-07-13 00:00:00Z],
+    until: ~U[2026-07-14 00:00:00Z]
+  )
+
+Enum.map(slots, & &1.start_at)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[~U[2026-07-13 10:40:00Z], ~U[2026-07-13 11:10:00Z]]
+```
+
+## Participant modes
+
+`ExBooking.MeetingType` supports three participant modes:
+
+* `:one` — any single free resource can take the slot (the default)
+* `:collective` — *every* resource must be free (host + interpreter, panel interviews)
+* `:pool` — capacity-aware: slots are offered while enough seats remain
+
+For `:collective`, only the intersection of everyone's free time is offered.
+Host and interpreter overlap 10:00–12:00 only:
+
+```elixir
+collective = %ExBooking.MeetingType{
+  id: "onboarding",
+  duration_min: 60,
+  slot_interval_min: 60,
+  participants: :collective
+}
+
+host = %ExBooking.Resource{id: "host", timezone: "Etc/UTC"}
+interpreter = %ExBooking.Resource{id: "interpreter", timezone: "Etc/UTC"}
+
+host_rule = %ExBooking.AvailabilityRule{
+  timezone: "Etc/UTC",
+  windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[12:00:00]}]
+}
+
+interpreter_rule = %ExBooking.AvailabilityRule{
+  timezone: "Etc/UTC",
+  windows: [%{weekday: 1, start_time: ~T[10:00:00], end_time: ~T[14:00:00]}]
+}
+
+{:ok, slots} =
+  ExBooking.available_slots(collective, [host, interpreter], [host_rule, interpreter_rule],
+    now: ~U[2026-07-06 09:00:00Z],
+    from: ~U[2026-07-13 00:00:00Z],
+    until: ~U[2026-07-14 00:00:00Z]
+  )
+
+Enum.map(slots, & &1.start_at)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[~U[2026-07-13 10:00:00Z], ~U[2026-07-13 11:00:00Z]]
+```
+
+For `:pool`, resources carry `capacity`, and `ExBooking.Reservation` values
+consume seats. A class needing 3 seats across two 2-seat rooms is offerable —
+until an existing reservation eats 2 seats of room A at 10:00:
+
+```elixir
+class = %ExBooking.MeetingType{
+  id: "class",
+  duration_min: 60,
+  slot_interval_min: 60,
+  participants: :pool,
+  capacity_required: 3
+}
+
+room_a = %ExBooking.Resource{
+  id: "room_a",
+  timezone: "Etc/UTC",
+  capacity: 2,
+  reservations: [
+    %ExBooking.Reservation{
+      interval: ExBooking.Interval.new!(~U[2026-07-13 10:00:00Z], ~U[2026-07-13 11:00:00Z]),
+      capacity_consumed: 2
+    }
+  ]
+}
+
+room_b = %ExBooking.Resource{id: "room_b", timezone: "Etc/UTC", capacity: 2}
+
+room_rule = %ExBooking.AvailabilityRule{
+  timezone: "Etc/UTC",
+  windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[12:00:00]}]
+}
+
+{:ok, slots} =
+  ExBooking.available_slots(class, [room_a, room_b], [room_rule, room_rule],
+    now: ~U[2026-07-06 09:00:00Z],
+    from: ~U[2026-07-13 00:00:00Z],
+    until: ~U[2026-07-14 00:00:00Z]
+  )
+
+Enum.map(slots, & &1.start_at)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[~U[2026-07-13 09:00:00Z], ~U[2026-07-13 11:00:00Z]]
+```
+
+When a pool booking is decided, the decision reports exactly how the seats
+were split:
+
+```elixir
+request = %ExBooking.Request{
+  meeting_type_id: "class",
+  invitee_timezone: "Etc/UTC",
+  slot: hd(slots)
+}
+
+{:ok, decision} =
+  ExBooking.decide(request, class, [room_a, room_b], [room_rule, room_rule],
+    now: ~U[2026-07-06 09:00:00Z]
+  )
+
+decision.seat_allocations
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[%{capacity_consumed: 2, resource_id: "room_a"}, %{capacity_consumed: 1, resource_id: "room_b"}]
+```
+
+Next: [Assignment & policy](assignment-and-policy.livemd) — once a slot is
+valid, *who* takes it?

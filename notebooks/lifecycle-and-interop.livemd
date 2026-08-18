@@ -1,0 +1,389 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# Lifecycle & Calendar Interop
+
+```elixir
+app_root = Path.expand("..", __DIR__)
+
+deps =
+  if File.exists?(Path.join(app_root, "mix.exs")) do
+    [{:ex_booking, path: app_root}]
+  else
+    [{:ex_booking, "~> 0.1"}]
+  end
+
+Mix.install(deps)
+Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
+```
+
+## Anatomy of a decision
+
+Every lifecycle entry point returns an `ExBooking.Decision`. The contract:
+`{:error, _}` is reserved for *malformed input* — a rejected booking is still
+a successful decision, with `status`, machine-readable `reasons`, and
+`alternatives` you can show the invitee.
+
+A fixed cast for this notebook:
+
+```elixir
+meeting_type = %ExBooking.MeetingType{
+  id: "demo",
+  duration_min: 30,
+  slot_interval_min: 30,
+  cancellation_policy: %{allowed: true, min_notice_min: 1440}
+}
+
+alice = %ExBooking.Resource{
+  id: "alice",
+  timezone: "Etc/UTC",
+  busy: [ExBooking.Interval.new!(~U[2026-07-13 10:00:00Z], ~U[2026-07-13 11:00:00Z])]
+}
+
+rule = %ExBooking.AvailabilityRule{
+  timezone: "Etc/UTC",
+  windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[12:00:00]}],
+  lead_time_min: 60
+}
+
+now = ~U[2026-07-13 08:00:00Z]
+horizon = [from: ~U[2026-07-13 00:00:00Z], until: ~U[2026-07-14 00:00:00Z]]
+
+request = fn start_at, minutes ->
+  %ExBooking.Request{
+    meeting_type_id: "demo",
+    invitee_timezone: "Etc/UTC",
+    slot: ExBooking.Interval.new!(start_at, DateTime.add(start_at, minutes, :minute))
+  }
+end
+```
+
+**Status `:ok`** — a bookable slot produces resource ids, one event, and
+ordered intents:
+
+```elixir
+{:ok, ok_decision} =
+  ExBooking.decide(request.(~U[2026-07-13 09:30:00Z], 30), meeting_type, [alice], [rule],
+    now: now
+  )
+
+{ok_decision.status, ok_decision.resource_ids, Enum.map(ok_decision.intents, &elem(&1, 0))}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, ["alice"], [:calendar_event, :notify, :emit]}
+```
+
+**Status `:conflict`** — the slot collides with busy time. Pass the horizon
+and the decision also assembles real alternatives:
+
+```elixir
+{:ok, conflict} =
+  ExBooking.decide(
+    request.(~U[2026-07-13 10:00:00Z], 30),
+    meeting_type,
+    [alice],
+    [rule],
+    [now: now] ++ horizon
+  )
+
+{conflict.status, conflict.reasons, Enum.map(conflict.alternatives, & &1.start_at)}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:conflict,
+ [
+   {:conflict, "alice",
+    %ExBooking.Interval{
+      start_at: ~U[2026-07-13 10:00:00Z],
+      end_at: ~U[2026-07-13 11:00:00Z],
+      kind: nil,
+      meta: nil
+    }}
+ ], [~U[2026-07-13 09:30:00Z], ~U[2026-07-13 09:00:00Z], ~U[2026-07-13 11:00:00Z]]}
+```
+
+**Status `:policy_reject`** — the slot is free and inside the window, but
+violates policy: at 08:45 a 09:30 start is 15 minutes short of the rule's
+60-minute lead time. The violation is quantified, ready for UI copy:
+
+```elixir
+{:ok, reject} =
+  ExBooking.decide(request.(~U[2026-07-13 09:30:00Z], 30), meeting_type, [alice], [rule],
+    now: ~U[2026-07-13 08:45:00Z]
+  )
+
+{reject.status, reject.reasons}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:policy_reject, [lead_time: 15]}
+```
+
+**Status `:needs_routing`** — no candidate resource exists for the request at
+all (here: an empty team); the consumer should route the request elsewhere
+instead of showing a conflict:
+
+```elixir
+{:ok, unroutable} =
+  ExBooking.decide(request.(~U[2026-07-13 09:30:00Z], 30), meeting_type, [], [], now: now)
+
+{unroutable.status, Enum.map(unroutable.reasons, &elem(&1, 0))}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:needs_routing, [:no_eligible_resource]}
+```
+
+## The hold lifecycle
+
+Two-phase booking: reserve with a hold at checkout, confirm on payment,
+release on expiry. The consumer owns hold ids, expiry timestamps, and the
+clock; the kernel returns the transitions.
+
+**Reserve** — same `decide/5`, plus your hold:
+
+```elixir
+slot_0930 = request.(~U[2026-07-13 09:30:00Z], 30).slot
+
+hold = %ExBooking.Hold{
+  id: "hold_7",
+  slot: slot_0930,
+  resource_ids: ["alice"],
+  meeting_type_id: "demo",
+  expires_at: ~U[2026-07-13 08:10:00Z]
+}
+
+{:ok, reserved} =
+  ExBooking.decide(request.(~U[2026-07-13 09:30:00Z], 30), meeting_type, [alice], [rule],
+    now: now,
+    hold: hold
+  )
+
+{hd(reserved.events).type, reserved.intents |> Enum.map(&elem(&1, 0))}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:booking_reserved, [:reserve, :emit]}
+```
+
+**Expire** — you noticed `expires_at` has passed; the kernel hands back the
+release intent and the canonical event:
+
+```elixir
+{:ok, expired} = ExBooking.expire_hold(hold, [])
+{expired.intents |> hd(), hd(expired.events).type}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{{:release, "hold_7"}, :booking_expired}
+```
+
+## Reschedule, cancel, no-show
+
+`ExBooking.reschedule/6` moves an existing booking, optionally releasing the
+old hold, and stamps the event with the from/to pair:
+
+```elixir
+{:ok, moved} =
+  ExBooking.reschedule(
+    slot_0930,
+    request.(~U[2026-07-13 11:30:00Z], 30),
+    meeting_type,
+    [alice],
+    [rule],
+    now: now,
+    release_hold_id: "hold_7"
+  )
+
+{moved.status, hd(moved.events).type, Enum.map(moved.intents, &elem(&1, 0))}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, :booking_rescheduled, [:release, :calendar_event, :notify, :emit]}
+```
+
+Cancellation is a pure policy question first (`evaluate_cancellation/3`),
+a transition second (`cancel/3`). Under the 24-hour notice policy, same-day
+cancellation is refused — as a *decision*, not an error:
+
+```elixir
+{:ok, refused} = ExBooking.cancel(slot_0930, meeting_type, now: now, resource_ids: ["alice"])
+{refused.status, refused.reasons}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:policy_reject, [{:policy, :cancellation, :min_notice}]}
+```
+
+```elixir
+{:ok, canceled} =
+  ExBooking.cancel(slot_0930, meeting_type,
+    now: ~U[2026-07-10 08:00:00Z],
+    resource_ids: ["alice"]
+  )
+
+{canceled.status, hd(canceled.events).type, Enum.map(canceled.intents, &elem(&1, 0))}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, :booking_canceled, [:calendar_event, :notify, :emit]}
+```
+
+No-show marking emits the canonical event for analytics and billing; fees and
+detection are consumer concerns:
+
+```elixir
+{:ok, no_show} = ExBooking.mark_no_show(slot_0930, meeting_type, resource_ids: ["alice"])
+hd(no_show.events).type
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:booking_no_show
+```
+
+## Recurrence: a small RRULE expander
+
+`ExBooking.expand_rrule/4` expands a dependency-free RFC 5545 subset —
+`FREQ` (daily/weekly), `INTERVAL`, `COUNT`, UTC `UNTIL`, weekly `BYDAY` —
+into UTC intervals over an explicit horizon. Unsupported parts fail loudly
+instead of being ignored:
+
+```elixir
+{:ok, standups} =
+  ExBooking.expand_rrule(
+    "FREQ=WEEKLY;COUNT=4;BYDAY=MO,WE",
+    ~U[2026-07-13 09:00:00Z],
+    15,
+    from: ~U[2026-07-13 00:00:00Z],
+    until: ~U[2026-08-01 00:00:00Z]
+  )
+
+Enum.map(standups, & &1.start_at)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[~U[2026-07-13 09:00:00Z], ~U[2026-07-15 09:00:00Z], ~U[2026-07-20 09:00:00Z],
+ ~U[2026-07-22 09:00:00Z]]
+```
+
+```elixir
+ExBooking.expand_rrule("FREQ=MONTHLY;BYMONTHDAY=13", ~U[2026-07-13 09:00:00Z], 30,
+  from: ~U[2026-07-13 00:00:00Z],
+  until: ~U[2026-08-01 00:00:00Z]
+)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:error, {:unsupported, :rrule, "BYMONTHDAY"}}
+```
+
+## Importing busy time: ICS and JSCalendar
+
+`ExBooking.import_ics_free_busy/1` parses `FREEBUSY` lines from
+caller-supplied ICS text — including folded lines, `start/duration` periods,
+and `FBTYPE=FREE` periods (validated but excluded from the busy result):
+
+```elixir
+ics = """
+BEGIN:VCALENDAR
+BEGIN:VFREEBUSY
+FREEBUSY:20260713T090000Z/20260713T093000Z,20260713T100000Z/PT1H
+FREEBUSY;FBTYPE=FREE:20260713T120000Z/20260713T130000Z
+END:VFREEBUSY
+END:VCALENDAR
+"""
+
+{:ok, imported_busy} = ExBooking.import_ics_free_busy(ics)
+Enum.map(imported_busy, &{&1.kind, &1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  {:busy, ~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z]},
+  {:busy, ~U[2026-07-13 10:00:00Z], ~U[2026-07-13 11:00:00Z]}
+]
+```
+
+`ExBooking.import_jscalendar_busy/1` maps decoded JSCalendar `Event` and
+`Group` objects; cancelled and free events are skipped:
+
+```elixir
+group = %{
+  "@type" => "Group",
+  "entries" => [
+    %{
+      "@type" => "Event",
+      "start" => "2026-07-13T14:00:00",
+      "timeZone" => "America/New_York",
+      "duration" => "PT1H"
+    },
+    %{
+      "@type" => "Event",
+      "start" => "2026-07-13T16:00:00",
+      "timeZone" => "America/New_York",
+      "status" => "cancelled"
+    }
+  ]
+}
+
+{:ok, js_busy} = ExBooking.import_jscalendar_busy(group)
+Enum.map(js_busy, &{&1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[{~U[2026-07-13 18:00:00Z], ~U[2026-07-13 19:00:00Z]}]
+```
+
+## Closing the loop
+
+Imported busy time is just `ExBooking.Interval` data — feed it straight back
+into a resource and the whole pipeline respects the external calendar:
+
+```elixir
+synced_alice = %{alice | busy: alice.busy ++ imported_busy}
+
+{:ok, open} =
+  ExBooking.available_slots(meeting_type, [synced_alice], [rule],
+    [now: ~U[2026-07-06 09:00:00Z]] ++ horizon
+  )
+
+Enum.map(open, & &1.start_at)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[~U[2026-07-13 09:30:00Z], ~U[2026-07-13 11:00:00Z], ~U[2026-07-13 11:30:00Z]]
+```
+
+That is the entire boundary story in one cell: external systems produce
+normalized data, the kernel produces decisions, and your application executes
+the intents. Back to the start: [A Tour of ExBooking](tour.livemd).

@@ -1,0 +1,265 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# Interval Algebra
+
+```elixir
+app_root = Path.expand("..", __DIR__)
+
+deps =
+  if File.exists?(Path.join(app_root, "mix.exs")) do
+    [{:ex_booking, path: app_root}]
+  else
+    [{:ex_booking, "~> 0.1"}]
+  end
+
+Mix.install(deps)
+Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
+```
+
+## The foundation
+
+Everything in ExBooking — blackout clipping, busy-time subtraction, buffers,
+slot containment, free-time merging — reduces to algebra over
+`ExBooking.Interval`, a **half-open** UTC interval: `[start_at, end_at)`.
+
+Half-open is the load-bearing choice. An interval that *ends* at 10:00 does
+not overlap one that *starts* at 10:00, so back-to-back bookings are legal by
+construction, with no `±1 second` fudging anywhere in the codebase.
+
+## Creating intervals
+
+`ExBooking.Interval.new/3` validates and normalizes; `new!/3` raises on bad
+input. The struct carries an optional `kind` (`:busy`, `:available`,
+`:blackout`, `:hold`) and free-form `meta`:
+
+```elixir
+{:ok, interval} = ExBooking.Interval.new(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z])
+interval
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%ExBooking.Interval{
+  start_at: ~U[2026-07-13 09:00:00Z],
+  end_at: ~U[2026-07-13 10:00:00Z],
+  kind: nil,
+  meta: nil
+}
+```
+
+Empty and reversed intervals are rejected as data errors, not silently
+swapped:
+
+```elixir
+ExBooking.Interval.new(~U[2026-07-13 10:00:00Z], ~U[2026-07-13 09:00:00Z])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:error, {:invalid, :interval, :empty_or_reversed}}
+```
+
+Inputs in any timezone are normalized to UTC at the boundary. A 09:00 meeting
+in New York is stored as 13:00 UTC:
+
+```elixir
+start_local = DateTime.new!(~D[2026-07-13], ~T[09:00:00], "America/New_York")
+end_local = DateTime.new!(~D[2026-07-13], ~T[10:00:00], "America/New_York")
+
+local_meeting = ExBooking.Interval.new!(start_local, end_local)
+{local_meeting.start_at, local_meeting.end_at}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{~U[2026-07-13 13:00:00Z], ~U[2026-07-13 14:00:00Z]}
+```
+
+## Half-open semantics at work
+
+Touching intervals do not overlap — this is the property that makes
+back-to-back bookings work:
+
+```elixir
+first = ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+second = ExBooking.Interval.new!(~U[2026-07-13 09:30:00Z], ~U[2026-07-13 10:00:00Z])
+
+ExBooking.Interval.overlaps?(first, second)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+false
+```
+
+Containment is how slot validity is checked — a candidate slot must fit
+entirely inside offerable time:
+
+```elixir
+working_day = ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 17:00:00Z])
+ExBooking.Interval.contains?(working_day, first)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+true
+```
+
+## Subtraction: how busy time carves up a day
+
+Subtracting a lunch break from a working day leaves two free fragments:
+
+```elixir
+lunch = ExBooking.Interval.new!(~U[2026-07-13 12:00:00Z], ~U[2026-07-13 13:00:00Z])
+
+working_day
+|> ExBooking.Interval.subtract(lunch)
+|> Enum.map(&{&1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  {~U[2026-07-13 09:00:00Z], ~U[2026-07-13 12:00:00Z]},
+  {~U[2026-07-13 13:00:00Z], ~U[2026-07-13 17:00:00Z]}
+]
+```
+
+`subtract_all/2` is the workhorse behind availability: a set of free intervals
+minus a set of busy intervals. Overlapping busy blocks are handled correctly:
+
+```elixir
+meetings = [
+  ExBooking.Interval.new!(~U[2026-07-13 10:00:00Z], ~U[2026-07-13 10:30:00Z]),
+  ExBooking.Interval.new!(~U[2026-07-13 10:15:00Z], ~U[2026-07-13 11:00:00Z]),
+  ExBooking.Interval.new!(~U[2026-07-13 15:00:00Z], ~U[2026-07-13 16:00:00Z])
+]
+
+[working_day]
+|> ExBooking.Interval.subtract_all(meetings)
+|> Enum.map(&{&1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  {~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z]},
+  {~U[2026-07-13 11:00:00Z], ~U[2026-07-13 15:00:00Z]},
+  {~U[2026-07-13 16:00:00Z], ~U[2026-07-13 17:00:00Z]}
+]
+```
+
+## Merging: normal form
+
+`merge/1` sorts and coalesces. Both *overlapping* and *touching* intervals
+collapse — the two 10:xx meetings above become one block:
+
+```elixir
+meetings
+|> ExBooking.Interval.merge()
+|> Enum.map(&{&1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  {~U[2026-07-13 10:00:00Z], ~U[2026-07-13 11:00:00Z]},
+  {~U[2026-07-13 15:00:00Z], ~U[2026-07-13 16:00:00Z]}
+]
+```
+
+```elixir
+[first, second]
+|> ExBooking.Interval.merge()
+|> Enum.map(&{&1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[{~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z]}]
+```
+
+## Clipping and intersection
+
+`clip/2` bounds one interval by another and returns `nil` when they are
+disjoint — this is how blackouts and horizons trim offerable time:
+
+```elixir
+morning = ExBooking.Interval.new!(~U[2026-07-13 00:00:00Z], ~U[2026-07-13 12:00:00Z])
+clipped = ExBooking.Interval.clip(working_day, morning)
+{clipped.start_at, clipped.end_at}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{~U[2026-07-13 09:00:00Z], ~U[2026-07-13 12:00:00Z]}
+```
+
+`intersect/2` runs over whole interval *sets* in normal form — used when a
+collective meeting needs every resource free at once:
+
+```elixir
+host_free = [
+  ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 11:00:00Z]),
+  ExBooking.Interval.new!(~U[2026-07-13 14:00:00Z], ~U[2026-07-13 17:00:00Z])
+]
+
+room_free = [ExBooking.Interval.new!(~U[2026-07-13 10:00:00Z], ~U[2026-07-13 15:00:00Z])]
+
+ExBooking.Interval.intersect(host_free, room_free)
+|> Enum.map(&{&1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  {~U[2026-07-13 10:00:00Z], ~U[2026-07-13 11:00:00Z]},
+  {~U[2026-07-13 14:00:00Z], ~U[2026-07-13 15:00:00Z]}
+]
+```
+
+## Buffers via inflate
+
+`inflate/3` widens an interval by minutes on each side. Availability assembly
+uses it to apply meeting buffers to busy time — a 15-minute prep buffer and a
+10-minute wrap-up buffer make a 30-minute meeting block 55 minutes of the
+calendar:
+
+```elixir
+busy = ExBooking.Interval.new!(~U[2026-07-13 10:00:00Z], ~U[2026-07-13 10:30:00Z])
+padded = ExBooking.Interval.inflate(busy, 15, 10)
+{padded.start_at, padded.end_at}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{~U[2026-07-13 09:45:00Z], ~U[2026-07-13 10:40:00Z]}
+```
+
+## Duration
+
+```elixir
+ExBooking.Interval.duration_min(padded)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+55
+```
+
+Next: [Schedules & DST](schedules-and-dst.livemd) — how weekly wall-time
+windows become these UTC intervals, including on the two worst days of the
+year.

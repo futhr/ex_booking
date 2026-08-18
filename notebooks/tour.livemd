@@ -1,0 +1,358 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# A Tour of ExBooking
+
+```elixir
+app_root = Path.expand("..", __DIR__)
+
+deps =
+  if File.exists?(Path.join(app_root, "mix.exs")) do
+    # Running from a cloned repository: use the local checkout.
+    [{:ex_booking, path: app_root}]
+  else
+    # Running from HexDocs or a downloaded copy: use the released package.
+    [{:ex_booking, "~> 0.1"}]
+  end
+
+Mix.install(deps)
+Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
+```
+
+## Why this library exists
+
+`ExBooking` is a **pure booking kernel**: availability search, slot
+generation, conflict detection, resource assignment, and booking lifecycle
+transitions — all as deterministic functions. It owns none of your state.
+There is no database, no process tree, no HTTP, and crucially **no clock**:
+every function that depends on the current time takes `now` as an argument.
+
+That one design rule buys a lot. Every decision in this notebook is
+reproducible — you can re-run any cell today, next year, or inside a replayed
+background job and get byte-identical answers. Where a real system needs a
+side effect (create a calendar event, send a notification), the kernel returns
+an **intent** describing it, and your application executes it.
+
+This tour walks the whole surface in one sitting. The other notebooks in this
+folder dig into each layer:
+[interval algebra](interval-algebra.livemd),
+[schedules & DST](schedules-and-dst.livemd),
+[availability & slotting](availability-and-slotting.livemd),
+[assignment & policy](assignment-and-policy.livemd), and
+[lifecycle & calendar interop](lifecycle-and-interop.livemd).
+
+## The cast
+
+A booking scenario needs three kinds of input, all plain structs you build
+from your own data:
+
+* `ExBooking.MeetingType` — what is being booked: duration, slot grid,
+  participant mode, and lifecycle policies.
+* `ExBooking.Resource` — who or what can be booked: a timezone, busy time,
+  and optional fairness counters.
+* `ExBooking.AvailabilityRule` — when a resource is offerable: weekly
+  wall-time windows in a named timezone, plus policy limits.
+
+A 30-minute intro call, offered on a 30-minute grid, with notice policies for
+rescheduling (4 hours) and cancellation (24 hours):
+
+```elixir
+meeting_type = %ExBooking.MeetingType{
+  id: "intro_call",
+  duration_min: 30,
+  slot_interval_min: 30,
+  reschedule_policy: %{allowed: true, min_notice_min: 240},
+  cancellation_policy: %{allowed: true, min_notice_min: 1440}
+}
+```
+
+Two sales reps on different continents. The New York rep already has a
+one-hour meeting on the day we will search:
+
+```elixir
+rep_stockholm = %ExBooking.Resource{id: "rep_sto", timezone: "Europe/Stockholm"}
+
+rep_new_york = %ExBooking.Resource{
+  id: "rep_ny",
+  timezone: "America/New_York",
+  busy: [ExBooking.Interval.new!(~U[2026-07-13 18:00:00Z], ~U[2026-07-13 19:00:00Z], kind: :busy)]
+}
+
+resources = [rep_stockholm, rep_new_york]
+```
+
+Each resource is paired positionally with an availability rule. Both reps
+work Mondays 09:00–17:00 *in their own timezone*; the Stockholm rep also
+requires two hours of lead time before any booking:
+
+```elixir
+rule_stockholm = %ExBooking.AvailabilityRule{
+  timezone: "Europe/Stockholm",
+  windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[17:00:00]}],
+  lead_time_min: 120
+}
+
+rule_new_york = %ExBooking.AvailabilityRule{
+  timezone: "America/New_York",
+  windows: [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[17:00:00]}]
+}
+
+rules = [rule_stockholm, rule_new_york]
+```
+
+## Searching availability
+
+`ExBooking.available_slots/4` expands each rule to UTC, subtracts busy time,
+cuts the free time into candidate slots, applies policies, and returns the
+union (this meeting books *one* of the reps). `now` and the search horizon
+are explicit inputs:
+
+```elixir
+now = ~U[2026-07-06 09:00:00Z]
+
+{:ok, slots} =
+  ExBooking.available_slots(meeting_type, resources, rules,
+    now: now,
+    from: ~U[2026-07-13 00:00:00Z],
+    until: ~U[2026-07-14 00:00:00Z]
+  )
+
+length(slots)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+26
+```
+
+Monday 2026-07-13, 09:00–17:00 in Stockholm is 07:00–15:00 UTC; the same
+window in New York is 13:00–21:00 UTC. The union covers 07:00–20:30 starts on
+the half hour, minus the two starts blocked by the New York rep's meeting.
+Slots always come back sorted ascending by start:
+
+```elixir
+slots |> Enum.take(3) |> Enum.map(&{&1.start_at, &1.end_at})
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  {~U[2026-07-13 07:00:00Z], ~U[2026-07-13 07:30:00Z]},
+  {~U[2026-07-13 07:30:00Z], ~U[2026-07-13 08:00:00Z]},
+  {~U[2026-07-13 08:00:00Z], ~U[2026-07-13 08:30:00Z]}
+]
+```
+
+The kernel works in UTC; rendering belongs to the caller. For an invitee in
+London:
+
+```elixir
+slots
+|> Enum.take(3)
+|> Enum.map(fn slot ->
+  slot.start_at |> DateTime.shift_zone!("Europe/London") |> Calendar.strftime("%a %H:%M %Z")
+end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+["Mon 08:00 BST", "Mon 08:30 BST", "Mon 09:00 BST"]
+```
+
+## Determinism, demonstrated
+
+Same inputs, same output — always. No hidden clock read, no randomness, no
+process state to warm up:
+
+```elixir
+{:ok, rerun} =
+  ExBooking.available_slots(meeting_type, resources, rules,
+    now: now,
+    from: ~U[2026-07-13 00:00:00Z],
+    until: ~U[2026-07-14 00:00:00Z]
+  )
+
+rerun == slots
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+true
+```
+
+## Deciding a booking
+
+The invitee picked 13:30 UTC — a time both reps can take. Who gets it?
+`ExBooking.decide/5` validates the request, checks availability and policy,
+runs an assignment strategy, and returns an `ExBooking.Decision`. With
+`:round_robin`, explicit fairness counters decide — the New York rep has had
+fewer assignments:
+
+```elixir
+chosen = Enum.find(slots, &(&1.start_at == ~U[2026-07-13 13:30:00Z]))
+
+request = %ExBooking.Request{
+  meeting_type_id: "intro_call",
+  invitee_timezone: "Europe/London",
+  slot: chosen,
+  routing_context: %{source: "pricing_page"}
+}
+
+fair_resources = [
+  %{rep_stockholm | fairness: %{assignments_count: 12}},
+  %{rep_new_york | fairness: %{assignments_count: 8}}
+]
+
+{:ok, decision} =
+  ExBooking.decide(request, meeting_type, fair_resources, rules,
+    now: now,
+    strategy: :round_robin
+  )
+
+{decision.status, decision.resource_ids}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, ["rep_ny"]}
+```
+
+A successful decision carries a canonical event for your analytics and
+billing layers:
+
+```elixir
+Enum.map(decision.events, & &1.type)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[:booking_confirmed]
+```
+
+…and ordered **intents** — the side effects your application should now
+execute. The kernel never executes them itself:
+
+```elixir
+Enum.map(decision.intents, &elem(&1, 0))
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[:calendar_event, :notify, :emit]
+```
+
+## Holds: two-phase booking
+
+For checkout-style flows, pass a consumer-built `ExBooking.Hold` to reserve
+the slot first. The decision flips to `:booking_reserved` and asks you to
+persist the hold:
+
+```elixir
+hold = %ExBooking.Hold{
+  id: "hold_42",
+  slot: chosen,
+  resource_ids: ["rep_ny"],
+  meeting_type_id: "intro_call",
+  expires_at: ~U[2026-07-06 09:10:00Z]
+}
+
+{:ok, reserved} =
+  ExBooking.decide(request, meeting_type, fair_resources, rules,
+    now: now,
+    strategy: :round_robin,
+    hold: hold
+  )
+
+{hd(reserved.events).type, Enum.map(reserved.intents, &elem(&1, 0))}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:booking_reserved, [:reserve, :emit]}
+```
+
+You own the clock, so *you* decide when a hold has expired — then ask the
+kernel for the canonical transition:
+
+```elixir
+{:ok, expired} = ExBooking.expire_hold(hold, [])
+{hd(expired.events).type, hd(expired.intents)}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:booking_expired, {:release, "hold_42"}}
+```
+
+## Rescheduling
+
+`ExBooking.reschedule/6` first checks the meeting type's reschedule notice
+policy against `now`, then runs a full decision for the new slot:
+
+```elixir
+new_request = %{request | slot: Enum.find(slots, &(&1.start_at == ~U[2026-07-13 15:00:00Z]))}
+
+{:ok, rescheduled} =
+  ExBooking.reschedule(chosen, new_request, meeting_type, fair_resources, rules, now: now)
+
+{rescheduled.status, hd(rescheduled.events).type}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, :booking_rescheduled}
+```
+
+## Canceling
+
+Cancellation policy is evaluated against the caller's `now`. One hour before
+the meeting is too late under a 24-hour notice policy:
+
+```elixir
+booked = new_request.slot
+ExBooking.evaluate_cancellation(booked, meeting_type, now: ~U[2026-07-13 14:00:00Z])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, %{allowed?: false, reason: :min_notice}}
+```
+
+Three days ahead is fine, and `ExBooking.cancel/3` returns the full
+transition:
+
+```elixir
+{:ok, canceled} =
+  ExBooking.cancel(booked, meeting_type,
+    now: ~U[2026-07-10 09:00:00Z],
+    resource_ids: ["rep_ny"]
+  )
+
+{canceled.status, hd(canceled.events).type}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, :booking_canceled}
+```
+
+## Where to go next
+
+Each layer you just used has a dedicated notebook:
+
+* [Interval algebra](interval-algebra.livemd) — the half-open temporal math everything sits on
+* [Schedules & DST](schedules-and-dst.livemd) — wall time to UTC, and why DST transitions don't scare this library
+* [Availability & slotting](availability-and-slotting.livemd) — the assembly pipeline, buffers, and participant modes
+* [Assignment & policy](assignment-and-policy.livemd) — all six strategies, fairness, scorers, and policy predicates
+* [Lifecycle & calendar interop](lifecycle-and-interop.livemd) — decisions, holds, events, intents, RRULE/ICS/JSCalendar
