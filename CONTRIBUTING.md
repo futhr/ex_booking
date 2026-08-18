@@ -44,4 +44,9 @@ and CHANGELOG are managed with `git_ops` (`mix release`).
 
 Maintainers only: `mix release` bumps the version from the commit history,
 updates `CHANGELOG.md`, and tags. Pushing the tag triggers the publish
-workflow (tests, lint, docs, `hex.build`, provenance attestation, Hex publish).
+workflow. The workflow accepts only the exact `v<project-version>` tag at the
+triggering commit, runs the full quality gate on a clean tree, and builds a
+validated Hex package before publishing. It then downloads the package from the
+Hex registry, requires it to match the validated package byte for byte, and
+attests that registry artifact. The Hex API key is available only to the publish
+step.
