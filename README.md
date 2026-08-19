@@ -5,6 +5,7 @@
 [![Hex.pm](https://img.shields.io/hexpm/v/ex_booking.svg)](https://hex.pm/packages/ex_booking)
 [![Docs](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/ex_booking)
 [![CI](https://github.com/futhr/ex_booking/actions/workflows/ci.yml/badge.svg)](https://github.com/futhr/ex_booking/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/futhr/ex_booking/branch/main/graph/badge.svg)](https://codecov.io/gh/futhr/ex_booking)
 [![License](https://img.shields.io/github/license/futhr/ex_booking.svg)](https://github.com/futhr/ex_booking/blob/main/LICENSE)
 
 [Installation](#installation) ·
@@ -107,16 +108,26 @@ request = %ExBooking.Request{
 
 ## Livebooks
 
-Six runnable notebooks in [`notebooks/`](https://github.com/futhr/ex_booking/tree/main/notebooks) teach the library from the temporal math up to lifecycle decisions.
+The Livebook notebooks are executable guides, not extra API reference pages.
+Start with the complete tour in your browser:
 
-| Notebook | Covers | Run |
-|----------|--------|-----|
-| [A Tour of ExBooking](notebooks/tour.livemd) | The whole library in one sitting: search, decide, holds, reschedule, cancel. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Ftour.livemd) |
-| [Interval Algebra](notebooks/interval-algebra.livemd) | The half-open temporal math everything sits on. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Finterval-algebra.livemd) |
-| [Schedules & DST](notebooks/schedules-and-dst.livemd) | Wall time to UTC; spring-forward gaps and fall-back folds. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Fschedules-and-dst.livemd) |
-| [Availability & Slotting](notebooks/availability-and-slotting.livemd) | Duration vs. step, grid alignment, buffers, participant modes. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Favailability-and-slotting.livemd) |
-| [Assignment & Policy](notebooks/assignment-and-policy.livemd) | All six strategies, fairness inputs, scorers, policy predicates. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Fassignment-and-policy.livemd) |
-| [Lifecycle & Calendar Interop](notebooks/lifecycle-and-interop.livemd) | Decision anatomy, events, intents, RRULE/ICS/JSCalendar. | [Run in Livebook](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Flifecycle-and-interop.livemd) |
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Ftour.livemd)
+
+- **[A Tour of ExBooking](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Ftour.livemd)** -
+  Explore the whole library in one sitting: search, decide, hold, reschedule, and cancel.
+- **[Interval Algebra](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Finterval-algebra.livemd)** -
+  Learn the half-open temporal math everything else builds on.
+- **[Schedules & DST](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Fschedules-and-dst.livemd)** -
+  Turn wall time into UTC across spring-forward gaps and fall-back folds.
+- **[Availability & Slotting](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Favailability-and-slotting.livemd)** -
+  Work with duration, step, grid alignment, buffers, and participant modes.
+- **[Assignment & Policy](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Fassignment-and-policy.livemd)** -
+  Compare all six strategies, fairness inputs, scorers, and policy predicates.
+- **[Lifecycle & Calendar Interop](https://livebook.dev/run?url=https%3A%2F%2Fex-booking.hexdocs.pm%2Flifecycle-and-interop.livemd)** -
+  Follow decisions into events, intents, RRULE, ICS, and JSCalendar.
+
+The notebook sources live in
+[`notebooks/`](https://github.com/futhr/ex_booking/tree/main/notebooks).
 
 From a local checkout, `livebook server notebooks/tour.livemd` — the setup cell
 detects the checkout and installs ExBooking from source, so the notebook always
