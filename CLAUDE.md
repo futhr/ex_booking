@@ -72,6 +72,12 @@ Every accepted design gets a spec (`SP.NN`) and a task entry
 (`docs/tasks/booking-tasks.md`) before broad implementation. Research notes link
 to the task file rather than smuggling implementation tasks.
 
+Project documents have no fixed token, word, character, page, line, file-size,
+or diff-size budget. Size them to the evidence and decisions required for a
+safe result. Split only for coherent ownership or lifecycle boundaries, never
+merely because a document is long. Runtime limits and deliberately bounded
+product-output contracts are separate and remain explicit.
+
 ## Quality Gates
 
 `mix check` runs the full pipeline and must be green before you declare a task

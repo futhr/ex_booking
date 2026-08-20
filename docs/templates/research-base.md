@@ -18,7 +18,8 @@ shape, not a vendor.
 
 ## Executive Summary
 
-The bottom line in a few sentences: what was investigated and what was decided.
+State completely what was investigated, what was decided, the decisive
+evidence, and any material uncertainty.
 
 ## Research Question
 
