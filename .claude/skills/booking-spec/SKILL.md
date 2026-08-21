@@ -1,8 +1,6 @@
 ---
 name: booking-spec
-description: Create or update ExBooking normative specs under docs/specs. Use before implementing temporal, availability, slotting, assignment, policy, or lifecycle changes.
-disable-model-invocation: true
-allowed-tools: Read, Glob, Grep, Edit, Write, Bash(rg *), Bash(sed *)
+description: "Apply automatically when authoring or revising an ExBooking normative spec under docs/specs. Define observable temporal, time-zone, DST, availability, overlap, concurrency, assignment, policy, public API, and Hex-consumer behavior before implementation, grounded in repository evidence and explicit unresolved decisions."
 ---
 
 # Booking Spec

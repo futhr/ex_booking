@@ -7,7 +7,6 @@ referenced `.claude/` standards and skills.
 Do not duplicate or reinterpret those rules here. This file exists so agents
 outside Claude Code can discover the same project instructions quickly.
 
-Claude Code skills under `.claude/skills/` may not run automatically in other
-agent environments. When working outside Claude Code, apply the same rules
-manually and run the equivalent validation gates (`mix check`) before handing
-off.
+Canonical skills live only under `.claude/skills/` and are selected automatically
+from their descriptions. Clients without native skill discovery should read the
+matching `SKILL.md` there and run `mix check` before handing off.

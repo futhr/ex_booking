@@ -1,7 +1,6 @@
 ---
 name: booking-review
-description: Review ExBooking changes for purity, determinism, DST correctness, tests, docs, AI-slop/test-integrity signals, and quality-gate risk. Use when the user asks for review, audit, bug hunt, coverage review, or architecture review.
-allowed-tools: Bash(rg *), Bash(mix *), Bash(git *)
+description: "Apply automatically when ExBooking work involving availability, time-zone and DST semantics, overlap/concurrency invariants, public APIs, and Hex consumers needs review exbooking changes for purity, determinism, dst correctness, tests, docs, ai-slop/test-integrity signals, and quality-gate risk. use when the user asks for review, audit, bug hunt, coverage review, or architecture review. Use repository evidence, preserve authority boundaries, and report blocked or unavailable proof explicitly."
 ---
 
 # Booking Review

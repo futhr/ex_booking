@@ -1,8 +1,6 @@
 ---
 name: booking-research
-description: Create or update ExBooking research notes under docs/research with primary sources, tradeoff analysis, and an explicit decision. Use for scheduling-market, calendaring-standards, recurrence-library, or Elixir-ecosystem research.
-disable-model-invocation: true
-allowed-tools: Read, Glob, Grep, Edit, Write, Bash(rg *), Bash(sed *), WebSearch, WebFetch
+description: "Apply automatically when an ExBooking decision about scheduling standards, calendaring, recurrence libraries, time-zone/DST behavior, or the Elixir ecosystem depends on facts outside the repository. Use primary sources, compare tradeoffs against booking invariants and Hex consumers, cite dates, and record the resulting decision under docs/research."
 ---
 
 # Booking Research

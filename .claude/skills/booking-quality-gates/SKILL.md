@@ -1,10 +1,9 @@
 ---
-name: done
-description: Run ExBooking's full quality gate after implementation, docs changes, or before committing. Use when work is finished, ready to commit, ship-ready, or whenever the user asks for clean gates.
-allowed-tools: Bash(mix *), Bash(git *), Bash(rg *)
+name: booking-quality-gates
+description: "Apply automatically before a ExBooking completion or release-readiness claim. Run the smallest authoritative gate matrix that covers availability, time-zone and DST semantics, overlap/concurrency invariants, public APIs, and Hex consumers, and report every skipped, blocked, failed, and hosted-only check."
 ---
 
-# Done
+# ExBooking Quality Gates
 
 Run the full gate. Everything must be clean before declaring a task done or
 committing. `mix check` runs the whole pipeline; the individual commands make
