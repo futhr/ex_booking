@@ -11,7 +11,7 @@ deps =
     [{:ex_booking, path: app_root}]
   else
     # Running from HexDocs or a downloaded copy: use the released package.
-    [{:ex_booking, "~> 0.1"}]
+    [{:ex_booking, "~> 0.2"}]
   end
 
 Mix.install(deps)

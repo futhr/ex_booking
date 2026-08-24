@@ -9,7 +9,7 @@ deps =
   if File.exists?(Path.join(app_root, "mix.exs")) do
     [{:ex_booking, path: app_root}]
   else
-    [{:ex_booking, "~> 0.1"}]
+    [{:ex_booking, "~> 0.2"}]
   end
 
 Mix.install(deps)
