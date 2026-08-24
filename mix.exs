@@ -100,7 +100,7 @@ defmodule ExBooking.MixProject do
         bench/output/benchmarks.md
         CHANGELOG.md
       ],
-      maintainers: ["Tobias Bohwalli"]
+      maintainers: ["Tobias Bohwalli <hi@futhr.io>"]
     ]
   end
 
