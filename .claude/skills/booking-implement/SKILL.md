@@ -13,6 +13,10 @@ spec it cites.
 - Read `CLAUDE.md` and the cited `SP.NN` section in full.
 - Confirm the task's dependencies (earlier milestone tasks) are done.
 - Check `docs/specs/SP.02` for the error vocabulary and option contract.
+- Write the smallest example, property, DST fixture, or characterization that proves the next
+  behavior and run it against current code. It must fail at the intended assertion; a syntax,
+  fixture, dependency, or harness failure is not RED. If it is already green, resolve whether the
+  task is implemented or the proof is non-discriminating before editing.
 
 ## During
 
@@ -24,9 +28,12 @@ spec it cites.
 - Every public function gets a `@doc`, a `@spec`, and a doctest.
 - Update the cited `SP.NN` spec in the same change if behavior shifts.
 - Add StreamData properties and DST fixtures for timezone-sensitive behavior.
+- Make the smallest change that turns the same observed failing proof green. Never weaken, skip, or
+  delete the proof to obtain GREEN.
 
 ## After
 
 - Tick the task's `AC:` items in `docs/tasks/booking-tasks.md` and update the
   Progress Summary counts.
 - Run the `done` skill; all gates must be clean.
+- Record exact focused RED, focused GREEN, and final-gate output from the final working tree.

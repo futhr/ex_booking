@@ -15,3 +15,9 @@ owning pure function, not a caller-side reorder or a fixture exception.
 
 Retain the minimized example and a general property when the defect represents an invariant.
 Re-run notebooks/package evidence when the public surface changes.
+
+Do not edit before one causal hypothesis explains the observed counterexample. Record the outcome
+of one discriminating probe at a time. After three materially distinct failed fixes for the same
+symptom, stop local patching and reopen the interval model, timezone policy, public contract, or
+algorithmic decomposition. Close only with fresh output from the minimized example and retained
+property/regression; an unavailable consumer lane remains unverified.

@@ -11,6 +11,19 @@ Research notes live under `docs/research/` as `R.NN-slug.md` and start from
 Write only under `docs/research/`. Do not modify source, tests, config, or
 quality-ignore files from this skill.
 
+## Evidence reconciliation before a verdict
+
+- Inventory related research, specifications, code, tests, and any sibling
+  repository that owns or consumes the contract. Record the screening rule,
+  close-reading set, and material exclusions.
+- Prefer current primary external sources and preserve source dates/versions.
+- Reconcile affirming, contradicting, and superseding evidence. Distinguish
+  shipped behavior, specified intent, proposal, and inference.
+- End in one terminal state: adopted, bounded validation, rejected, or deferred
+  dependency, with its semantic owner and falsifier.
+- One talk, product comparison, summary, benchmark, or model judgment is never
+  enough for a cross-validated conclusion.
+
 ## Required
 
 - `ex_booking:` research frontmatter (`id`, `topic`, `category`, `status`,
