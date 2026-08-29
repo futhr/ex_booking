@@ -761,7 +761,7 @@ defmodule ExBooking.Availability do
   defp candidates(pairs, []), do: pairs
 
   defp candidates(pairs, ids),
-    do: Enum.filter(pairs, fn {resource, _} -> resource.id in ids end)
+    do: Enum.filter(pairs, fn {resource, _} -> Enum.member?(ids, resource.id) end)
 
   defp effective_buffers(%MeetingType{buffers: nil}, rule), do: rule.buffers
   defp effective_buffers(%MeetingType{buffers: buffers}, _), do: buffers

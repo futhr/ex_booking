@@ -269,7 +269,7 @@ defmodule ExBooking.RRule do
     Stream.iterate(0, &(&1 + 1))
     |> Stream.filter(
       &(week_in_interval?(&1, interval) and
-          Date.day_of_week(Date.add(DateTime.to_date(dtstart), &1)) in byday)
+          Enum.member?(byday, Date.day_of_week(Date.add(DateTime.to_date(dtstart), &1))))
     )
     |> Stream.map(&calendar_occurrence(dtstart, &1))
   end
