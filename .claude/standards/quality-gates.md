@@ -1,7 +1,7 @@
 # Quality Gates Standard
 
 The gate that must be green before any change is declared done or committed.
-`SP.06` is the normative testing strategy; this restates the enforced bar.
+`SP.07` is the normative testing strategy; this restates the enforced bar.
 
 ## Gate Commands
 
@@ -10,10 +10,12 @@ mix format --check-formatted
 mix compile --warnings-as-errors
 mix credo --strict
 mix deps.audit
+mix hex.audit
 mix dialyzer
 mix doctor
 mix docs
 mix test --cover
+mix verify.package
 mix check          # ex_check runs all of the above
 ```
 
@@ -23,8 +25,8 @@ mix check          # ex_check runs all of the above
   Every public function has a `@doc`, an `@spec`, and a doctest.
 - **Coverage**: `mix test --cover` — ≥95% line coverage (`coveralls.json`).
   `test/support` is excluded.
-- **Types**: `mix dialyzer` clean. `:no_extra_return` is a temporary flag while
-  stubs exist (`SP.07` v0.1); remove it once real returns land.
+- **Types**: `mix dialyzer` clean, including `:extra_return` and `:underspecs`;
+  there are no stub exemptions.
 - **Style**: `mix credo --strict` clean, including `Readability.Specs`.
 
 ## Required Test Kinds

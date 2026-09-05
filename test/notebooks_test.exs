@@ -17,7 +17,7 @@ defmodule ExBooking.NotebooksTest do
     describe Path.basename(path) do
       @path path
 
-      test "every code cell evaluates and saved outputs are current" do
+      test "every non-setup code cell evaluates and saved outputs are current" do
         text = File.read!(@path)
 
         case NotebookOutputs.mismatches(text, @path) do

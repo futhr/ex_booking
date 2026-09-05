@@ -17,10 +17,12 @@ mix format --check-formatted
 mix compile --warnings-as-errors
 mix credo --strict
 mix deps.audit
+mix hex.audit
 mix dialyzer
 mix doctor
 mix docs
 mix test --cover
+mix verify.package
 mix check
 ```
 

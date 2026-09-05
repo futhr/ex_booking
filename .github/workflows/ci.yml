@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "17 6 * * 1"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -61,6 +63,9 @@ jobs:
 
       - name: Run tests
         run: mix test
+
+      - name: Verify packaged consumer and notebook setup
+        run: mix verify.package
 
       - name: Run coverage gate
         if: matrix.elixir == '1.18' && matrix.otp == '28'

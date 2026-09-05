@@ -19,7 +19,7 @@ source, tests, config, or quality-ignore files from this skill.
 - Deterministic, exact algorithms — pseudocode or `elixir` for normative steps.
 - Explicit DST / timezone / ordering rules where relevant.
 - Error vocabulary additions cross-referenced to `SP.02`.
-- Testing strategy (doctest / property / DST fixture) per `SP.06`.
+- Testing strategy (doctest / property / DST fixture) per `SP.07`.
 - Sources: link `R.NN` and any RFC/standard.
 
 ## Constraints

@@ -12,3 +12,5 @@ ex_booking-*.tar
 .agents/
 .codex/
 priv/plts/
+
+/bench/output/smoke.md

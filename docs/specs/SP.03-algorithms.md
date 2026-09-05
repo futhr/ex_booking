@@ -162,7 +162,7 @@ conflicts; generic busy overlaps remain full conflicts.
 Requested-slot validation uses this exact order:
 
 ```text
-1. The facade validates request identity, interval, exact duration, options,
+1. The public entry path validates request identity, interval, exact duration, options,
    strategy, and horizon as malformed-input checks (SP.02/SP.04).
 2. Pair each resource with its rule positionally.
 3. Expand each rule over the requested slot horizon, including overrides and

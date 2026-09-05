@@ -138,8 +138,13 @@ They point at the `ex-booking.hexdocs.pm` host directly, because the
 `hexdocs.pm/ex_booking` redirect drops the CORS header that Livebook needs to
 render a preview.
 
-Every code cell and its saved output is executed and verified by the test suite;
-after changing library behavior, refresh the outputs with:
+The test suite executes every example cell and verifies saved outputs.
+`mix verify.package` builds and extracts the Hex archive, runs a fresh production
+consumer, then executes each distinct notebook setup cell in a separate Elixir
+process and verifies the packaged examples. This exercises the local-source setup
+branch against the archive; the released-package branch is checked for its version
+pin but requires a published release to verify that release's contents.
+After changing library behavior, refresh the outputs with:
 
 ```bash
 mix run scripts/regen_notebook_outputs.exs
@@ -178,11 +183,15 @@ The benchmark suite covers interval algebra, schedule expansion, availability,
 validation, assignment, lifecycle decisions, and calendar-data normalizers.
 
 ```bash
-mix bench --smoke   # quick run that refreshes benchmark markdown
+mix bench --smoke   # quick execution check; writes ignored bench/output/smoke.md
 mix bench           # full local measurement run
 ```
 
-The generated benchmark report is included in HexDocs as the performance page.
+The full `mix bench` report is included in HexDocs as the performance page.
+Each scenario is checked for a successful result before timing. Input construction
+is included, and results describe the recorded machine and workloads; ratios
+between different scenarios are not before/after speedups. Smoke runs never
+overwrite this performance evidence.
 
 ## Development
 

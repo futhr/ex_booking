@@ -24,17 +24,30 @@ defmodule ExBooking.Bench do
   def run(argv \\ System.argv()) do
     smoke? = "--smoke" in argv
     File.mkdir_p!(@output_dir)
+    scenarios = scenarios()
+    Enum.each(scenarios, &verify_scenario!/1)
+    report = if smoke?, do: Path.join(@output_dir, "smoke.md"), else: @markdown_file
 
     Benchee.run(
-      scenarios(),
+      scenarios,
       Keyword.merge(bench_config(smoke?),
         percentiles: [50, 95, 99],
         formatters: [
           Benchee.Formatters.Console,
-          {Benchee.Formatters.Markdown, file: @markdown_file, description: description(smoke?)}
+          {Benchee.Formatters.Markdown, file: report, description: description(smoke?)}
         ]
       )
     )
+  end
+
+  defp verify_scenario!({name, scenario}) do
+    case scenario.() do
+      {:ok, [_ | _]} -> :ok
+      {:ok, %ExBooking.Decision{status: :ok}} -> :ok
+      [_ | _] -> :ok
+      :ok -> :ok
+      result -> raise "#{name} returned an unexpected result: #{inspect(result)}"
+    end
   end
 
   defp bench_config(true), do: @smoke_config
@@ -92,7 +105,7 @@ defmodule ExBooking.Bench do
       "BK.08 validate request across 100 hosts" => fn ->
         ExBooking.validate_request(request, meeting_type, resources, rules, now: @base)
       end,
-      "BK.09 decide with assignment and alternatives" => fn ->
+      "BK.09 decide accepted request with assignment" => fn ->
         ExBooking.decide(request, meeting_type, resources, rules,
           now: @base,
           from: @base,
@@ -139,11 +152,11 @@ defmodule ExBooking.Bench do
   end
 
   defp description(true) do
-    "Smoke benchmark run for documentation freshness. Run `mix bench` locally for stable measurements."
+    "Smoke execution check only; these timings are not performance evidence. Run `mix bench` for the published report."
   end
 
   defp description(false) do
-    "Benchmark run for ExBooking's interval, availability, assignment, lifecycle, and calendar-data paths."
+    "Full benchmark run (2s warmup, 5s measurement, 1s memory per scenario). Input construction is included. Memory means cumulative process allocations, including garbage-collected memory. Results describe distinct workloads on the recorded machine; cross-scenario ratios are not before/after speedups."
   end
 
   defp horizon(days) do
@@ -213,16 +226,15 @@ defmodule ExBooking.Bench do
 
   defp jscalendar_group(count) do
     entries =
-      for index <- 0..(count - 1), into: %{} do
+      for index <- 0..(count - 1) do
         start_at = DateTime.add(@base, index * 60, :minute)
 
-        {"event_#{pad(index)}",
-         %{
-           "@type" => "Event",
-           "start" => start_at |> DateTime.to_iso8601() |> String.trim_trailing("Z"),
-           "timeZone" => "Etc/UTC",
-           "duration" => "PT30M"
-         }}
+        %{
+          "@type" => "Event",
+          "start" => start_at |> DateTime.to_iso8601() |> String.trim_trailing("Z"),
+          "timeZone" => "Etc/UTC",
+          "duration" => "PT30M"
+        }
       end
 
     %{"@type" => "Group", "entries" => entries}

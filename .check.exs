@@ -25,6 +25,9 @@
     {:doctor, command: "mix doctor"},
     {:ex_doc, command: "mix docs"},
 
+    # Extracted Hex archive, fresh production consumer, and notebook setup cells
+    {:package_consumer, command: "mix verify.package"},
+
     # Tests
     {:ex_unit, command: "mix test --cover"}
   ]

@@ -67,10 +67,12 @@ mix format --check-formatted
 mix compile --warnings-as-errors
 mix credo --strict
 mix deps.audit
+mix hex.audit
 mix dialyzer
 mix doctor
 mix docs
 mix test --cover
+mix verify.package
 ```
 
 Coverage must remain at or above 95% line coverage with `test/support` excluded.
@@ -99,3 +101,11 @@ All checkout and cache action references use full commit pins for checkout v7.0.
 ## Behavioral property coverage
 
 Generators include arbitrary seconds and microseconds. Clock-grid properties produce nonempty multi-day results and inspect every slot without conditional skips. Assignment properties cover proportional load, permutation invariance, unbounded counters, and missing fairness. Weekly recurrence is checked against an independently enumerated calendar-day reference including Monday anchoring and absolute COUNT before horizon filtering. Daily recurrence cardinality and wall time are checked across both Stockholm and New York DST gaps. Lead-time properties exercise every generated positive subsecond deficit and its exact accepting boundary. Normalized subtraction completeness and pool peak capacity are covered alongside their fixes (A16/A17).
+
+## Archive and notebook verification
+
+`mix verify.package`, included in `mix check --no-retry` and every CI runtime-matrix job, builds and extracts an actual Hex archive into temporary directories. A fresh production consumer resolves only the runtime dependencies, compiles and exercises timezone-aware availability and decisions, and verifies the application dependency list and absence of an application callback. Packaged notebooks are required. Their actual setup cells run in fresh Elixir processes before every example and saved output is checked. Identical setup sources may share a process. The archive/local-source setup branch is executed; the released-version branch is pin-checked and its registry contents remain release-specific hosted evidence. Temporary artifacts are removed on success or failure.
+
+## Performance and maintenance evidence
+
+A full benchmark run uses 2 seconds of warmup, 5 seconds of timing, and 1 second of memory measurement per scenario. The tracked report is produced only by full runs. Smoke output is ignored and separate. Scenarios must return successful nonempty results before timing; the JSCalendar Group fixture uses the standard entries array. Recorded input construction is part of workload cost. Weekly CI checks security independently of new commits, and Dependabot proposes Mix and GitHub Actions version updates for review. Hosted workflow execution, registry publication and release provenance cannot be certified by local gates.

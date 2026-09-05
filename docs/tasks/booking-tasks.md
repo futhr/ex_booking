@@ -244,7 +244,7 @@ Files: `test/**`, `mix.exs`, `.doctor.exs`, `.credo.exs`, `.formatter.exs`
     breaking decision-model work).
 [x] Supply booking-specific daily-count facts instead of deriving daily caps
     from every generic :busy calendar interval (SP.01/SP.03).
-[x] Complete public-input hardening for temporal structs and timezones across
+[x] Complete the initial public-input hardening for temporal structs and timezones across
     availability/lifecycle entry points (SP.01/SP.02/SP.03).
 [x] Validate hand-built RRULE values before stream construction, preserve zoned
     wall time across DST, and normalize recurrence output to UTC (SP.02/SP.06).
@@ -256,10 +256,10 @@ Files: `test/**`, `mix.exs`, `.doctor.exs`, `.credo.exs`, `.formatter.exs`
 [x] Profile availability hot paths; replace Cartesian collective interval
     intersection with an equivalent linear two-pointer walk and quadratic
     rejection-reason appends with order-preserving reverse accumulation.
-[x] Profile RRULE walking from distant DTSTART and retain the sequential walk:
-    even a 100-year offset stayed below 35 ms, while a correct jump must retain
-    absolute COUNT ordinals and DST wall-time behavior. This is not material to
-    production booking horizons and is intentionally not speculative work.
+[x] Profile RRULE walking from distant DTSTART (historical R.04 decision).
+    September audit A04 supersedes retaining the weekly day-by-day walk:
+    large INTERVAL values required explicit horizon bounds and active-week jumps.
+    COUNT ordinals and DST behavior remain regression-tested.
 ```
 
 ## Delegated Outside This Repo
@@ -279,7 +279,7 @@ These are intentionally not roadmap tasks for `ex_booking`:
 
 ## September 2026 audit remediation
 
-Progress: 21/22 findings completed.
+Progress: 22/22 findings completed.
 
 - [x] A01: Security audit and Mint update (SP.07).
 - [x] A02: Unique resource identities (SP.01/SP.02).
@@ -302,4 +302,4 @@ Progress: 21/22 findings completed.
 - [x] A19: Update pinned checkout and cache actions (SP.07).
 - [x] A20: Consolidate validation and precise public types (SP.01/SP.02).
 - [x] A21: Expand behavioral properties (SP.07).
-- [ ] A22: Package, notebook, benchmark, and maintenance evidence (SP.07).
+- [x] A22: Package, notebook, benchmark, and maintenance evidence (SP.07).

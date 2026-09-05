@@ -61,8 +61,9 @@ consumer application (the orchestration layer)
 - `docs/tasks/booking-tasks.md` — canonical checkbox task list.
 - `docs/templates/` — base templates for new research, specs, and tasks.
 - `notebooks/` — runnable Livebook tutorials, published to HexDocs (Livebooks
-  group). Cells and saved outputs are executed and verified by
-  `test/notebooks_test.exs`; after behavior changes run
+  group). Example cells and saved outputs are executed and verified by
+  `test/notebooks_test.exs`; `mix verify.package` executes setup cells in fresh
+  Elixir processes against the extracted Hex archive. After behavior changes run
   `mix run scripts/regen_notebook_outputs.exs` to refresh outputs. Each setup
   cell's version pin must match `mix.exs` (major.minor).
 - `.claude/skills/` — repo-specific workflows for Claude Code.
@@ -88,10 +89,12 @@ mix format --check-formatted
 mix compile --warnings-as-errors
 mix credo --strict
 mix deps.audit
+mix hex.audit
 mix dialyzer
 mix doctor          # 100% moduledoc, ≥80% @spec coverage
 mix docs
 mix test --cover    # ≥95% line coverage (coveralls.json); test/support excluded
+mix verify.package # fresh archive consumer and notebook setup/examples
 mix check           # runs all of the above (ex_check)
 ```
 

@@ -12,6 +12,11 @@ ex_booking:
 
 # R.04 — Availability Performance Profile
 
+> September 2026 update: the recurrence recommendation below is historical.
+> Large weekly INTERVAL values exposed unbounded traversal omitted by these
+> measurements. A04 and SP.06 now require horizon bounds and active-week jumps.
+> See [R.05](R.05-september-audit.md) for the superseding evidence.
+
 ## Executive Summary
 
 Measured profiles found two material algorithmic costs in availability assembly:

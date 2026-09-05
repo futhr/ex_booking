@@ -5,6 +5,40 @@ See [Conventional Commits](https://www.conventionalcommits.org) for commit guide
 
 <!-- changelog -->
 
+## Unreleased
+
+### Changed
+
+- Weekly recurrence uses Monday-anchored intervals and bounded traversal.
+  Invalid local times are skipped without consuming COUNT; COUNT and UNTIL
+  together now return an error.
+- Duplicate resource IDs, malformed options, unsupported JSCalendar recurrence
+  fields and empty FREEBUSY periods now return explicit errors.
+- Closed-day overrides remove inbound overnight availability. Collective
+  preferences retain all required participants, and alternatives preserve
+  request preferences.
+- Lead-time checks, slot deduplication, hold matching and assignment ordering
+  preserve microsecond precision. Missing fairness ranks explicitly, and
+  weighted assignment supports arbitrarily large integer counters.
+- Interval subtraction normalizes both sets and uses a linear sweep after
+  sorting. Pool capacity uses peak simultaneous reservation consumption.
+- Shared validation removes redundant work and unreachable fallback branches;
+  public types describe supported strategies and partial fairness maps.
+
+### Maintenance
+
+- Update Mint to 1.10.0, ExDoc to 0.40.4 and Req to 0.7.4; add Hex registry
+  advisory checks alongside the existing dependency audit.
+- Update pinned checkout/cache actions and add weekly security checks and
+  dependency update proposals.
+- Expand behavioral properties, package notebook sources, verify extracted Hex
+  archives in fresh consumers, execute notebook setup cells, and separate smoke
+  benchmarks from full performance measurements.
+
+These unreleased changes alter recurrence results and malformed-input handling.
+Consumers should review those behavior changes before upgrading.
+
+
 ## [v0.2.0](https://github.com/futhr/ex_booking/compare/v0.1.0...v0.2.0) (2026-08-24)
 
 

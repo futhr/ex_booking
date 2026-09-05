@@ -92,6 +92,7 @@ defmodule ExBooking.MixProject do
       },
       files: ~w[
         lib
+        notebooks
         .formatter.exs
         mix.exs
         README.md
@@ -178,6 +179,7 @@ defmodule ExBooking.MixProject do
       "test.cover": ["coveralls"],
       bench: ["run bench/run.exs"],
       "bench.smoke": ["run bench/run.exs --smoke"],
+      "verify.package": ["run --no-start scripts/verify_package.exs"],
       ci: ["setup", "lint", "test.cover"],
 
       # Release
