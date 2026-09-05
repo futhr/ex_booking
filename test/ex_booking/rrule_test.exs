@@ -2,6 +2,7 @@ defmodule ExBooking.RRuleTest do
   @moduledoc false
 
   use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias ExBooking.RRule
 
@@ -272,5 +273,62 @@ defmodule ExBooking.RRuleTest do
 
     assert Enum.map(intervals, & &1.start_at) ==
              [~U[2026-03-07 07:30:00Z], ~U[2026-03-09 06:30:00Z]]
+  end
+
+  property "weekly expansion matches a calendar-day reference with absolute COUNT" do
+    check all(
+            start_offset <- integer(0..6),
+            interval <- integer(1..4),
+            day_mask <- integer(1..127),
+            count <- integer(1..20),
+            horizon_offset <- integer(0..45)
+          ) do
+      weekdays = for day <- 1..7, rem(div(day_mask, Integer.pow(2, day - 1)), 2) == 1, do: day
+      start_date = Date.add(~D[2026-07-13], start_offset)
+      dtstart = DateTime.new!(start_date, ~T[09:00:00], "Etc/UTC")
+      from = DateTime.add(dtstart, horizon_offset, :day)
+      until = DateTime.add(dtstart, 120, :day)
+      monday = Date.add(start_date, 1 - Date.day_of_week(start_date))
+
+      expected =
+        start_date
+        |> Date.range(Date.add(start_date, 119))
+        |> Enum.filter(fn date ->
+          Date.day_of_week(date) in weekdays and
+            rem(div(Date.diff(date, monday), 7), interval) == 0
+        end)
+        |> Enum.take(count)
+        |> Enum.filter(&(Date.compare(&1, DateTime.to_date(from)) != :lt))
+
+      rule = %RRule{freq: :weekly, interval: interval, byday: weekdays, count: count}
+      assert {:ok, actual} = RRule.expand(rule, dtstart, 30, from, until)
+      assert Enum.map(actual, &DateTime.to_date(&1.start_at)) == expected
+    end
+  end
+
+  property "daily COUNT counts valid local times across both spring DST gaps" do
+    check all(count <- integer(2..9), duration <- integer(1..90)) do
+      for {zone, start_date} <- [
+            {"Europe/Stockholm", ~D[2026-03-28]},
+            {"America/New_York", ~D[2026-03-07]}
+          ] do
+        dtstart = DateTime.new!(start_date, ~T[02:30:00], zone)
+        until = DateTime.add(dtstart, 14, :day)
+
+        assert {:ok, actual} =
+                 RRule.expand("FREQ=DAILY;COUNT=#{count}", dtstart, duration, dtstart, until)
+
+        assert length(actual) == count
+        starts = Enum.map(actual, & &1.start_at)
+        assert length(Enum.uniq(starts)) == count
+
+        for occurrence <- actual do
+          local = DateTime.shift_zone!(occurrence.start_at, zone)
+          assert DateTime.to_time(local) == ~T[02:30:00]
+          assert DateTime.to_date(local) != Date.add(start_date, 1)
+          assert DateTime.diff(occurrence.end_at, occurrence.start_at, :second) == duration * 60
+        end
+      end
+    end
   end
 end

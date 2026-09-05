@@ -95,3 +95,7 @@ The September 2026 maintenance baseline uses ExDoc 0.40.4 and Req 0.7.4. ExDoc f
 ## Pinned CI action maintenance
 
 All checkout and cache action references use full commit pins for checkout v7.0.1 and cache v6.1.0. Checkout v7 restricts unsafe privileged fork-PR checkout; our push and pull_request triggers remain supported. Cache v6 uses the Node 24 ESM runtime, supported by GitHub-hosted Ubuntu runners. Keep credential persistence disabled. Release notes: [checkout](https://github.com/actions/checkout/releases/tag/v7.0.1), [cache](https://github.com/actions/cache/releases/tag/v6.1.0). Local gates validate repository behavior; hosted workflow execution remains a CI responsibility.
+
+## Behavioral property coverage
+
+Generators include arbitrary seconds and microseconds. Clock-grid properties produce nonempty multi-day results and inspect every slot without conditional skips. Assignment properties cover proportional load, permutation invariance, unbounded counters, and missing fairness. Weekly recurrence is checked against an independently enumerated calendar-day reference including Monday anchoring and absolute COUNT before horizon filtering. Daily recurrence cardinality and wall time are checked across both Stockholm and New York DST gaps. Lead-time properties exercise every generated positive subsecond deficit and its exact accepting boundary. Normalized subtraction completeness and pool peak capacity are covered alongside their fixes (A16/A17).

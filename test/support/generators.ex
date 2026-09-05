@@ -7,12 +7,13 @@ defmodule ExBooking.TestGenerators do
 
   @base ~U[2026-07-13 00:00:00Z]
 
-  @doc "Generates a minute-aligned interval up to ten hours long."
+  @doc "Generates an interval up to ten hours long with arbitrary sub-minute precision."
   @spec interval() :: StreamData.t(Interval.t())
   def interval do
-    bind(integer(0..20_000), fn start_min ->
+    bind(tuple({integer(0..20_000), integer(0..59_999_999)}), fn {start_min, fraction} ->
       map(integer(1..600), fn length_min ->
-        Interval.new!(minute(start_min), minute(start_min + length_min))
+        start_at = DateTime.add(minute(start_min), fraction, :microsecond)
+        Interval.new!(start_at, DateTime.add(start_at, length_min, :minute))
       end)
     end)
   end

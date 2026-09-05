@@ -112,23 +112,29 @@ defmodule ExBooking.SlottingTest do
     property "every slot starts on the grid anchored to the free interval start" do
       check all(free <- interval(), {duration_min, step_min} <- duration_and_step()) do
         for slot <- Slotting.generate_slots(free, duration_min, step_min) do
-          offset_min = div(DateTime.diff(slot.start_at, free.start_at, :second), 60)
-          assert rem(offset_min, step_min) == 0
+          offset = DateTime.diff(slot.start_at, free.start_at, :microsecond)
+          assert rem(offset, step_min * 60_000_000) == 0
         end
       end
     end
 
-    property "clock-aligned slots start on UTC clock boundaries" do
-      check all(free <- interval(), {duration_min, step_min} <- duration_and_step()) do
-        if rem(1_440, step_min) == 0 do
-          slots = Slotting.generate_slots(free, duration_min, step_min, align: :clock)
+    property "every clock-aligned slot lies on the UTC grid, including across midnight" do
+      check all(
+              fraction <- integer(1..59_999_999),
+              step_min <- member_of([5, 10, 15, 20, 30, 60, 120]),
+              duration_min <- integer(1..120)
+            ) do
+        start_at = DateTime.add(~U[2026-07-13 23:57:00Z], fraction, :microsecond)
+        free = Interval.new!(start_at, DateTime.add(start_at, 2, :day))
+        slots = Slotting.generate_slots(free, duration_min, step_min, align: :clock)
+        assert length(slots) >= 2
 
-          if first = List.first(slots) do
-            minutes_since_midnight = first.start_at.hour * 60 + first.start_at.minute
-            assert rem(minutes_since_midnight, step_min) == 0
-            assert first.start_at.second == 0
-            assert first.start_at.microsecond == {0, 0}
-          end
+        for slot <- slots do
+          minutes_since_midnight = slot.start_at.hour * 60 + slot.start_at.minute
+          assert rem(minutes_since_midnight, step_min) == 0
+          assert slot.start_at.second == 0
+          assert slot.start_at.microsecond == {0, 0}
+          assert Interval.contains?(free, slot)
         end
       end
     end

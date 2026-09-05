@@ -2,6 +2,7 @@ defmodule ExBooking.PolicyTest do
   @moduledoc false
 
   use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias ExBooking.AvailabilityRule
   alias ExBooking.Interval
@@ -191,5 +192,16 @@ defmodule ExBooking.PolicyTest do
              )
 
     assert [] = Policy.violations(slot(now), rule(lead_time_min: 0), resource(), now)
+  end
+
+  property "every positive subsecond lead-time deficit rejects, while the boundary accepts" do
+    check all(lead <- integer(0..1440), deficit <- integer(1..999_999)) do
+      boundary = DateTime.add(@now, lead, :minute)
+      early = DateTime.add(boundary, -deficit, :microsecond)
+      assert Policy.violations(slot(boundary), rule(lead_time_min: lead), resource(), @now) == []
+
+      assert [{:lead_time, 1}] =
+               Policy.violations(slot(early), rule(lead_time_min: lead), resource(), @now)
+    end
   end
 end

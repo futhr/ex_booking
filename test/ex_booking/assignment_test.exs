@@ -2,6 +2,7 @@ defmodule ExBooking.AssignmentTest do
   @moduledoc false
 
   use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias ExBooking.Assignment
   alias ExBooking.Interval
@@ -316,5 +317,31 @@ defmodule ExBooking.AssignmentTest do
 
     assert {:error, {:invalid, :resource_capacity, {"a", 0}}} =
              winner([%{resource("a") | capacity: 0}], [])
+  end
+
+  property "weighted winners minimize proportional load regardless of input order" do
+    check all(
+            count_a <- integer(0..1_000_000),
+            count_b <- integer(0..1_000_000),
+            weight_a <- integer(1..100),
+            weight_b <- integer(1..100),
+            scale <- member_of([1, Integer.pow(2, 1100)])
+          ) do
+      a = resource("a", %{assignments_count: count_a * scale, weight: weight_a})
+      b = resource("b", %{assignments_count: count_b * scale, weight: weight_b})
+      expected = if count_a * weight_b <= count_b * weight_a, do: a, else: b
+      assert {:ok, [^expected]} = winner([a, b], strategy: :weighted)
+      assert {:ok, [^expected]} = winner([b, a], strategy: :weighted)
+    end
+  end
+
+  property "a missing counter ranks behind every supplied nonnegative count" do
+    check all(count <- integer(0..1_000_000), exponent <- integer(0..400)) do
+      known = resource("z", %{assignments_count: count * Integer.pow(10, exponent)})
+
+      for strategy <- [:round_robin, :weighted] do
+        assert {:ok, [^known]} = winner([resource("a"), known], strategy: strategy)
+      end
+    end
   end
 end
