@@ -182,7 +182,7 @@ defmodule ExBooking.RRuleTest do
              ]
     end
 
-    test "snaps a Stockholm spring-forward recurrence out of the gap" do
+    test "skips a Stockholm gap without consuming COUNT" do
       {:ok, dtstart} = DateTime.new(~D[2026-03-28], ~T[02:30:00], "Europe/Stockholm")
 
       assert {:ok, intervals} =
@@ -196,7 +196,7 @@ defmodule ExBooking.RRuleTest do
 
       assert Enum.map(intervals, & &1.start_at) == [
                ~U[2026-03-28 01:30:00Z],
-               ~U[2026-03-29 01:00:00Z]
+               ~U[2026-03-30 00:30:00Z]
              ]
     end
   end
@@ -242,5 +242,35 @@ defmodule ExBooking.RRuleTest do
 
     assert Enum.map(intervals, &DateTime.to_date(&1.start_at)) ==
              [~D[2026-07-15], ~D[2026-07-27], ~D[2026-07-29], ~D[2026-08-10]]
+  end
+
+  test "COUNT and UNTIL cannot be combined" do
+    assert {:error, {:invalid, :rrule, :count_and_until}} =
+             RRule.parse("FREQ=DAILY;COUNT=2;UNTIL=20260715T090000Z")
+
+    assert {:error, {:invalid, :rrule, :count_and_until}} =
+             RRule.expand(
+               %RRule{freq: :daily, count: 2, until: @until},
+               @dtstart,
+               30,
+               @from,
+               @until
+             )
+  end
+
+  test "New York spring gap does not consume COUNT" do
+    {:ok, start} = DateTime.new(~D[2026-03-07], ~T[02:30:00], "America/New_York")
+
+    assert {:ok, intervals} =
+             RRule.expand(
+               "FREQ=DAILY;COUNT=2",
+               start,
+               30,
+               ~U[2026-03-07 00:00:00Z],
+               ~U[2026-03-11 00:00:00Z]
+             )
+
+    assert Enum.map(intervals, & &1.start_at) ==
+             [~U[2026-03-07 07:30:00Z], ~U[2026-03-09 06:30:00Z]]
   end
 end

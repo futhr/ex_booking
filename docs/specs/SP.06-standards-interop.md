@@ -54,7 +54,7 @@ next local date = Date.add(DateTime.to_date(dtstart), calendar offset)
 DateTime.new(next local date, DateTime.to_time(dtstart), dtstart.time_zone)
   {:ok, dt}              -> dt
   {:ambiguous, first, _} -> first
-  {:gap, _, after}       -> after
+  {:gap, _, _}           -> skip occurrence without counting it
 ```
 
 Every occurrence is shifted to UTC before interval construction. Output is
@@ -167,3 +167,10 @@ Weekly BYDAY rules use Monday as the default week start. The first active week
 is the Monday-containing week of DTSTART. Later active weeks advance by
 `INTERVAL * 7` calendar days; starts before DTSTART are excluded. Explicit WKST
 remains unsupported.
+
+## RFC recurrence bounds
+
+COUNT and UNTIL are mutually exclusive in both strings and caller-built rules.
+Supplying both returns `{:invalid, :rrule, :count_and_until}`. Nonexistent
+wall-time recurrences are skipped and do not consume COUNT, per RFC 5545
+section 3.3.10. Availability windows retain their separate gap-snapping policy.

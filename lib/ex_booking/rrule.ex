@@ -134,6 +134,7 @@ defmodule ExBooking.RRule do
          {:ok, interval} <- parse_positive(parts["INTERVAL"], 1, :interval),
          {:ok, count} <- parse_optional_positive(parts["COUNT"], :count),
          {:ok, until} <- parse_until(parts["UNTIL"]),
+         :ok <- validate_bounds(count, until),
          {:ok, byday} <- parse_byday(parts["BYDAY"], freq) do
       {:ok, %__MODULE__{freq: freq, interval: interval, count: count, until: until, byday: byday}}
     end
@@ -192,10 +193,15 @@ defmodule ExBooking.RRule do
          :ok <- validate_positive(rule.interval, :interval),
          :ok <- validate_optional_positive(rule.count, :count),
          :ok <- validate_optional_datetime(rule.until),
+         :ok <- validate_bounds(rule.count, rule.until),
          {:ok, byday} <- validate_rule_byday(rule.byday, rule.freq) do
       {:ok, %{rule | byday: byday}}
     end
   end
+
+  defp validate_bounds(nil, _), do: :ok
+  defp validate_bounds(_, nil), do: :ok
+  defp validate_bounds(_, _), do: {:error, {:invalid, :rrule, :count_and_until}}
 
   defp validate_frequency(freq) when freq in [:daily, :weekly], do: :ok
   defp validate_frequency(freq), do: {:error, {:unsupported, :rrule, {:freq, freq}}}
@@ -243,6 +249,7 @@ defmodule ExBooking.RRule do
 
     rule
     |> occurrence_stream(dtstart, until)
+    |> Stream.reject(&is_nil/1)
     |> Stream.take_while(&within_rule_bounds?(&1, rule, until))
     |> Stream.with_index(1)
     |> Stream.take_while(fn {_, index} -> rule.count == nil or index <= rule.count end)
@@ -294,7 +301,7 @@ defmodule ExBooking.RRule do
     case DateTime.new(date, DateTime.to_time(dtstart), dtstart.time_zone) do
       {:ok, datetime} -> datetime
       {:ambiguous, first, _} -> first
-      {:gap, _, after_gap} -> after_gap
+      {:gap, _, _} -> nil
     end
   end
 
