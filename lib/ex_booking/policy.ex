@@ -129,9 +129,9 @@ defmodule ExBooking.Policy do
 
   defp lead_time_violation(slot, rule, now) do
     earliest = DateTime.add(now, rule.lead_time_min, :minute)
-    seconds_short = DateTime.diff(earliest, slot.start_at, :second)
+    microseconds_short = DateTime.diff(earliest, slot.start_at, :microsecond)
 
-    if seconds_short > 0, do: {:lead_time, ceil_div(seconds_short, 60)}
+    if microseconds_short > 0, do: {:lead_time, ceil_div(microseconds_short, 60_000_000)}
   end
 
   defp booking_window_violation(_, %AvailabilityRule{booking_window_days: nil}, _), do: nil

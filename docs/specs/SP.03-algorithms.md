@@ -197,3 +197,9 @@ reads the clock; every time-relative decision uses caller-supplied `now`.
 For collective meetings every supplied resource is required. Preferred resource
 ids do not narrow that list; consumers define the required group before calling
 the kernel. For one-resource and pool meetings, preferences restrict eligibility.
+
+## Lead-time precision
+
+Lead time compares exact microsecond instants. Any positive shortfall rejects
+the slot; the reported positive minutes short is the ceiling of that shortfall
+divided by 60,000,000 microseconds.

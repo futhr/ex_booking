@@ -178,4 +178,18 @@ defmodule ExBooking.PolicyTest do
     assert Enum.any?(reasons, &match?({:lead_time, _}, &1))
     assert Enum.any?(reasons, &match?({:outside_window, _}, &1))
   end
+
+  test "lead time rejects subsecond shortfalls and allows the exact boundary" do
+    now = ~U[2026-07-13 09:00:00.500000Z]
+
+    assert [{:lead_time, 1}] =
+             Policy.violations(
+               slot(~U[2026-07-13 09:00:00Z]),
+               rule(lead_time_min: 0),
+               resource(),
+               now
+             )
+
+    assert [] = Policy.violations(slot(now), rule(lead_time_min: 0), resource(), now)
+  end
 end
