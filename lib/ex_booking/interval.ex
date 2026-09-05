@@ -192,7 +192,8 @@ defmodule ExBooking.Interval do
   end
 
   @doc """
-  Subtracts every interval in `subtrahends` from every interval in `minuends`.
+  Subtracts the union of `subtrahends` from the union of `minuends`.
+  Both operands are merged first, using `merge/1` metadata semantics.
 
   Returns a sorted, non-overlapping list.
 
@@ -207,15 +208,9 @@ defmodule ExBooking.Interval do
   """
   @spec subtract_all([t()], [t()]) :: [t()]
   def subtract_all(minuends, subtrahends) do
-    normalized = merge(subtrahends)
-
     minuends
-    |> Enum.flat_map(fn minuend ->
-      Enum.reduce(normalized, [minuend], fn subtrahend, remainders ->
-        Enum.flat_map(remainders, &subtract(&1, subtrahend))
-      end)
-    end)
-    |> Enum.sort_by(& &1.start_at, DateTime)
+    |> merge()
+    |> subtract_normalized(merge(subtrahends), [])
   end
 
   @doc """
@@ -323,6 +318,33 @@ defmodule ExBooking.Interval do
     interval.end_at
     |> DateTime.diff(interval.start_at, :second)
     |> div(60)
+  end
+
+  defp subtract_normalized([], _, acc), do: Enum.reverse(acc)
+  defp subtract_normalized(minuends, [], acc), do: Enum.reverse(acc, minuends)
+
+  defp subtract_normalized([a | as] = minuends, [b | bs] = cuts, acc) do
+    cond do
+      DateTime.compare(b.end_at, a.start_at) != :gt ->
+        subtract_normalized(minuends, bs, acc)
+
+      DateTime.compare(a.end_at, b.start_at) != :gt ->
+        subtract_normalized(as, cuts, [a | acc])
+
+      true ->
+        subtract_step(subtract(a, b), as, cuts, acc)
+    end
+  end
+
+  defp subtract_step([], rest, cuts, acc), do: subtract_normalized(rest, cuts, acc)
+
+  defp subtract_step([left, right], rest, [_ | cuts], acc),
+    do: subtract_normalized([right | rest], cuts, [left | acc])
+
+  defp subtract_step([remainder], rest, [cut | cuts] = subtrahends, acc) do
+    if DateTime.compare(remainder.start_at, cut.end_at) == :eq,
+      do: subtract_normalized([remainder | rest], cuts, acc),
+      else: subtract_normalized(rest, subtrahends, [remainder | acc])
   end
 
   defp coalesce(interval, []), do: [interval]

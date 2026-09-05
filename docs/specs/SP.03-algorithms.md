@@ -217,3 +217,11 @@ including spillover from the previous day. Its exclusion is the interval from
 local midnight to the next local midnight using the schedule DST resolution
 policy, so closed dates may span 23 or 25 elapsed hours. If duplicate override
 dates are supplied, the first entry wins consistently with window replacement.
+
+## Normalized set subtraction
+
+`subtract_all/2` first merges both operands. Overlapping minuends use merge
+metadata semantics (earliest start, stable input order for ties). A two-pointer
+walk then returns sorted, disjoint, non-adjacent remainders without rescanning
+previous cuts. Sorting costs O(A log A + B log B); the normalized walk costs
+O(A + B + output size). Metadata on each remainder comes from its merged minuend.

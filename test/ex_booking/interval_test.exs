@@ -256,4 +256,34 @@ defmodule ExBooking.IntervalTest do
       end
     end
   end
+
+  property "set subtraction equals the normalized reference and retains all free time" do
+    check all(minuends <- intervals(), subtrahends <- intervals()) do
+      expected =
+        Enum.reduce(Interval.merge(subtrahends), Interval.merge(minuends), fn cut, free ->
+          Enum.flat_map(free, &Interval.subtract(&1, cut))
+        end)
+
+      assert Interval.subtract_all(minuends, subtrahends) == expected
+    end
+  end
+
+  test "set subtraction normalizes overlapping minuends" do
+    value = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z], meta: %{id: 1})
+    assert Interval.subtract_all([value, value], []) == [value]
+  end
+
+  test "subtraction preserves elapsed time across both spring DST gaps" do
+    for {zone, date} <- [
+          {"Europe/Stockholm", ~D[2026-03-29]},
+          {"America/New_York", ~D[2026-03-08]}
+        ] do
+      start = DateTime.new!(date, ~T[00:00:00], zone)
+      ending = DateTime.new!(date, ~T[04:00:00], zone)
+      free = Interval.new!(start, ending)
+      cut = Interval.new!(DateTime.add(start, 60, :minute), DateTime.add(start, 120, :minute))
+      result = Interval.subtract_all([free, free], [cut])
+      assert Enum.sum(Enum.map(result, &Interval.duration_min/1)) == 120
+    end
+  end
 end
