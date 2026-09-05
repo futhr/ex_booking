@@ -141,8 +141,8 @@ Participant modes:
 - `:collective` — slots are offered only where all listed resources are free.
 - `:pool` — slots are offered when available seats meet
   `meeting_type.capacity_required`; resource `capacity > 1` contributes remaining
-  seats after overlapping booking reservations. Each overlapping
-  `Reservation.capacity_consumed` is summed. Any overlapping generic `busy`
+  seats after peak concurrent booking reservations over the buffer-inflated
+  request. Only consumption active at the same instant is summed. Any overlapping generic `busy`
   interval blocks the resource's full capacity because it has no partial-seat
   fact. Consumption is clamped at zero remaining capacity.
 
@@ -225,3 +225,13 @@ metadata semantics (earliest start, stable input order for ties). A two-pointer
 walk then returns sorted, disjoint, non-adjacent remainders without rescanning
 previous cuts. Sorting costs O(A log A + B log B); the normalized walk costs
 O(A + B + output size). Metadata on each remainder comes from its merged minuend.
+
+## Peak concurrent pool consumption
+
+Resource capacity represents interchangeable seats within a fixed resource.
+Clip reservations to the buffer-inflated request, sort their start/end deltas
+by UTC microseconds, and subtract peak simultaneous consumption from capacity.
+At equal instants, ends precede starts to retain half-open semantics. Generic
+busy intervals still block every seat. Remaining capacity is clamped to zero.
+Assignment chooses resources that each retain their allocated capacity throughout
+the entire interval; the kernel does not migrate an allocation between resources.

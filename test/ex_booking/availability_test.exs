@@ -450,4 +450,76 @@ defmodule ExBooking.AvailabilityTest do
                now: @now
              )
   end
+
+  property "consecutive reservations do not consume seats simultaneously" do
+    check all(split <- integer(1..29)) do
+      slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+      middle = DateTime.add(slot.start_at, split, :minute)
+
+      pooled = %{
+        resource()
+        | capacity: 2,
+          reservations: [
+            reservation(slot.start_at, middle, 1),
+            reservation(middle, slot.end_at, 1)
+          ]
+      }
+
+      assert :ok =
+               Availability.validate(
+                 request(slot),
+                 meeting_type(participants: :pool),
+                 [pooled],
+                 [rule()],
+                 now: @now
+               )
+
+      assert {:ok, slots} =
+               Availability.assemble(
+                 meeting_type(participants: :pool),
+                 [pooled],
+                 [rule()],
+                 @horizon
+               )
+
+      assert Enum.any?(slots, &(&1.start_at == slot.start_at))
+    end
+  end
+
+  test "pool capacity remains available across both spring gaps" do
+    for {zone, date} <- [
+          {"Europe/Stockholm", ~D[2026-03-29]},
+          {"America/New_York", ~D[2026-03-08]}
+        ] do
+      start = DateTime.new!(date, ~T[01:45:00], zone)
+      slot = Interval.new!(start, DateTime.add(start, 30, :minute))
+      middle = DateTime.add(slot.start_at, 15, :minute)
+
+      pooled = %{
+        resource()
+        | capacity: 2,
+          reservations: [
+            reservation(slot.start_at, middle, 1),
+            reservation(middle, slot.end_at, 1)
+          ]
+      }
+
+      schedule =
+        rule(
+          timezone: zone,
+          windows: [
+            %{weekday: 7, start_time: ~T[01:00:00], end_time: ~T[04:00:00]}
+          ]
+        )
+
+      assert :ok =
+               Availability.validate(
+                 request(slot),
+                 meeting_type(participants: :pool),
+                 [pooled],
+                 [schedule],
+                 now: ~U[2026-03-01 00:00:00Z]
+               )
+    end
+  end
 end

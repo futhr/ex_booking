@@ -247,3 +247,10 @@ kernel does not read the clock.
 Resource ids must be unique within each caller-supplied list. Duplicate ids
 return `{:invalid, :resource_id, {:duplicate, id}}` before capacity is summed
 or resources are selected. Identity is never inferred from list position.
+
+## Interchangeable resource capacity
+
+Pool capacity counts interchangeable seats. Reservation consumption applies
+only during its half-open interval, and available capacity uses peak simultaneous
+consumption over the request and buffers. Consumers needing individually fixed
+seat identities represent those seats as separate resources.

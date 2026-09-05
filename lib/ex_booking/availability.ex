@@ -750,21 +750,36 @@ defmodule ExBooking.Availability do
     if Enum.any?(resource.busy, &Interval.overlaps?(inflated, &1)) do
       0
     else
-      consumed = Enum.reduce(resource.reservations, 0, &consumed_capacity(&1, inflated, &2))
+      consumed = peak_consumption(resource.reservations, inflated)
       max(resource.capacity - consumed, 0)
     end
   end
 
-  defp consumed_capacity(
-         %Reservation{interval: interval, capacity_consumed: consumed},
-         inflated,
-         total
-       )
-       when is_integer(consumed) and consumed > 0 do
-    if Interval.overlaps?(inflated, interval), do: total + consumed, else: total
+  defp peak_consumption(reservations, interval) do
+    {_, peak} =
+      reservations
+      |> Enum.flat_map(&reservation_events(&1, interval))
+      |> Enum.sort()
+      |> Enum.reduce({0, 0}, fn {_, delta}, {current, peak} ->
+        next = current + delta
+        {next, max(peak, next)}
+      end)
+
+    peak
   end
 
-  defp consumed_capacity(_, _, total), do: total
+  defp reservation_events(reservation, interval) do
+    case Interval.clip(reservation.interval, interval) do
+      nil ->
+        []
+
+      clipped ->
+        [
+          {DateTime.to_unix(clipped.start_at, :microsecond), reservation.capacity_consumed},
+          {DateTime.to_unix(clipped.end_at, :microsecond), -reservation.capacity_consumed}
+        ]
+    end
+  end
 
   defp step(%MeetingType{slot_interval_min: nil, duration_min: duration}), do: duration
   defp step(%MeetingType{slot_interval_min: step}), do: step
