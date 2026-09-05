@@ -561,7 +561,7 @@ defmodule ExBookingTest do
                  capacity_required: 6
                )
 
-      assert {:ok, [%ExBooking.Resource{id: "b"}]} =
+      assert {:error, {:invalid, :resource_capacity, {"a", 0}}} =
                ExBooking.assign(
                  [build(:resource, id: "a", capacity: 0), build(:resource, id: "b", capacity: 3)],
                  build(:interval),
@@ -801,5 +801,24 @@ defmodule ExBookingTest do
                now: @now,
                hold: hold
              )
+  end
+
+  test "lifecycle options reject malformed lists and empty identities" do
+    for opts <- [:bad, [:bad], [now: @now, now: @now]] do
+      assert {:error, {:invalid, :opts, _}} =
+               ExBooking.cancel(build(:interval), build(:meeting_type), opts)
+
+      assert {:error, {:invalid, :opts, _}} =
+               ExBooking.mark_no_show(build(:interval), build(:meeting_type), opts)
+    end
+
+    for opts <- [[resource_ids: [""]], [release_hold_id: ""], [routing_context: ~D[2026-07-13]]] do
+      assert {:error, {:invalid, _, _}} =
+               ExBooking.cancel(
+                 build(:interval),
+                 build(:meeting_type),
+                 Keyword.put(opts, :now, @now)
+               )
+    end
   end
 end

@@ -280,4 +280,33 @@ defmodule ExBooking.AvailabilityInputValidationTest do
                @horizon
              )
   end
+
+  test "standalone availability rejects malformed options and nil preferred ids" do
+    assert {:error, {:invalid, :horizon, :not_increasing}} =
+             ExBooking.Availability.assemble(meeting_type(), [resource()], [rule()],
+               now: @horizon[:now],
+               from: @horizon[:until],
+               until: @horizon[:from]
+             )
+
+    assert {:error, {:invalid, :opts, _}} =
+             ExBooking.Availability.assemble(
+               meeting_type(),
+               [resource()],
+               [rule()],
+               Keyword.delete(@horizon, :now)
+             )
+
+    request = %Request{
+      meeting_type_id: "intro",
+      invitee_timezone: "Etc/UTC",
+      slot: Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z]),
+      preferred_resource_ids: [nil]
+    }
+
+    assert {:error, {:invalid, :preferred_resource_ids, nil}} =
+             ExBooking.validate_request(request, meeting_type(), [resource()], [rule()],
+               now: @horizon[:now]
+             )
+  end
 end

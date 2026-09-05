@@ -35,12 +35,21 @@ defmodule ExBooking.Availability do
   alias ExBooking.AvailabilityRule
   alias ExBooking.Interval
   alias ExBooking.MeetingType
+  alias ExBooking.Options
   alias ExBooking.Policy
   alias ExBooking.Request
   alias ExBooking.Reservation
   alias ExBooking.Resource
   alias ExBooking.Schedule
   alias ExBooking.Slotting
+
+  @assemble_opts NimbleOptions.new!(
+                   now: [type: {:struct, DateTime}, required: true],
+                   from: [type: {:struct, DateTime}, required: true],
+                   until: [type: {:struct, DateTime}, required: true],
+                   align: [type: {:in, [:free_start, :clock]}, default: :free_start]
+                 )
+  @now_opts NimbleOptions.new!(now: [type: {:struct, DateTime}, required: true])
 
   @fairness_fields [:assignments_count, :last_assigned_at, :weight, :priority]
 
@@ -65,13 +74,12 @@ defmodule ExBooking.Availability do
   @spec assemble(MeetingType.t(), [Resource.t()], [AvailabilityRule.t()], keyword()) ::
           {:ok, [Interval.t()]} | {:error, term()}
   def assemble(%MeetingType{} = meeting_type, resources, rules, opts) do
-    now = Keyword.fetch!(opts, :now)
-    from = Keyword.fetch!(opts, :from)
-    until = Keyword.fetch!(opts, :until)
-
-    with :ok <- validate_inputs(meeting_type, resources, rules),
+    with :ok <- Options.validate_horizon(opts, :required),
+         {:ok, opts} <- Options.validate(opts, @assemble_opts),
+         :ok <- validate_inputs(meeting_type, resources, rules),
          {:ok, pairs} <- pair(resources, rules) do
-      {:ok, combine(meeting_type, pairs, {from, until, now, slotting_opts(opts)})}
+      {:ok,
+       combine(meeting_type, pairs, {opts[:from], opts[:until], opts[:now], slotting_opts(opts)})}
     end
   end
 
@@ -143,9 +151,11 @@ defmodule ExBooking.Availability do
   @spec validate(Request.t(), MeetingType.t(), [Resource.t()], [AvailabilityRule.t()], keyword()) ::
           :ok | {:error, [term()] | {:invalid, atom(), term()}}
   def validate(%Request{} = request, %MeetingType{} = meeting_type, resources, rules, opts) do
-    case eligible(request, meeting_type, resources, rules, Keyword.fetch!(opts, :now)) do
-      {:ok, _} -> :ok
-      {:error, reasons} -> {:error, reasons}
+    with {:ok, opts} <- Options.validate(opts, @now_opts) do
+      case eligible(request, meeting_type, resources, rules, opts[:now]) do
+        {:ok, _} -> :ok
+        {:error, reasons} -> {:error, reasons}
+      end
     end
   end
 
@@ -669,9 +679,11 @@ defmodule ExBooking.Availability do
     do: {:error, {:invalid, :invitee_timezone, timezone}}
 
   defp validate_preferred_ids(ids) when is_list(ids) do
-    case Enum.find(ids, &(not is_binary(&1) or &1 == "")) do
-      nil -> :ok
-      invalid -> {:error, {:invalid, :preferred_resource_ids, invalid}}
+    if Enum.all?(ids, &(is_binary(&1) and &1 != "")) do
+      :ok
+    else
+      invalid = Enum.find(ids, &(not is_binary(&1) or &1 == ""))
+      {:error, {:invalid, :preferred_resource_ids, invalid}}
     end
   end
 

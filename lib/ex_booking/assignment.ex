@@ -26,6 +26,7 @@ defmodule ExBooking.Assignment do
   """
 
   alias ExBooking.Interval
+  alias ExBooking.Options
   alias ExBooking.Resource
 
   @typedoc "Assignment strategy selector."
@@ -33,6 +34,14 @@ defmodule ExBooking.Assignment do
 
   @typedoc "Opaque scoring hook over routing context."
   @type scorer :: (Resource.t(), map() -> number())
+
+  @assign_opts NimbleOptions.new!(
+                 strategy: [type: :any, default: :first_available],
+                 scorer: [type: :any],
+                 routing_context: [type: {:map, :any, :any}, default: %{}],
+                 participants: [type: {:in, [:one, :collective, :pool]}, default: :one],
+                 capacity_required: [type: :pos_integer, default: 1]
+               )
 
   @base_strategies [
     :first_available,
@@ -74,6 +83,7 @@ defmodule ExBooking.Assignment do
     with :ok <- validate_strategy(strategy),
          :ok <- validate_resources(resources, strategy),
          :ok <- Resource.validate_ids(resources),
+         :ok <- validate_capacities(resources),
          :ok <- validate_scorer(Keyword.get(opts, :scorer)) do
       validate_weights(resources, strategy)
     end
@@ -106,7 +116,8 @@ defmodule ExBooking.Assignment do
           {:ok, [Resource.t()]}
           | {:error, :no_eligible_resource | {:invalid, atom(), term()}}
   def assign(resources, %Interval{} = slot, opts) do
-    with :ok <- Interval.validate(slot),
+    with {:ok, opts} <- Options.validate(opts, @assign_opts),
+         :ok <- Interval.validate(slot),
          :ok <- validate(resources, opts) do
       assign_valid(resources, slot, opts)
     end
@@ -131,6 +142,13 @@ defmodule ExBooking.Assignment do
         [] -> {:error, :no_eligible_resource}
         selected -> {:ok, selected}
       end
+    end
+  end
+
+  defp validate_capacities(resources) do
+    case Enum.find(resources, &(not is_integer(&1.capacity) or &1.capacity <= 0)) do
+      nil -> :ok
+      resource -> {:error, {:invalid, :resource_capacity, {resource.id, resource.capacity}}}
     end
   end
 

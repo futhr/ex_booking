@@ -303,4 +303,18 @@ defmodule ExBooking.AssignmentTest do
                strategy: :least_recently_booked
              )
   end
+
+  test "standalone assignment validates participant options and resource capacity" do
+    for opts <- [
+          [participants: :bogus],
+          [typo: true],
+          [capacity_required: 0],
+          [participants: :one, participants: :pool]
+        ] do
+      assert {:error, {:invalid, :opts, _}} = winner([resource("a")], opts)
+    end
+
+    assert {:error, {:invalid, :resource_capacity, {"a", 0}}} =
+             winner([%{resource("a") | capacity: 0}], [])
+  end
 end

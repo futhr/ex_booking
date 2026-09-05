@@ -349,3 +349,14 @@ Alternative slots retain the original request's preferred resource restriction
 for one-resource and pool meetings. Collective alternatives retain all required
 participants. Every suggestion must pass `validate_request/5` with the original
 request fields and caller facts, replacing only its slot.
+
+## Uniform option boundaries
+
+All facade option lists and standalone assignment/availability options reject
+non-keyword lists, duplicate keys, and unknown keys with `{:invalid, :opts, detail}`.
+Lifecycle resource ids and non-nil release ids are non-empty strings; routing
+context is a plain map. Preferred ids cannot contain nil. Standalone assembly
+checks required now/from/until and an increasing horizon before expansion.
+Standalone assignment validates participant mode, positive capacity requirements
+and resource capacities before selection. Explicit nil scorer/hold/release options
+mean absence. `ExBooking.Options` owns shared schema and horizon validation.

@@ -48,6 +48,7 @@ defmodule ExBooking do
   alias ExBooking.Interval
   alias ExBooking.JSCalendar
   alias ExBooking.MeetingType
+  alias ExBooking.Options
   alias ExBooking.Policy
   alias ExBooking.Request
   alias ExBooking.Resource
@@ -61,7 +62,7 @@ defmodule ExBooking do
                    type: {:or, [:atom, {:tuple, [:atom, :keyword_list]}]},
                    default: :first_available
                  ],
-                 scorer: [type: {:fun, 2}],
+                 scorer: [type: {:or, [{:fun, 2}, {:in, [nil]}]}],
                  align: [type: {:in, [:free_start, :clock]}, default: :free_start]
                )
 
@@ -71,7 +72,7 @@ defmodule ExBooking do
                              type: {:or, [:atom, {:tuple, [:atom, :keyword_list]}]},
                              default: :first_available
                            ],
-                           scorer: [type: {:fun, 2}],
+                           scorer: [type: {:or, [{:fun, 2}, {:in, [nil]}]}],
                            from: [type: {:struct, DateTime}],
                            until: [type: {:struct, DateTime}]
                          )
@@ -82,8 +83,8 @@ defmodule ExBooking do
                    type: {:or, [:atom, {:tuple, [:atom, :keyword_list]}]},
                    default: :first_available
                  ],
-                 scorer: [type: {:fun, 2}],
-                 hold: [type: {:struct, ExBooking.Hold}],
+                 scorer: [type: {:or, [{:fun, 2}, {:in, [nil]}]}],
+                 hold: [type: {:or, [{:struct, ExBooking.Hold}, {:in, [nil]}]}],
                  from: [type: {:struct, DateTime}],
                  until: [type: {:struct, DateTime}],
                  align: [type: {:in, [:free_start, :clock]}, default: :free_start],
@@ -96,8 +97,8 @@ defmodule ExBooking do
                        type: {:or, [:atom, {:tuple, [:atom, :keyword_list]}]},
                        default: :first_available
                      ],
-                     scorer: [type: {:fun, 2}],
-                     release_hold_id: [type: :string],
+                     scorer: [type: {:or, [{:fun, 2}, {:in, [nil]}]}],
+                     release_hold_id: [type: {:or, [:string, {:in, [nil]}]}],
                      from: [type: {:struct, DateTime}],
                      until: [type: {:struct, DateTime}],
                      align: [type: {:in, [:free_start, :clock]}, default: :free_start],
@@ -110,7 +111,7 @@ defmodule ExBooking do
                  now: [type: {:struct, DateTime}, required: true],
                  resource_ids: [type: {:list, :string}, default: []],
                  routing_context: [type: {:map, :any, :any}, default: %{}],
-                 release_hold_id: [type: :string]
+                 release_hold_id: [type: {:or, [:string, {:in, [nil]}]}]
                )
 
   @transition_opts NimbleOptions.new!(
@@ -152,11 +153,16 @@ defmodule ExBooking do
   @spec available_slots(MeetingType.t(), [Resource.t()], [AvailabilityRule.t()], keyword()) ::
           {:ok, [Interval.t()]} | {:error, term()}
   def available_slots(%MeetingType{} = meeting_type, resources, rules, opts) do
-    with :ok <- validate_horizon(opts, :required),
+    with :ok <- Options.validate_horizon(opts, :required),
          {:ok, opts} <- validate_opts(opts, @search_opts),
          :ok <- Availability.validate_inputs(meeting_type, resources, rules),
          :ok <- Assignment.validate(resources, opts) do
-      Availability.assemble(meeting_type, resources, rules, opts)
+      Availability.assemble(
+        meeting_type,
+        resources,
+        rules,
+        Keyword.take(opts, [:now, :from, :until, :align])
+      )
     end
   end
 
@@ -208,12 +214,12 @@ defmodule ExBooking do
         rules,
         opts
       ) do
-    with :ok <- validate_horizon(opts, :optional),
+    with :ok <- Options.validate_horizon(opts, :optional),
          {:ok, opts} <- validate_opts(opts, @validate_request_opts),
          :ok <- Availability.validate_request_shape(request, meeting_type),
          :ok <- Availability.validate_inputs(meeting_type, resources, rules),
          :ok <- Assignment.validate(resources, opts) do
-      Availability.validate(request, meeting_type, resources, rules, opts)
+      Availability.validate(request, meeting_type, resources, rules, Keyword.take(opts, [:now]))
     end
   end
 
@@ -259,7 +265,7 @@ defmodule ExBooking do
   @spec decide(Request.t(), MeetingType.t(), [Resource.t()], [AvailabilityRule.t()], keyword()) ::
           {:ok, Decision.t()} | {:error, term()}
   def decide(%Request{} = request, %MeetingType{} = meeting_type, resources, rules, opts) do
-    with :ok <- validate_horizon(opts, :optional),
+    with :ok <- Options.validate_horizon(opts, :optional),
          {:ok, opts} <- validate_opts(opts, @decide_opts),
          :ok <- Availability.validate_request_shape(request, meeting_type),
          :ok <- Availability.validate_inputs(meeting_type, resources, rules),
@@ -329,7 +335,7 @@ defmodule ExBooking do
         rules,
         opts
       ) do
-    with :ok <- validate_horizon(opts, :optional),
+    with :ok <- Options.validate_horizon(opts, :optional),
          {:ok, opts} <- validate_opts(opts, @reschedule_opts),
          :ok <- validate_existing(existing),
          :ok <- Availability.validate_request_shape(request, meeting_type),
@@ -559,7 +565,7 @@ defmodule ExBooking do
   @spec expand_rrule(String.t() | RRule.t(), DateTime.t(), pos_integer(), keyword()) ::
           {:ok, [Interval.t()]} | {:error, term()}
   def expand_rrule(rrule, %DateTime{} = dtstart, duration_min, opts) do
-    with :ok <- validate_horizon(opts, :required),
+    with :ok <- Options.validate_horizon(opts, :required),
          {:ok, opts} <- validate_opts(opts, @rrule_opts) do
       RRule.expand(rrule, dtstart, duration_min, opts[:from], opts[:until])
     end
@@ -834,7 +840,13 @@ defmodule ExBooking do
     with true <- opts[:alternatives_limit] > 0,
          %DateTime{} <- opts[:from],
          %DateTime{} <- opts[:until],
-         {:ok, slots} <- Availability.assemble(meeting_type, resources, rules, opts) do
+         {:ok, slots} <-
+           Availability.assemble(
+             meeting_type,
+             resources,
+             rules,
+             Keyword.take(opts, [:now, :from, :until, :align])
+           ) do
       slots
       |> Enum.reject(&same_interval?(&1, requested))
       |> Enum.sort_by(&alternative_key(&1, requested))
@@ -935,41 +947,5 @@ defmodule ExBooking do
     }
   end
 
-  defp validate_opts(opts, schema) do
-    case NimbleOptions.validate(opts, schema) do
-      {:ok, validated} -> {:ok, validated}
-      {:error, error} -> {:error, {:invalid, :opts, Exception.message(error)}}
-    end
-  end
-
-  defp validate_horizon(opts, requirement) when is_list(opts) do
-    if Keyword.keyword?(opts) do
-      validate_keyword_horizon(opts, requirement)
-    else
-      {:error, {:invalid, :opts, :not_a_keyword_list}}
-    end
-  end
-
-  defp validate_horizon(_, _), do: {:error, {:invalid, :opts, :not_a_keyword_list}}
-
-  defp validate_keyword_horizon(opts, requirement) do
-    from? = Keyword.has_key?(opts, :from)
-    until? = Keyword.has_key?(opts, :until)
-
-    case {from?, until?, Keyword.get(opts, :from), Keyword.get(opts, :until), requirement} do
-      {false, false, _, _, :optional} ->
-        :ok
-
-      {true, true, %DateTime{} = from, %DateTime{} = until, _} ->
-        if DateTime.compare(from, until) == :lt,
-          do: :ok,
-          else: {:error, {:invalid, :horizon, :not_increasing}}
-
-      {true, true, _, _, _} ->
-        :ok
-
-      _ ->
-        {:error, {:invalid, :horizon, :requires_from_and_until}}
-    end
-  end
+  defp validate_opts(opts, schema), do: Options.validate(opts, schema)
 end
