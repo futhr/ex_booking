@@ -242,7 +242,7 @@ defmodule ExBooking.RRule do
     utc_until = DateTime.shift_zone!(until, "Etc/UTC")
 
     rule
-    |> occurrence_stream(dtstart)
+    |> occurrence_stream(dtstart, until)
     |> Stream.take_while(&within_rule_bounds?(&1, rule, until))
     |> Stream.with_index(1)
     |> Stream.take_while(fn {_, index} -> rule.count == nil or index <= rule.count end)
@@ -255,26 +255,35 @@ defmodule ExBooking.RRule do
     |> Enum.sort_by(& &1.start_at, DateTime)
   end
 
-  defp occurrence_stream(%__MODULE__{freq: :daily, interval: interval}, dtstart) do
+  defp occurrence_stream(rule, dtstart, horizon_until) do
+    last_date =
+      horizon_until
+      |> DateTime.shift_zone!(dtstart.time_zone)
+      |> DateTime.to_date()
+
+    last_offset = Date.diff(last_date, DateTime.to_date(dtstart))
+
+    rule
+    |> occurrence_offsets(dtstart)
+    |> Stream.take_while(&(&1 <= last_offset))
+    |> Stream.map(&calendar_occurrence(dtstart, &1))
+  end
+
+  defp occurrence_offsets(%__MODULE__{freq: :daily, interval: interval}, _) do
     Stream.iterate(0, &(&1 + interval))
-    |> Stream.map(&calendar_occurrence(dtstart, &1))
   end
 
-  defp occurrence_stream(%__MODULE__{freq: :weekly, byday: nil, interval: interval}, dtstart) do
+  defp occurrence_offsets(%__MODULE__{freq: :weekly, byday: nil, interval: interval}, _) do
     Stream.iterate(0, &(&1 + interval * 7))
-    |> Stream.map(&calendar_occurrence(dtstart, &1))
   end
 
-  defp occurrence_stream(%__MODULE__{freq: :weekly, byday: byday, interval: interval}, dtstart) do
-    Stream.iterate(0, &(&1 + 1))
-    |> Stream.filter(
-      &(week_in_interval?(&1, interval) and
-          Enum.member?(byday, Date.day_of_week(Date.add(DateTime.to_date(dtstart), &1))))
-    )
-    |> Stream.map(&calendar_occurrence(dtstart, &1))
-  end
+  defp occurrence_offsets(%__MODULE__{freq: :weekly, byday: byday, interval: interval}, dtstart) do
+    weekday = Date.day_of_week(DateTime.to_date(dtstart))
+    offsets = Enum.filter(0..6, &((rem(weekday + &1 - 1, 7) + 1) in byday))
 
-  defp week_in_interval?(day_offset, interval), do: rem(div(day_offset, 7), interval) == 0
+    Stream.iterate(0, &(&1 + interval * 7))
+    |> Stream.flat_map(fn week -> Enum.map(offsets, &(&1 + week)) end)
+  end
 
   defp calendar_occurrence(dtstart, 0), do: dtstart
 

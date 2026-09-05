@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: medium
   created: "2026-07-08"
-  updated: "2026-07-11"
+  updated: "2026-09-05"
   tags: ["rrule", "ics", "jscalendar", "interop"]
   depends_on: ["R.02", "SP.01", "SP.03"]
 ---
@@ -146,3 +146,10 @@ and calendar transport belong in consumer/adaptor repositories.
 - [RFC 5545 §3.8.2.6, Free/Busy Time](https://datatracker.ietf.org/doc/html/rfc5545#section-3.8.2.6).
 - [RFC 8984 §1.4.2, Duration](https://www.rfc-editor.org/rfc/rfc8984.html#section-1.4.2).
 - [RFC 8984 §1.4.5, LocalDateTime](https://www.rfc-editor.org/rfc/rfc8984.html#section-1.4.5).
+
+## Bounded recurrence traversal
+
+Recurrence offsets are bounded by the final local date of the search horizon
+before resolving wall times. Weekly BYDAY traversal jumps between active week
+blocks instead of inspecting intervening days. COUNT limits emitted occurrences;
+looking for a subsequent occurrence must never scan beyond the horizon.

@@ -212,4 +212,21 @@ defmodule ExBooking.RRuleTest do
       assert interval.start_at == @dtstart
     end
   end
+
+  test "large weekly intervals terminate within a one-day horizon" do
+    task =
+      Task.async(fn ->
+        RRule.expand(
+          "FREQ=WEEKLY;INTERVAL=100000000;BYDAY=MO;COUNT=1",
+          @dtstart,
+          30,
+          @from,
+          ~U[2026-07-14 00:00:00Z]
+        )
+      end)
+
+    result = Task.yield(task, 500) || Task.shutdown(task, :brutal_kill)
+    assert {:ok, {:ok, [first]}} = result
+    assert first.start_at == @dtstart
+  end
 end
