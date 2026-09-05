@@ -75,6 +75,7 @@ defmodule ExBooking.Assignment do
 
     with :ok <- validate_strategy(strategy),
          :ok <- validate_resources(resources, strategy),
+         :ok <- Resource.validate_ids(resources),
          :ok <- validate_scorer(Keyword.get(opts, :scorer)) do
       validate_weights(resources, strategy)
     end

@@ -268,4 +268,16 @@ defmodule ExBooking.AvailabilityInputValidationTest do
       assert :ok = Schedule.validate(rule(booking_window_days: 1, max_per_day: 1))
     end
   end
+
+  test "duplicate resource identity cannot multiply pool capacity" do
+    resource = resource()
+
+    assert {:error, {:invalid, :resource_id, {:duplicate, "host_1"}}} =
+             ExBooking.available_slots(
+               meeting_type(participants: :pool, capacity_required: 2),
+               [resource, resource],
+               [rule(), rule()],
+               @horizon
+             )
+  end
 end

@@ -49,4 +49,27 @@ defmodule ExBooking.Resource do
           fairness: fairness() | nil,
           meta: map() | nil
         }
+  @doc """
+  Rejects repeated ids in an already validated resource list.
+
+  ## Examples
+
+      iex> resource = %ExBooking.Resource{id: "a", timezone: "Etc/UTC"}
+      ...> ExBooking.Resource.validate_ids([resource, resource])
+      {:error, {:invalid, :resource_id, {:duplicate, "a"}}}
+  """
+  @spec validate_ids([t()]) :: :ok | {:error, {:invalid, :resource_id, {:duplicate, String.t()}}}
+  def validate_ids(resources) do
+    result =
+      Enum.reduce_while(resources, MapSet.new(), fn resource, seen ->
+        if MapSet.member?(seen, resource.id),
+          do: {:halt, {:error, {:invalid, :resource_id, {:duplicate, resource.id}}}},
+          else: {:cont, MapSet.put(seen, resource.id)}
+      end)
+
+    case result do
+      %MapSet{} -> :ok
+      error -> error
+    end
+  end
 end

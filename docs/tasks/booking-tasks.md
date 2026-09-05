@@ -279,10 +279,10 @@ These are intentionally not roadmap tasks for `ex_booking`:
 
 ## September 2026 audit remediation
 
-Progress: 1/22 findings completed.
+Progress: 2/22 findings completed.
 
 - [x] A01: Security audit and Mint update (SP.07).
-- [ ] A02: Unique resource identities (SP.01/SP.02).
+- [x] A02: Unique resource identities (SP.01/SP.02).
 - [ ] A03: Collective preferences preserve required participants (SP.03).
 - [ ] A04: Bound weekly recurrence expansion (SP.06).
 - [ ] A05: Reject unsupported JSCalendar recurrence fields (SP.06).

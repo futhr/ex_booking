@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: critical
   created: "2026-07-08"
-  updated: "2026-07-12"
+  updated: "2026-09-05"
   tags: ["data-model", "structs", "public-api"]
   depends_on: ["R.01"]
 ---
@@ -241,3 +241,9 @@ and available as evidence to consumer-defined meters (SP.05).
 
 Timestamps (`occurred_at`) are stamped by the consumer at execution time — the
 kernel does not read the clock.
+
+## Resource identity uniqueness
+
+Resource ids must be unique within each caller-supplied list. Duplicate ids
+return `{:invalid, :resource_id, {:duplicate, id}}` before capacity is summed
+or resources are selected. Identity is never inferred from list position.

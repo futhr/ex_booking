@@ -95,6 +95,7 @@ defmodule ExBooking.Availability do
   def validate_inputs(%MeetingType{} = meeting_type, resources, rules) do
     with :ok <- validate_meeting_type(meeting_type),
          :ok <- validate_resources(resources),
+         :ok <- Resource.validate_ids(resources),
          :ok <- validate_rules(rules),
          {:ok, _} <- pair(resources, rules) do
       :ok

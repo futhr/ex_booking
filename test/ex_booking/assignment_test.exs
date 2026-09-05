@@ -224,4 +224,9 @@ defmodule ExBooking.AssignmentTest do
                winner([resource("a", %{assignments_count: -1})], strategy: :round_robin)
     end
   end
+
+  test "assignment rejects duplicate identities before selection" do
+    assert {:error, {:invalid, :resource_id, {:duplicate, "a"}}} =
+             winner([resource("a"), resource("a")], participants: :pool, capacity_required: 2)
+  end
 end
