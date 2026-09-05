@@ -229,4 +229,42 @@ defmodule ExBooking.AssignmentTest do
     assert {:error, {:invalid, :resource_id, {:duplicate, "a"}}} =
              winner([resource("a"), resource("a")], participants: :pool, capacity_required: 2)
   end
+
+  test "missing fairness ranks after any supplied magnitude" do
+    assert {:ok, [%Resource{id: "b"}]} =
+             winner(
+               [
+                 resource("a"),
+                 resource("b", %{assignments_count: 1_000_000_001})
+               ],
+               strategy: :round_robin
+             )
+
+    assert {:ok, [%Resource{id: "b"}]} =
+             winner(
+               [
+                 resource("a"),
+                 resource("b", %{priority: -1_000_000_001})
+               ],
+               strategy: :priority
+             )
+
+    assert {:ok, [%Resource{id: "b"}]} =
+             winner(
+               [
+                 resource("a", %{weight: 1.0e20}),
+                 resource("b", %{assignments_count: 1})
+               ],
+               strategy: :weighted
+             )
+
+    assert {:ok, [%Resource{id: "b"}]} =
+             winner(
+               [
+                 resource("a", %{assignments_count: 1}),
+                 resource("b", %{assignments_count: 1, last_assigned_at: ~U[2026-07-12 00:00:00Z]})
+               ],
+               strategy: :round_robin
+             )
+  end
 end

@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-07-08"
-  updated: "2026-07-29"
+  updated: "2026-09-05"
   tags: ["assignment", "fairness", "round-robin", "scoring-hook"]
   depends_on: ["R.01", "SP.01"]
 ---
@@ -116,3 +116,10 @@ Territory mapping, SDR→AE handoff rules, enrichment, spam screening,
 meeting-limits-per-link, and distribution *credits* accounting live in the
 consuming orchestration layer. They shape the inputs (`fairness`, `scorer`,
 pre-filtered pools), never the kernel code.
+
+## Missing fairness values
+
+Missing counters, priorities, and weighted numerators use explicit missing-value
+rank tags, never numeric sentinels. A supplied value always precedes missing data
+within that comparison. Missing assignment time ranks last in round-robin and
+priority tie-breaks, but first for least-recently-booked (never assigned).

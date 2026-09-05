@@ -28,8 +28,6 @@ defmodule ExBooking.Assignment do
   alias ExBooking.Interval
   alias ExBooking.Resource
 
-  @ranks_last 1_000_000_000
-
   @typedoc "Assignment strategy selector."
   @type strategy :: atom() | {atom(), keyword()}
 
@@ -295,13 +293,13 @@ defmodule ExBooking.Assignment do
   defp strategy_key(_, :first_available), do: {0}
 
   defp strategy_key(resource, :round_robin),
-    do: {assignments_count(resource), last_assigned_key(resource)}
+    do: {assignments_count(resource), last_assigned_key(resource, 1)}
 
-  defp strategy_key(resource, :least_recently_booked), do: {last_assigned_key(resource)}
+  defp strategy_key(resource, :least_recently_booked), do: {last_assigned_key(resource, 0)}
   defp strategy_key(resource, :weighted), do: {weighted_ratio(resource)}
 
   defp strategy_key(resource, :priority) do
-    {-priority(resource), assignments_count(resource), last_assigned_key(resource)}
+    {priority(resource), assignments_count(resource), last_assigned_key(resource, 1)}
   end
 
   defp strategy_key(resource, {:owner_first, opts}) do
@@ -314,26 +312,30 @@ defmodule ExBooking.Assignment do
 
   defp owner_rank(resource, owner_id), do: if(resource.id == owner_id, do: 0, else: 1)
 
-  defp assignments_count(%Resource{fairness: nil}), do: @ranks_last
+  defp assignments_count(resource), do: fairness_key(resource, :assignments_count, 1)
+  defp priority(resource), do: fairness_key(resource, :priority, -1)
 
-  defp assignments_count(%Resource{fairness: fairness}),
-    do: Map.get(fairness, :assignments_count, @ranks_last)
-
-  defp priority(%Resource{fairness: nil}), do: -@ranks_last
-  defp priority(%Resource{fairness: fairness}), do: Map.get(fairness, :priority, -@ranks_last)
-
-  defp weighted_ratio(%Resource{fairness: nil}), do: @ranks_last * 1.0
-
-  defp weighted_ratio(%Resource{fairness: fairness}) do
-    Map.get(fairness, :assignments_count, @ranks_last) / Map.get(fairness, :weight, 1.0)
+  defp fairness_key(resource, field, direction) do
+    case fairness_value(resource, field) do
+      nil -> {1, 0}
+      value -> {0, direction * value}
+    end
   end
 
-  defp last_assigned_key(%Resource{fairness: nil}), do: {0, 0}
+  defp fairness_value(%Resource{fairness: nil}, _), do: nil
+  defp fairness_value(%Resource{fairness: fairness}, field), do: Map.get(fairness, field)
 
-  defp last_assigned_key(%Resource{fairness: fairness}) do
-    case Map.get(fairness, :last_assigned_at) do
-      nil -> {0, 0}
-      %DateTime{} = last_assigned_at -> {1, DateTime.to_unix(last_assigned_at)}
+  defp weighted_ratio(resource) do
+    case fairness_value(resource, :assignments_count) do
+      nil -> {1, 0}
+      count -> {0, count / (fairness_value(resource, :weight) || 1.0)}
+    end
+  end
+
+  defp last_assigned_key(resource, nil_rank) do
+    case fairness_value(resource, :last_assigned_at) do
+      nil -> {nil_rank, 0}
+      %DateTime{} = datetime -> {1 - nil_rank, DateTime.to_unix(datetime)}
     end
   end
 end

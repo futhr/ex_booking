@@ -279,7 +279,7 @@ These are intentionally not roadmap tasks for `ex_booking`:
 
 ## September 2026 audit remediation
 
-Progress: 10/22 findings completed.
+Progress: 11/22 findings completed.
 
 - [x] A01: Security audit and Mint update (SP.07).
 - [x] A02: Unique resource identities (SP.01/SP.02).
@@ -291,7 +291,7 @@ Progress: 10/22 findings completed.
 - [x] A08: RFC recurrence gaps and rule validation (SP.06).
 - [x] A09: Precise lead-time comparison (SP.03).
 - [x] A10: Compare slot instants independently of display precision (SP.03/SP.05).
-- [ ] A11: Explicit missing fairness ranking (SP.04).
+- [x] A11: Explicit missing fairness ranking (SP.04).
 - [ ] A12: Safe weighted arithmetic and precise assignment time (SP.04).
 - [ ] A13: Consistent public input validation (SP.02).
 - [ ] A14: Closed-day overrides suppress overnight spill (SP.03).
