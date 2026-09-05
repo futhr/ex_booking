@@ -138,4 +138,12 @@ defmodule ExBooking.ICalendarTest do
       assert busy.end_at == ~U[2026-07-13 09:30:00Z]
     end
   end
+
+  test "empty FREEBUSY periods are malformed even when marked FREE" do
+    for values <- ["", ",,", ",20260713T090000Z/PT30M", "20260713T090000Z/PT30M,"],
+        property <- ["FREEBUSY", "FREEBUSY;FBTYPE=FREE"] do
+      assert {:error, {:invalid, :freebusy, :period}} =
+               ExBooking.ICalendar.free_busy(property <> ":" <> values)
+    end
+  end
 end

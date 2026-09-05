@@ -73,7 +73,7 @@ defmodule ExBooking.ICalendar do
     case String.split(line, ":", parts: 2) do
       [property, values] ->
         type = fbtype(property)
-        {:ok, Enum.map(String.split(values, ",", trim: true), &{&1, type})}
+        {:ok, Enum.map(String.split(values, ","), &{&1, type})}
 
       _ ->
         {:error, {:invalid, :freebusy, :property}}

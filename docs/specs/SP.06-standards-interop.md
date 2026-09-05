@@ -174,3 +174,9 @@ COUNT and UNTIL are mutually exclusive in both strings and caller-built rules.
 Supplying both returns `{:invalid, :rrule, :count_and_until}`. Nonexistent
 wall-time recurrences are skipped and do not consume COUNT, per RFC 5545
 section 3.3.10. Availability windows retain their separate gap-snapping policy.
+
+## Empty FREEBUSY periods
+
+FREEBUSY values must contain at least one non-empty period. Empty values and
+leading, trailing, or repeated commas return `{:invalid, :freebusy, :period}`
+including when FBTYPE is FREE. They never normalize to an empty busy set.

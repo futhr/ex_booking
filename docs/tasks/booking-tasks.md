@@ -279,7 +279,7 @@ These are intentionally not roadmap tasks for `ex_booking`:
 
 ## September 2026 audit remediation
 
-Progress: 14/22 findings completed.
+Progress: 15/22 findings completed.
 
 - [x] A01: Security audit and Mint update (SP.07).
 - [x] A02: Unique resource identities (SP.01/SP.02).
@@ -295,7 +295,7 @@ Progress: 14/22 findings completed.
 - [x] A12: Safe weighted arithmetic and precise assignment time (SP.04).
 - [x] A13: Consistent public input validation (SP.02).
 - [x] A14: Closed-day overrides suppress overnight spill (SP.03).
-- [ ] A15: Reject empty FREEBUSY periods (SP.06).
+- [x] A15: Reject empty FREEBUSY periods (SP.06).
 - [ ] A16: Normalized linear interval subtraction (SP.03).
 - [ ] A17: Peak concurrent pool consumption (SP.01/SP.03).
 - [ ] A18: ExDoc and Req maintenance updates (SP.07).
