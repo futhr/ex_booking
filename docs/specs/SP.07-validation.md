@@ -91,3 +91,7 @@ The release workflow inherits both checks through `mix check --no-retry`.
 ## Development dependency maintenance
 
 The September 2026 maintenance baseline uses ExDoc 0.40.4 and Req 0.7.4. ExDoc fixes documentation output and navigation; Req fixes query-parameter and redirect handling. These are development-only lockfile updates and do not expand the runtime dependency surface. Release notes: [ExDoc](https://github.com/elixir-lang/ex_doc/releases/tag/v0.40.4), [Req](https://github.com/wojtekmach/req/releases/tag/v0.7.4).
+
+## Pinned CI action maintenance
+
+All checkout and cache action references use full commit pins for checkout v7.0.1 and cache v6.1.0. Checkout v7 restricts unsafe privileged fork-PR checkout; our push and pull_request triggers remain supported. Cache v6 uses the Node 24 ESM runtime, supported by GitHub-hosted Ubuntu runners. Keep credential persistence disabled. Release notes: [checkout](https://github.com/actions/checkout/releases/tag/v7.0.1), [cache](https://github.com/actions/cache/releases/tag/v6.1.0). Local gates validate repository behavior; hosted workflow execution remains a CI responsibility.
