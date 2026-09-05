@@ -254,3 +254,7 @@ Pool capacity counts interchangeable seats. Reservation consumption applies
 only during its half-open interval, and available capacity uses peak simultaneous
 consumption over the request and buffers. Consumers needing individually fixed
 seat identities represent those seats as separate resources.
+
+## Fairness map shape
+
+Fairness fields are optional; an empty or partial map is valid. Resource.validate_fairness/2 owns the shared field checks. Assignment preserves its strategy-specific resource_weight error when validating weighted assignment directly.

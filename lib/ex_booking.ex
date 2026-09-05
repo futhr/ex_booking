@@ -155,8 +155,7 @@ defmodule ExBooking do
   def available_slots(%MeetingType{} = meeting_type, resources, rules, opts) do
     with :ok <- Options.validate_horizon(opts, :required),
          {:ok, opts} <- validate_opts(opts, @search_opts),
-         :ok <- Availability.validate_inputs(meeting_type, resources, rules),
-         :ok <- Assignment.validate(resources, opts) do
+         :ok <- Assignment.validate_options(opts) do
       Availability.assemble(
         meeting_type,
         resources,
@@ -216,9 +215,7 @@ defmodule ExBooking do
       ) do
     with :ok <- Options.validate_horizon(opts, :optional),
          {:ok, opts} <- validate_opts(opts, @validate_request_opts),
-         :ok <- Availability.validate_request_shape(request, meeting_type),
-         :ok <- Availability.validate_inputs(meeting_type, resources, rules),
-         :ok <- Assignment.validate(resources, opts) do
+         :ok <- Assignment.validate_options(opts) do
       Availability.validate(request, meeting_type, resources, rules, Keyword.take(opts, [:now]))
     end
   end
@@ -267,9 +264,7 @@ defmodule ExBooking do
   def decide(%Request{} = request, %MeetingType{} = meeting_type, resources, rules, opts) do
     with :ok <- Options.validate_horizon(opts, :optional),
          {:ok, opts} <- validate_opts(opts, @decide_opts),
-         :ok <- Availability.validate_request_shape(request, meeting_type),
-         :ok <- Availability.validate_inputs(meeting_type, resources, rules),
-         :ok <- Assignment.validate(resources, opts) do
+         :ok <- Assignment.validate_options(opts) do
       decision(request, meeting_type, {resources, rules}, opts, nil)
     end
   end
@@ -340,7 +335,7 @@ defmodule ExBooking do
          :ok <- validate_existing(existing),
          :ok <- Availability.validate_request_shape(request, meeting_type),
          :ok <- Availability.validate_inputs(meeting_type, resources, rules),
-         :ok <- Assignment.validate(resources, opts) do
+         :ok <- Assignment.validate_options(opts) do
       case Policy.notice_ok(existing, meeting_type.reschedule_policy, opts[:now]) do
         :ok ->
           decision(request, meeting_type, {resources, rules}, opts, {existing, request.slot})

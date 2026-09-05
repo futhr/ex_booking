@@ -32,10 +32,10 @@ defmodule ExBooking.Resource do
 
   @typedoc "Explicit fairness inputs for assignment strategies."
   @type fairness :: %{
-          assignments_count: non_neg_integer(),
-          last_assigned_at: DateTime.t() | nil,
-          weight: number(),
-          priority: integer()
+          optional(:assignments_count) => non_neg_integer(),
+          optional(:last_assigned_at) => DateTime.t() | nil,
+          optional(:weight) => number(),
+          optional(:priority) => integer()
         }
 
   @typedoc "A bookable resource."
@@ -72,4 +72,40 @@ defmodule ExBooking.Resource do
       error -> error
     end
   end
+
+  @fairness_fields [:assignments_count, :last_assigned_at, :weight, :priority]
+
+  @doc """
+  Validates optional fairness fields without interpreting an assignment strategy.
+
+  ## Examples
+
+      iex> ExBooking.Resource.validate_fairness("a", %{assignments_count: 0})
+      :ok
+      iex> ExBooking.Resource.validate_fairness("a", %{weight: 0})
+      {:error, {:invalid, :resource_fairness, {"a", {:weight, 0}}}}
+  """
+  @spec validate_fairness(String.t(), term()) ::
+          :ok | {:error, {:invalid, :resource_fairness, {String.t(), term()}}}
+  def validate_fairness(_, nil), do: :ok
+
+  def validate_fairness(id, fairness) when is_map(fairness) and not is_struct(fairness) do
+    invalid = Enum.find(fairness, &invalid_fairness?/1)
+
+    if invalid,
+      do: {:error, {:invalid, :resource_fairness, {id, invalid}}},
+      else: :ok
+  end
+
+  def validate_fairness(id, fairness),
+    do: {:error, {:invalid, :resource_fairness, {id, fairness}}}
+
+  defp invalid_fairness?({key, _}) when key not in @fairness_fields, do: true
+  defp invalid_fairness?({:assignments_count, value}), do: not is_integer(value) or value < 0
+
+  defp invalid_fairness?({:last_assigned_at, value}),
+    do: value != nil and not is_struct(value, DateTime)
+
+  defp invalid_fairness?({:weight, value}), do: not is_number(value) or value <= 0
+  defp invalid_fairness?({:priority, value}), do: not is_integer(value)
 end

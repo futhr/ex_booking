@@ -51,8 +51,6 @@ defmodule ExBooking.Availability do
                  )
   @now_opts NimbleOptions.new!(now: [type: {:struct, DateTime}, required: true])
 
-  @fairness_fields [:assignments_count, :last_assigned_at, :weight, :priority]
-
   @doc """
   Assembles bookable slots for a meeting type over a search horizon.
 
@@ -76,8 +74,8 @@ defmodule ExBooking.Availability do
   def assemble(%MeetingType{} = meeting_type, resources, rules, opts) do
     with :ok <- Options.validate_horizon(opts, :required),
          {:ok, opts} <- Options.validate(opts, @assemble_opts),
-         :ok <- validate_inputs(meeting_type, resources, rules),
-         {:ok, pairs} <- pair(resources, rules) do
+         :ok <- validate_meeting_type(meeting_type),
+         {:ok, pairs} <- validated_pairs(resources, rules) do
       {:ok,
        combine(meeting_type, pairs, {opts[:from], opts[:until], opts[:now], slotting_opts(opts)})}
     end
@@ -102,11 +100,16 @@ defmodule ExBooking.Availability do
           :ok | {:error, {:invalid, atom(), term()}}
   def validate_inputs(%MeetingType{} = meeting_type, resources, rules) do
     with :ok <- validate_meeting_type(meeting_type),
-         :ok <- validate_resources(resources),
-         :ok <- Resource.validate_ids(resources),
-         :ok <- validate_rules(rules),
-         {:ok, _} <- pair(resources, rules) do
+         {:ok, _} <- validated_pairs(resources, rules) do
       :ok
+    end
+  end
+
+  defp validated_pairs(resources, rules) do
+    with :ok <- validate_resources(resources),
+         :ok <- Resource.validate_ids(resources),
+         :ok <- validate_rules(rules) do
+      pair(resources, rules)
     end
   end
 
@@ -287,24 +290,15 @@ defmodule ExBooking.Availability do
         %DateTime{} = now
       ) do
     with :ok <- validate_request_shape(request, meeting_type),
-         :ok <- validate_inputs(meeting_type, resources, rules) do
-      case pair(resources, rules) do
-        {:ok, pairs} ->
-          pairs
-          |> candidates(request.preferred_resource_ids, meeting_type.participants)
-          |> screen(meeting_type, slot, now)
-
-        {:error, reason} ->
-          {:error, reason}
-      end
+         {:ok, pairs} <- validated_pairs(resources, rules) do
+      pairs
+      |> candidates(request.preferred_resource_ids, meeting_type.participants)
+      |> screen(meeting_type, slot, now)
     end
   end
 
   def eligible(%Request{} = request, %MeetingType{} = meeting_type, _, _, %DateTime{}) do
-    case validate_request_shape(request, meeting_type) do
-      {:error, _} = error -> error
-      :ok -> {:error, {:invalid, :slot, :invalid_interval}}
-    end
+    validate_request_shape(request, meeting_type)
   end
 
   defp combine(
@@ -497,11 +491,6 @@ defmodule ExBooking.Availability do
     {:error, {:invalid, :meeting_type_id, {:mismatch, request_id, meeting_type_id}}}
   end
 
-  defp validate_request_fields(%Request{}, %MeetingType{duration_min: duration})
-       when not is_integer(duration) or duration <= 0 do
-    {:error, {:invalid, :duration_min, duration}}
-  end
-
   defp validate_request_fields(%Request{slot: nil}, %MeetingType{}) do
     {:error, {:invalid, :slot, :required}}
   end
@@ -548,7 +537,7 @@ defmodule ExBooking.Availability do
          :ok <- validate_busy(id, resource.busy),
          :ok <- validate_reservations(id, resource.reservations),
          :ok <- validate_daily_counts(id, resource.daily_booking_counts) do
-      validate_fairness(id, resource.fairness)
+      Resource.validate_fairness(id, resource.fairness)
     end
   end
 
@@ -633,28 +622,6 @@ defmodule ExBooking.Availability do
 
   defp validate_daily_counts(id, counts),
     do: {:error, {:invalid, :daily_booking_counts, {id, counts}}}
-
-  defp validate_fairness(_, nil), do: :ok
-
-  defp validate_fairness(id, fairness) when is_map(fairness) and not is_struct(fairness) do
-    invalid = Enum.find(fairness, &invalid_fairness?/1)
-
-    if invalid,
-      do: {:error, {:invalid, :resource_fairness, {id, invalid}}},
-      else: :ok
-  end
-
-  defp validate_fairness(id, fairness),
-    do: {:error, {:invalid, :resource_fairness, {id, fairness}}}
-
-  defp invalid_fairness?({key, _}) when key not in @fairness_fields, do: true
-  defp invalid_fairness?({:assignments_count, value}), do: not is_integer(value) or value < 0
-
-  defp invalid_fairness?({:last_assigned_at, value}),
-    do: value != nil and not is_struct(value, DateTime)
-
-  defp invalid_fairness?({:weight, value}), do: not is_number(value) or value <= 0
-  defp invalid_fairness?({:priority, value}), do: not is_integer(value)
 
   defp validate_request(%Request{meeting_type_id: id}) when not is_binary(id) or id == "",
     do: {:error, {:invalid, :meeting_type_id, id}}

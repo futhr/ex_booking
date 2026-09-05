@@ -360,3 +360,7 @@ checks required now/from/until and an increasing horizon before expansion.
 Standalone assignment validates participant mode, positive capacity requirements
 and resource capacities before selection. Explicit nil scorer/hold/release options
 mean absence. `ExBooking.Options` owns shared schema and horizon validation.
+
+## Validation ownership
+
+Each public domain operation validates its own inputs. Facade operations validate their option schemas and strategy/scorer options, then delegate resource and request validation to availability. Rescheduling retains preflight before its policy can short-circuit. Availability validates and pairs resources once within each operation. Error selection among multiple independently malformed fields is not an API ordering guarantee. Assignment strategy types enumerate the supported selectors; resource fairness maps have optional keys.

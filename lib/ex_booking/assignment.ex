@@ -30,7 +30,10 @@ defmodule ExBooking.Assignment do
   alias ExBooking.Resource
 
   @typedoc "Assignment strategy selector."
-  @type strategy :: atom() | {atom(), keyword()}
+  @type base_strategy ::
+          :first_available | :round_robin | :least_recently_booked | :weighted | :priority
+  @type strategy ::
+          base_strategy() | {:owner_first, [owner_id: String.t(), fallback: base_strategy()]}
 
   @typedoc "Opaque scoring hook over routing context."
   @type scorer :: (Resource.t(), map() -> number())
@@ -50,7 +53,6 @@ defmodule ExBooking.Assignment do
     :weighted,
     :priority
   ]
-  @fairness_fields [:assignments_count, :last_assigned_at, :weight, :priority]
 
   @doc """
   Validates a strategy and any fairness inputs it consumes.
@@ -66,28 +68,39 @@ defmodule ExBooking.Assignment do
 
   """
   @spec validate([Resource.t()], keyword()) ::
-          :ok | {:error, {:invalid, :opts | :strategy | :resource_weight, term()}}
-  def validate(resources, opts) when is_list(opts) do
+          :ok | {:error, {:invalid, atom(), term()}}
+  def validate(resources, opts) do
+    with :ok <- validate_options(opts),
+         :ok <- validate_resources(resources, Keyword.get(opts, :strategy, :first_available)),
+         :ok <- Resource.validate_ids(resources) do
+      validate_capacities(resources)
+    end
+  end
+
+  @doc """
+  Validates strategy and scorer options independently of resource data.
+
+  Other keys belong to the calling operation and are checked by its option schema.
+
+  ## Examples
+
+      iex> ExBooking.Assignment.validate_options(strategy: :round_robin)
+      :ok
+      iex> ExBooking.Assignment.validate_options(strategy: :random)
+      {:error, {:invalid, :strategy, :random}}
+  """
+  @spec validate_options(keyword()) :: :ok | {:error, {:invalid, atom(), term()}}
+  def validate_options(opts) when is_list(opts) do
     if Keyword.keyword?(opts) do
-      validate_keyword_options(resources, opts)
+      with :ok <- validate_strategy(Keyword.get(opts, :strategy, :first_available)) do
+        validate_scorer(Keyword.get(opts, :scorer))
+      end
     else
       {:error, {:invalid, :opts, :not_a_keyword_list}}
     end
   end
 
-  def validate(_, _), do: {:error, {:invalid, :opts, :not_a_keyword_list}}
-
-  defp validate_keyword_options(resources, opts) do
-    strategy = Keyword.get(opts, :strategy, :first_available)
-
-    with :ok <- validate_strategy(strategy),
-         :ok <- validate_resources(resources, strategy),
-         :ok <- Resource.validate_ids(resources),
-         :ok <- validate_capacities(resources),
-         :ok <- validate_scorer(Keyword.get(opts, :scorer)) do
-      validate_weights(resources, strategy)
-    end
-  end
+  def validate_options(_), do: {:error, {:invalid, :opts, :not_a_keyword_list}}
 
   @doc """
   Picks the resource(s) that take a booking for `slot`.
@@ -172,38 +185,16 @@ defmodule ExBooking.Assignment do
 
   defp validate_resources(resources, _), do: {:error, {:invalid, :resources, resources}}
 
-  defp validate_fairness(_, nil, _), do: :ok
+  defp validate_fairness(id, fairness, strategy) do
+    case Resource.validate_fairness(id, fairness) do
+      {:error, {:invalid, :resource_fairness, {^id, {:weight, weight}}}} = error ->
+        if weighted?(strategy),
+          do: {:error, {:invalid, :resource_weight, {id, weight}}},
+          else: error
 
-  defp validate_fairness(id, fairness, strategy)
-       when is_map(fairness) and not is_struct(fairness) do
-    case Enum.find(fairness, &invalid_fairness?/1) do
-      nil ->
-        :ok
-
-      {:weight, weight} = invalid ->
-        fairness_weight_error(id, weight, invalid, strategy)
-
-      invalid ->
-        {:error, {:invalid, :resource_fairness, {id, invalid}}}
+      result ->
+        result
     end
-  end
-
-  defp validate_fairness(id, fairness, _),
-    do: {:error, {:invalid, :resource_fairness, {id, fairness}}}
-
-  defp invalid_fairness?({key, _}) when key not in @fairness_fields, do: true
-  defp invalid_fairness?({:assignments_count, value}), do: not is_integer(value) or value < 0
-
-  defp invalid_fairness?({:last_assigned_at, value}),
-    do: value != nil and not is_struct(value, DateTime)
-
-  defp invalid_fairness?({:weight, value}), do: not is_number(value) or value <= 0
-  defp invalid_fairness?({:priority, value}), do: not is_integer(value)
-
-  defp fairness_weight_error(id, weight, invalid, strategy) do
-    if weighted?(strategy),
-      do: {:error, {:invalid, :resource_weight, {id, weight}}},
-      else: {:error, {:invalid, :resource_fairness, {id, invalid}}}
   end
 
   defp validate_scorer(nil), do: :ok
@@ -227,31 +218,12 @@ defmodule ExBooking.Assignment do
 
   defp validate_strategy(strategy), do: {:error, {:invalid, :strategy, strategy}}
 
-  defp validate_weights(resources, strategy) do
-    if weighted?(strategy) do
-      case Enum.find_value(resources, &invalid_weight/1) do
-        nil -> :ok
-        {id, weight} -> {:error, {:invalid, :resource_weight, {id, weight}}}
-      end
-    else
-      :ok
-    end
-  end
-
   defp weighted?(:weighted), do: true
 
   defp weighted?({:owner_first, opts}),
     do: Keyword.get(opts, :fallback, :round_robin) == :weighted
 
   defp weighted?(_), do: false
-
-  defp invalid_weight(%Resource{id: id, fairness: fairness}) when is_map(fairness) do
-    weight = Map.get(fairness, :weight, 1.0)
-    if is_number(weight) and weight > 0, do: nil, else: {id, weight}
-  end
-
-  defp invalid_weight(%Resource{fairness: nil}), do: nil
-  defp invalid_weight(%Resource{id: id, fairness: fairness}), do: {id, fairness}
 
   defp select(ranked, opts) do
     case Keyword.get(opts, :participants, :one) do
@@ -261,22 +233,17 @@ defmodule ExBooking.Assignment do
     end
   end
 
-  defp take_capacity(resources, required) when is_integer(required) and required > 0 do
+  defp take_capacity(resources, required) do
     {selected, remaining} =
       Enum.reduce_while(resources, {[], required}, &take_resource/2)
 
     if remaining == 0, do: Enum.reverse(selected), else: []
   end
 
-  defp take_capacity(_, _), do: []
-
-  defp take_resource(%Resource{capacity: capacity} = resource, {selected, remaining})
-       when is_integer(capacity) and capacity > 0 do
+  defp take_resource(%Resource{capacity: capacity} = resource, {selected, remaining}) do
     next = {[resource | selected], max(remaining - capacity, 0)}
     if elem(next, 1) == 0, do: {:halt, next}, else: {:cont, next}
   end
-
-  defp take_resource(_, acc), do: {:cont, acc}
 
   defp score_resources(resources, scorer, routing_context) do
     result =
@@ -329,8 +296,6 @@ defmodule ExBooking.Assignment do
     fallback = Keyword.get(opts, :fallback, :round_robin)
     {owner_rank(resource, owner_id), strategy_key(resource, fallback)}
   end
-
-  defp strategy_key(resource, {strategy, _}), do: strategy_key(resource, strategy)
 
   defp owner_rank(resource, owner_id), do: if(resource.id == owner_id, do: 0, else: 1)
 
