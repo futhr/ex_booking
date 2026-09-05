@@ -80,15 +80,17 @@ defmodule ExBooking.JSCalendar do
     end
   end
 
+  defp event_interval(event)
+       when is_map_key(event, "recurrenceRules") or is_map_key(event, "excludedRecurrenceRules") or
+              is_map_key(event, "recurrenceOverrides") do
+    {:error, {:unsupported, :jscalendar, :recurrence}}
+  end
+
   defp event_interval(%{"status" => "cancelled"}), do: {:ok, []}
   defp event_interval(%{"freeBusyStatus" => "free"}), do: {:ok, []}
 
   defp event_interval(%{"freeBusyStatus" => status}) when status not in ["busy", nil] do
     {:error, {:unsupported, :jscalendar, {:free_busy_status, status}}}
-  end
-
-  defp event_interval(%{"recurrenceRules" => _}) do
-    {:error, {:unsupported, :jscalendar, :recurrence}}
   end
 
   defp event_interval(%{"start" => start_value, "timeZone" => timezone} = event)

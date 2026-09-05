@@ -284,4 +284,23 @@ defmodule ExBooking.JSCalendarTest do
       assert busy.end_at == ~U[2026-07-13 07:30:00Z]
     end
   end
+
+  test "rejects recurrence additions and exclusions even on a free base event" do
+    base = %{
+      "@type" => "Event",
+      "start" => "2026-07-13T09:00:00",
+      "timeZone" => "Etc/UTC",
+      "duration" => "PT30M"
+    }
+
+    for field <- ["recurrenceRules", "excludedRecurrenceRules", "recurrenceOverrides"],
+        status <- ["busy", "free"] do
+      event =
+        base
+        |> Map.put(field, %{})
+        |> Map.put("freeBusyStatus", status)
+
+      assert {:error, {:unsupported, :jscalendar, :recurrence}} = JSCalendar.busy_intervals(event)
+    end
+  end
 end

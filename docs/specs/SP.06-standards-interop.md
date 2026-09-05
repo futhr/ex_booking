@@ -153,3 +153,10 @@ Recurrence offsets are bounded by the final local date of the search horizon
 before resolving wall times. Weekly BYDAY traversal jumps between active week
 blocks instead of inspecting intervening days. COUNT limits emitted occurrences;
 looking for a subsequent occurrence must never scan beyond the horizon.
+
+## Unsupported JSCalendar recurrence
+
+Presence of `recurrenceRules`, `excludedRecurrenceRules`, or
+`recurrenceOverrides` returns `{:unsupported, :jscalendar, :recurrence}`.
+This check precedes free/cancelled filtering because overrides can change the
+status of individual occurrences. Detached occurrence objects remain supported.
