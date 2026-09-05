@@ -276,3 +276,30 @@ These are intentionally not roadmap tasks for `ex_booking`:
 [-] Analytics dashboards, GTM/GA/PostHog/Segment integrations.
 [-] AI notetaking, prep, phone agents, routing agents.
 ```
+
+## September 2026 audit remediation
+
+Progress: 1/22 findings completed.
+
+- [x] A01: Security audit and Mint update (SP.07).
+- [ ] A02: Unique resource identities (SP.01/SP.02).
+- [ ] A03: Collective preferences preserve required participants (SP.03).
+- [ ] A04: Bound weekly recurrence expansion (SP.06).
+- [ ] A05: Reject unsupported JSCalendar recurrence fields (SP.06).
+- [ ] A06: Validate alternatives under request constraints (SP.02).
+- [ ] A07: Anchor recurrence weeks to Monday (SP.06).
+- [ ] A08: RFC recurrence gaps and rule validation (SP.06).
+- [ ] A09: Precise lead-time comparison (SP.03).
+- [ ] A10: Compare slot instants independently of display precision (SP.03/SP.05).
+- [ ] A11: Explicit missing fairness ranking (SP.04).
+- [ ] A12: Safe weighted arithmetic and precise assignment time (SP.04).
+- [ ] A13: Consistent public input validation (SP.02).
+- [ ] A14: Closed-day overrides suppress overnight spill (SP.03).
+- [ ] A15: Reject empty FREEBUSY periods (SP.06).
+- [ ] A16: Normalized linear interval subtraction (SP.03).
+- [ ] A17: Peak concurrent pool consumption (SP.01/SP.03).
+- [ ] A18: ExDoc and Req maintenance updates (SP.07).
+- [ ] A19: Update pinned checkout and cache actions (SP.07).
+- [ ] A20: Consolidate validation and precise public types (SP.01/SP.02).
+- [ ] A21: Expand behavioral properties (SP.07).
+- [ ] A22: Package, notebook, benchmark, and maintenance evidence (SP.07).

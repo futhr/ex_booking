@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-07-08"
-  updated: "2026-07-11"
+  updated: "2026-09-05"
   tags: ["tests", "quality-gates", "coverage", "properties"]
   depends_on: ["SP.03"]
 ---
@@ -81,3 +81,9 @@ Coverage must remain at or above 95% line coverage with `test/support` excluded.
 Any change that touches behavior must update the matching spec, task checklist,
 and tests in the same commit. Do not add dependencies or integration behavior to
 satisfy tests; keep the kernel pure and push effects to consumers.
+
+## Registry advisory gate
+
+Both `mix deps.audit` and `mix hex.audit` must pass. The latter checks current Hex
+registry advisories and fails when vulnerable or retired locked packages are found.
+The release workflow inherits both checks through `mix check --no-retry`.

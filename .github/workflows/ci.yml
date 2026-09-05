@@ -112,7 +112,9 @@ jobs:
         run: mix credo --strict
 
       - name: Security audit
-        run: mix deps.audit
+        run: |
+          mix deps.audit
+          mix hex.audit
 
   dialyzer:
     name: Dialyzer

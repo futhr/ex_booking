@@ -16,6 +16,7 @@
 
     # Security and dependencies
     {:mix_audit, command: "mix deps.audit"},
+    {:hex_audit, command: "mix hex.audit"},
 
     # Type checking
     {:dialyzer, command: "mix dialyzer"},
