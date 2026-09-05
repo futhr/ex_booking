@@ -746,4 +746,32 @@ defmodule ExBookingTest do
     start_utc = DateTime.shift_zone!(start_at, "Etc/UTC")
     Interval.new!(start_utc, DateTime.add(start_utc, 30, :minute))
   end
+
+  test "alternatives retain preferred resource constraints" do
+    slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+    unavailable = Interval.new!(slot.start_at, ~U[2026-07-13 11:00:00Z])
+    request = build(:request, slot: slot, preferred_resource_ids: ["a"])
+    resources = [build(:resource, id: "a", busy: [unavailable]), build(:resource, id: "b")]
+    rules = List.duplicate(build(:rule), 2)
+
+    assert {:ok, decision} =
+             ExBooking.decide(request, build(:meeting_type), resources, rules,
+               now: @now,
+               from: slot.start_at,
+               until: ~U[2026-07-13 12:00:00Z]
+             )
+
+    assert decision.alternatives != []
+
+    for alternative <- decision.alternatives do
+      assert :ok =
+               ExBooking.validate_request(
+                 %{request | slot: alternative},
+                 build(:meeting_type),
+                 resources,
+                 rules,
+                 now: @now
+               )
+    end
+  end
 end

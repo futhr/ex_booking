@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: critical
   created: "2026-07-08"
-  updated: "2026-07-29"
+  updated: "2026-09-05"
   tags: ["api", "facade", "options", "error-vocabulary"]
   depends_on: ["R.01", "SP.01"]
 ---
@@ -342,3 +342,10 @@ must not collapse the cases above into exceptions or untagged strings.
 
 Anything not listed in this spec may change without notice. Additions to the
 error vocabulary are minor-version changes; removals/renames are breaking.
+
+## Alternative eligibility
+
+Alternative slots retain the original request's preferred resource restriction
+for one-resource and pool meetings. Collective alternatives retain all required
+participants. Every suggestion must pass `validate_request/5` with the original
+request fields and caller facts, replacing only its slot.

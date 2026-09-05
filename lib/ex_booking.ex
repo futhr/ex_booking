@@ -823,12 +823,14 @@ defmodule ExBooking do
   end
 
   defp alternatives(
-         %Request{slot: %Interval{} = requested},
+         %Request{slot: %Interval{} = requested} = request,
          meeting_type,
          resources,
          rules,
          opts
        ) do
+    {resources, rules} = alternative_inputs(request, meeting_type, resources, rules)
+
     with true <- opts[:alternatives_limit] > 0,
          %DateTime{} <- opts[:from],
          %DateTime{} <- opts[:until],
@@ -843,6 +845,21 @@ defmodule ExBooking do
   end
 
   defp alternatives(_, _, _, _, _), do: []
+
+  defp alternative_inputs(_, %MeetingType{participants: :collective}, resources, rules),
+    do: {resources, rules}
+
+  defp alternative_inputs(%Request{preferred_resource_ids: []}, _, resources, rules),
+    do: {resources, rules}
+
+  defp alternative_inputs(request, _, resources, rules) do
+    ids = MapSet.new(request.preferred_resource_ids)
+
+    resources
+    |> Enum.zip(rules)
+    |> Enum.filter(fn {resource, _} -> MapSet.member?(ids, resource.id) end)
+    |> Enum.unzip()
+  end
 
   defp same_interval?(%Interval{} = a, %Interval{} = b),
     do: a.start_at == b.start_at and a.end_at == b.end_at
