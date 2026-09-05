@@ -267,4 +267,40 @@ defmodule ExBooking.AssignmentTest do
                strategy: :round_robin
              )
   end
+
+  test "weighted ranking accepts extreme positive numeric weights" do
+    resources = [
+      resource("a", %{assignments_count: 2, weight: 1.0e-320}),
+      resource("b", %{assignments_count: 1, weight: 1.0e-320})
+    ]
+
+    assert {:ok, [%Resource{id: "b"}]} = winner(resources, strategy: :weighted)
+
+    assert {:ok, [%Resource{id: "b"}]} =
+             winner(resources,
+               strategy: {:owner_first, owner_id: "missing", fallback: :weighted}
+             )
+
+    big = Integer.pow(10, 400)
+
+    assert {:ok, [%Resource{id: "b"}]} =
+             winner(
+               [
+                 resource("a", %{assignments_count: big + 1, weight: big}),
+                 resource("b", %{assignments_count: big, weight: big})
+               ],
+               strategy: :weighted
+             )
+  end
+
+  test "assignment retains microseconds in recency comparisons" do
+    assert {:ok, [%Resource{id: "b"}]} =
+             winner(
+               [
+                 resource("a", %{last_assigned_at: ~U[2026-07-12 00:00:00.900000Z]}),
+                 resource("b", %{last_assigned_at: ~U[2026-07-12 00:00:00.100000Z]})
+               ],
+               strategy: :least_recently_booked
+             )
+  end
 end

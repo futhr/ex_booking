@@ -123,3 +123,11 @@ Missing counters, priorities, and weighted numerators use explicit missing-value
 rank tags, never numeric sentinels. A supplied value always precedes missing data
 within that comparison. Missing assignment time ranks last in round-robin and
 priority tie-breaks, but first for least-recently-booked (never assigned).
+
+## Numeric and timestamp comparisons
+
+Assignment timestamps compare UTC microseconds. Weighted ratios compare exact
+integer fractions using cross multiplication; floats use their exact represented
+ratio (`Float.ratio/1`). No conversion of arbitrary integers to floating point
+or division by a tiny float is permitted. Owner-first weighted fallbacks use
+the same comparator. Equal ratios retain the resource-id tie-break.

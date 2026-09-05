@@ -121,7 +121,11 @@ defmodule ExBooking.Assignment do
 
     with {:ok, scored} <- score_resources(resources, scorer, routing_context) do
       ranked =
-        Enum.sort_by(scored, fn {resource, score} -> sort_key(resource, strategy, score) end)
+        Enum.sort_by(
+          scored,
+          fn {resource, score} -> sort_key(resource, strategy, score) end,
+          &(compare_key(&1, &2) != :gt)
+        )
 
       case select(Enum.map(ranked, &elem(&1, 0)), opts) do
         [] -> {:error, :no_eligible_resource}
@@ -327,15 +331,40 @@ defmodule ExBooking.Assignment do
 
   defp weighted_ratio(resource) do
     case fairness_value(resource, :assignments_count) do
-      nil -> {1, 0}
-      count -> {0, count / (fairness_value(resource, :weight) || 1.0)}
+      nil ->
+        {1, 0}
+
+      count ->
+        {numerator, denominator} = weight_ratio(fairness_value(resource, :weight) || 1)
+        {0, {:ratio, count * denominator, numerator}}
     end
   end
 
   defp last_assigned_key(resource, nil_rank) do
     case fairness_value(resource, :last_assigned_at) do
       nil -> {nil_rank, 0}
-      %DateTime{} = datetime -> {1 - nil_rank, DateTime.to_unix(datetime)}
+      %DateTime{} = datetime -> {1 - nil_rank, DateTime.to_unix(datetime, :microsecond)}
+    end
+  end
+
+  defp weight_ratio(weight) when is_integer(weight), do: {weight, 1}
+  defp weight_ratio(weight), do: Float.ratio(weight)
+
+  defp compare_key(a, b) when a == b, do: :eq
+  defp compare_key({:ratio, a, b}, {:ratio, c, d}), do: compare_key(a * d, c * b)
+
+  defp compare_key(a, b) when is_tuple(a) and is_tuple(b),
+    do: compare_parts(Tuple.to_list(a), Tuple.to_list(b))
+
+  defp compare_key(a, b) when a < b, do: :lt
+  defp compare_key(_, _), do: :gt
+
+  defp compare_parts([], []), do: :eq
+
+  defp compare_parts([a | as], [b | bs]) do
+    case compare_key(a, b) do
+      :eq -> compare_parts(as, bs)
+      order -> order
     end
   end
 end
