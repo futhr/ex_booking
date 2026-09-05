@@ -774,4 +774,32 @@ defmodule ExBookingTest do
                )
     end
   end
+
+  test "holds compare UTC instants rather than timestamp display precision" do
+    slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+
+    alternate = %{
+      slot
+      | start_at: %{slot.start_at | microsecond: {0, 6}},
+        end_at: %{slot.end_at | microsecond: {0, 6}}
+    }
+
+    hold = %ExBooking.Hold{
+      id: "h",
+      slot: alternate,
+      resource_ids: ["res_1"],
+      meeting_type_id: "demo_30",
+      expires_at: @now
+    }
+
+    assert {:ok, %{status: :ok}} =
+             ExBooking.decide(
+               build(:request, slot: slot),
+               build(:meeting_type),
+               [build(:resource)],
+               [build(:rule)],
+               now: @now,
+               hold: hold
+             )
+  end
 end

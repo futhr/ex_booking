@@ -862,7 +862,9 @@ defmodule ExBooking do
   end
 
   defp same_interval?(%Interval{} = a, %Interval{} = b),
-    do: a.start_at == b.start_at and a.end_at == b.end_at
+    do:
+      DateTime.compare(a.start_at, b.start_at) == :eq and
+        DateTime.compare(a.end_at, b.end_at) == :eq
 
   defp same_interval?(_, _), do: false
 
@@ -877,7 +879,7 @@ defmodule ExBooking do
   end
 
   defp alternative_key(slot, requested) do
-    distance = abs(DateTime.diff(slot.start_at, requested.start_at, :second))
+    distance = abs(DateTime.diff(slot.start_at, requested.start_at, :microsecond))
     {distance, DateTime.to_unix(slot.start_at, :microsecond)}
   end
 

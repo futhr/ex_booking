@@ -76,7 +76,7 @@ defmodule ExBooking.Slotting do
   def generate_all(free_intervals, duration_min, step_min, opts \\ []) do
     free_intervals
     |> Enum.flat_map(&generate_slots(&1, duration_min, step_min, opts))
-    |> Enum.uniq_by(& &1.start_at)
+    |> Enum.uniq_by(&DateTime.to_unix(&1.start_at, :microsecond))
     |> Enum.sort_by(& &1.start_at, DateTime)
   end
 

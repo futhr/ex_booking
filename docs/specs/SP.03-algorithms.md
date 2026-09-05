@@ -203,3 +203,9 @@ the kernel. For one-resource and pool meetings, preferences restrict eligibility
 Lead time compares exact microsecond instants. Any positive shortfall rejects
 the slot; the reported positive minutes short is the ceiling of that shortfall
 divided by 60,000,000 microseconds.
+
+## Instant identity
+
+Slot deduplication keys use UTC microseconds, independently of the DateTime
+display precision. Stable first occurrence metadata/representation wins.
+Alternative distance also uses microseconds, with earlier instant as tie-break.

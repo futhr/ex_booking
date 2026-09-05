@@ -71,8 +71,8 @@ canonical result:
 
 ```text
 hold.meeting_type_id == request.meeting_type_id == meeting_type.id
-hold.slot.start_at == request.slot.start_at
-hold.slot.end_at == request.slot.end_at
+DateTime.compare(hold.slot.start_at, request.slot.start_at) == :eq
+DateTime.compare(hold.slot.end_at, request.slot.end_at) == :eq
 hold.resource_ids == assigned resource ids  # same deterministic order
 ```
 

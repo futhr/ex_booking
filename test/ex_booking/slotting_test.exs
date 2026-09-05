@@ -160,4 +160,32 @@ defmodule ExBooking.SlottingTest do
       end
     end
   end
+
+  property "equal instants deduplicate regardless of display precision" do
+    check all(precision <- integer(0..6)) do
+      free = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z])
+      alternate = %{free | start_at: %{free.start_at | microsecond: {0, precision}}}
+
+      assert Slotting.generate_all([free, alternate], 30, 15) ==
+               Slotting.generate_slots(free, 30, 15)
+    end
+  end
+
+  test "deduplication preserves distinct fall-back instants in both DST zones" do
+    fixtures = [
+      {"Europe/Stockholm", ~D[2026-10-25], ~T[02:30:00]},
+      {"America/New_York", ~D[2026-11-01], ~T[01:30:00]}
+    ]
+
+    for {zone, date, time} <- fixtures do
+      {:ambiguous, first, second} = DateTime.new(date, time, zone)
+
+      intervals =
+        Enum.map([first, second], fn start ->
+          Interval.new!(start, DateTime.add(start, 30, :minute))
+        end)
+
+      assert length(Slotting.generate_all(intervals ++ intervals, 30, 30)) == 2
+    end
+  end
 end

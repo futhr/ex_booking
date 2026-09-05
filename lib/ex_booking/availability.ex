@@ -306,7 +306,7 @@ defmodule ExBooking.Availability do
     |> Enum.flat_map(fn {resource, rule} ->
       resource_slots(meeting_type, resource, rule, {from, until, now}, slotting_opts)
     end)
-    |> Enum.uniq_by(& &1.start_at)
+    |> Enum.uniq_by(&DateTime.to_unix(&1.start_at, :microsecond))
     |> Enum.sort_by(& &1.start_at, DateTime)
   end
 
@@ -344,7 +344,7 @@ defmodule ExBooking.Availability do
         slotting_opts
       )
     end)
-    |> Enum.uniq_by(& &1.start_at)
+    |> Enum.uniq_by(&DateTime.to_unix(&1.start_at, :microsecond))
     |> Enum.sort_by(& &1.start_at, DateTime)
     |> Enum.filter(
       &(offered_seats(offerables, meeting_type, &1, now) >= meeting_type.capacity_required)
