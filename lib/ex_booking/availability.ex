@@ -281,7 +281,7 @@ defmodule ExBooking.Availability do
       case pair(resources, rules) do
         {:ok, pairs} ->
           pairs
-          |> candidates(request.preferred_resource_ids)
+          |> candidates(request.preferred_resource_ids, meeting_type.participants)
           |> screen(meeting_type, slot, now)
 
         {:error, reason} ->
@@ -759,9 +759,10 @@ defmodule ExBooking.Availability do
 
   defp slotting_opts(opts), do: [align: Keyword.get(opts, :align, :free_start)]
 
-  defp candidates(pairs, []), do: pairs
+  defp candidates(pairs, _, :collective), do: pairs
+  defp candidates(pairs, [], _), do: pairs
 
-  defp candidates(pairs, ids),
+  defp candidates(pairs, ids, _),
     do: Enum.filter(pairs, fn {resource, _} -> Enum.member?(ids, resource.id) end)
 
   defp effective_buffers(%MeetingType{buffers: nil}, rule), do: rule.buffers

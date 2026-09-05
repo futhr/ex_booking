@@ -436,4 +436,18 @@ defmodule ExBooking.AvailabilityTest do
       assert MapSet.subset?(MapSet.new(starts(reduced_slots)), MapSet.new(starts(base_slots)))
     end
   end
+
+  test "collective preferences cannot remove a required busy resource" do
+    slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+    resources = [%{resource() | id: "a"}, %{resource([slot]) | id: "b"}]
+
+    assert {:error, [{:conflict, "b", ^slot}]} =
+             Availability.validate(
+               request(slot, preferred_resource_ids: ["a"]),
+               meeting_type(participants: :collective),
+               resources,
+               [rule(), rule()],
+               now: @now
+             )
+  end
 end

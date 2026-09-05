@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: critical
   created: "2026-07-08"
-  updated: "2026-07-12"
+  updated: "2026-09-05"
   tags: ["interval", "schedule", "availability", "slotting", "policy"]
   depends_on: ["SP.01"]
 ---
@@ -191,3 +191,9 @@ candidate pools quadratic.
 The availability pipeline sorts slots ascending by `start_at`. Where resources
 are later assigned, `SP.04` supplies the final resource-id tie-break. No function
 reads the clock; every time-relative decision uses caller-supplied `now`.
+
+## Collective resource preferences
+
+For collective meetings every supplied resource is required. Preferred resource
+ids do not narrow that list; consumers define the required group before calling
+the kernel. For one-resource and pool meetings, preferences restrict eligibility.
