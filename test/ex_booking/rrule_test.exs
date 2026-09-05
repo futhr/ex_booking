@@ -229,4 +229,18 @@ defmodule ExBooking.RRuleTest do
     assert {:ok, {:ok, [first]}} = result
     assert first.start_at == @dtstart
   end
+
+  test "biweekly BYDAY is anchored to Monday rather than DTSTART weekday" do
+    assert {:ok, intervals} =
+             RRule.expand(
+               "FREQ=WEEKLY;INTERVAL=2;COUNT=4;BYDAY=MO,WE",
+               ~U[2026-07-15 09:00:00Z],
+               30,
+               @from,
+               ~U[2026-08-15 00:00:00Z]
+             )
+
+    assert Enum.map(intervals, &DateTime.to_date(&1.start_at)) ==
+             [~D[2026-07-15], ~D[2026-07-27], ~D[2026-07-29], ~D[2026-08-10]]
+  end
 end

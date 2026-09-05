@@ -160,3 +160,10 @@ Presence of `recurrenceRules`, `excludedRecurrenceRules`, or
 `recurrenceOverrides` returns `{:unsupported, :jscalendar, :recurrence}`.
 This check precedes free/cancelled filtering because overrides can change the
 status of individual occurrences. Detached occurrence objects remain supported.
+
+## Weekly interval anchor
+
+Weekly BYDAY rules use Monday as the default week start. The first active week
+is the Monday-containing week of DTSTART. Later active weeks advance by
+`INTERVAL * 7` calendar days; starts before DTSTART are excluded. Explicit WKST
+remains unsupported.

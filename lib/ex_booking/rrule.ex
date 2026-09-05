@@ -279,10 +279,11 @@ defmodule ExBooking.RRule do
 
   defp occurrence_offsets(%__MODULE__{freq: :weekly, byday: byday, interval: interval}, dtstart) do
     weekday = Date.day_of_week(DateTime.to_date(dtstart))
-    offsets = Enum.filter(0..6, &((rem(weekday + &1 - 1, 7) + 1) in byday))
+    offsets = Enum.map(byday, &(&1 - weekday))
 
     Stream.iterate(0, &(&1 + interval * 7))
     |> Stream.flat_map(fn week -> Enum.map(offsets, &(&1 + week)) end)
+    |> Stream.drop_while(&(&1 < 0))
   end
 
   defp calendar_occurrence(dtstart, 0), do: dtstart
