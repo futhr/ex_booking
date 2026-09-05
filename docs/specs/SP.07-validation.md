@@ -87,3 +87,7 @@ satisfy tests; keep the kernel pure and push effects to consumers.
 Both `mix deps.audit` and `mix hex.audit` must pass. The latter checks current Hex
 registry advisories and fails when vulnerable or retired locked packages are found.
 The release workflow inherits both checks through `mix check --no-retry`.
+
+## Development dependency maintenance
+
+The September 2026 maintenance baseline uses ExDoc 0.40.4 and Req 0.7.4. ExDoc fixes documentation output and navigation; Req fixes query-parameter and redirect handling. These are development-only lockfile updates and do not expand the runtime dependency surface. Release notes: [ExDoc](https://github.com/elixir-lang/ex_doc/releases/tag/v0.40.4), [Req](https://github.com/wojtekmach/req/releases/tag/v0.7.4).
