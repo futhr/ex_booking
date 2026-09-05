@@ -209,3 +209,11 @@ divided by 60,000,000 microseconds.
 Slot deduplication keys use UTC microseconds, independently of the DateTime
 display precision. Stable first occurrence metadata/representation wins.
 Alternative distance also uses microseconds, with earlier instant as tie-break.
+
+## Closed-date override boundaries
+
+An override with `windows: []` removes its entire local calendar date,
+including spillover from the previous day. Its exclusion is the interval from
+local midnight to the next local midnight using the schedule DST resolution
+policy, so closed dates may span 23 or 25 elapsed hours. If duplicate override
+dates are supplied, the first entry wins consistently with window replacement.

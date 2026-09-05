@@ -55,7 +55,7 @@ defmodule ExBooking.Schedule do
         rule
         |> candidate_dates(from, until)
         |> Enum.flat_map(&expand_date(rule, &1))
-        |> Interval.subtract_all(rule.blackouts)
+        |> Interval.subtract_all(rule.blackouts ++ closed_dates(rule))
         |> Enum.map(&Interval.clip(&1, bounds))
         |> Enum.reject(&is_nil/1)
         |> Interval.merge()
@@ -202,6 +202,18 @@ defmodule ExBooking.Schedule do
     last = local_date(until, tz)
 
     Enum.to_list(Date.range(first, last))
+  end
+
+  defp closed_dates(rule) do
+    rule.overrides
+    |> Enum.uniq_by(& &1.date)
+    |> Enum.flat_map(fn
+      %{date: date, windows: []} ->
+        expand_window(%{start_time: ~T[00:00:00], end_time: ~T[00:00:00]}, date, rule.timezone)
+
+      _ ->
+        []
+    end)
   end
 
   defp expand_date(rule, date) do

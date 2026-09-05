@@ -177,4 +177,31 @@ defmodule ExBooking.ScheduleTest do
       end
     end
   end
+
+  test "closed dates suppress overnight spill across both spring DST transitions" do
+    fixtures = [{"Europe/Stockholm", ~D[2026-03-29]}, {"America/New_York", ~D[2026-03-08]}]
+
+    for {zone, closed} <- fixtures do
+      previous = Date.add(closed, -1)
+
+      schedule =
+        rule(
+          timezone: zone,
+          windows: [
+            %{
+              weekday: Date.day_of_week(previous),
+              start_time: ~T[22:00:00],
+              end_time: ~T[04:00:00]
+            }
+          ],
+          overrides: [%{date: closed, windows: []}]
+        )
+
+      from = utc(closed, ~T[00:00:00], zone)
+      until = utc(Date.add(closed, 1), ~T[00:00:00], zone)
+      assert {:ok, []} = Schedule.expand(schedule, from, until)
+      assert {:ok, [before]} = Schedule.expand(schedule, utc(previous, ~T[21:00:00], zone), until)
+      assert before.end_at == from
+    end
+  end
 end
