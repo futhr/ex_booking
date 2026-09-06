@@ -28,8 +28,8 @@ All of `mix check` must pass before a PR is reviewed. Coverage is gated at 95%.
 `mix verify.package` builds a temporary Hex archive, checks a fresh production
 consumer and executes packaged notebook setup and examples. It needs registry
 access (or populated Hex caches), `tar`, and the current `mix`/`elixir` on PATH.
-Weekly CI runs both security audits; Dependabot proposes Mix and action updates
-for review. Update PRs still require the full gate.
+Weekly CI runs both security audits. Dependency and GitHub Actions updates are
+maintained manually and require the full gate.
 
 ## Testing
 
