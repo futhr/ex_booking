@@ -303,3 +303,8 @@ Progress: 22/22 findings completed.
 - [x] A20: Consolidate validation and precise public types (SP.01/SP.02).
 - [x] A21: Expand behavioral properties (SP.07).
 - [x] A22: Package, notebook, benchmark, and maintenance evidence (SP.07).
+
+## Audit regression traceability
+
+- [x] Verify each logical finding A02–A17 has a discriminating regression; extend
+  public-facade and boundary coverage, record mutation evidence, and run SP.07 gates.

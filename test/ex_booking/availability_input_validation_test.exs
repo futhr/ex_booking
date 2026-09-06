@@ -269,6 +269,7 @@ defmodule ExBooking.AvailabilityInputValidationTest do
     end
   end
 
+  @tag audit_finding: "A02"
   test "duplicate resource identity cannot multiply pool capacity" do
     resource = resource()
 
@@ -281,6 +282,7 @@ defmodule ExBooking.AvailabilityInputValidationTest do
              )
   end
 
+  @tag audit_finding: "A13"
   test "standalone availability rejects malformed options and nil preferred ids" do
     assert {:error, {:invalid, :horizon, :not_increasing}} =
              ExBooking.Availability.assemble(meeting_type(), [resource()], [rule()],

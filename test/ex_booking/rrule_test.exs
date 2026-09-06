@@ -183,6 +183,7 @@ defmodule ExBooking.RRuleTest do
              ]
     end
 
+    @tag audit_finding: "A08"
     test "skips a Stockholm gap without consuming COUNT" do
       {:ok, dtstart} = DateTime.new(~D[2026-03-28], ~T[02:30:00], "Europe/Stockholm")
 
@@ -214,6 +215,7 @@ defmodule ExBooking.RRuleTest do
     end
   end
 
+  @tag audit_finding: "A04"
   test "large weekly intervals terminate within a one-day horizon" do
     task =
       Task.async(fn ->
@@ -231,6 +233,7 @@ defmodule ExBooking.RRuleTest do
     assert first.start_at == @dtstart
   end
 
+  @tag audit_finding: "A07"
   test "biweekly BYDAY is anchored to Monday rather than DTSTART weekday" do
     assert {:ok, intervals} =
              RRule.expand(
@@ -245,6 +248,7 @@ defmodule ExBooking.RRuleTest do
              [~D[2026-07-15], ~D[2026-07-27], ~D[2026-07-29], ~D[2026-08-10]]
   end
 
+  @tag audit_finding: "A08"
   test "COUNT and UNTIL cannot be combined" do
     assert {:error, {:invalid, :rrule, :count_and_until}} =
              RRule.parse("FREQ=DAILY;COUNT=2;UNTIL=20260715T090000Z")
@@ -259,6 +263,7 @@ defmodule ExBooking.RRuleTest do
              )
   end
 
+  @tag audit_finding: "A08"
   test "New York spring gap does not consume COUNT" do
     {:ok, start} = DateTime.new(~D[2026-03-07], ~T[02:30:00], "America/New_York")
 
@@ -275,6 +280,7 @@ defmodule ExBooking.RRuleTest do
              [~U[2026-03-07 07:30:00Z], ~U[2026-03-09 06:30:00Z]]
   end
 
+  @tag audit_finding: "A07"
   property "weekly expansion matches a calendar-day reference with absolute COUNT" do
     check all(
             start_offset <- integer(0..6),
@@ -306,6 +312,7 @@ defmodule ExBooking.RRuleTest do
     end
   end
 
+  @tag audit_finding: "A08"
   property "daily COUNT counts valid local times across both spring DST gaps" do
     check all(count <- integer(2..9), duration <- integer(1..90)) do
       for {zone, start_date} <- [
@@ -329,6 +336,25 @@ defmodule ExBooking.RRuleTest do
           assert DateTime.diff(occurrence.end_at, occurrence.start_at, :second) == duration * 60
         end
       end
+    end
+  end
+
+  @tag audit_finding: "A04"
+  test "sparse weekly rules with and without BYDAY stop at empty horizons without COUNT" do
+    for suffix <- ["", ";BYDAY=MO"] do
+      task =
+        Task.async(fn ->
+          RRule.expand(
+            "FREQ=WEEKLY;INTERVAL=100000000" <> suffix,
+            @dtstart,
+            30,
+            ~U[2026-07-14 00:00:00Z],
+            ~U[2026-07-15 00:00:00Z]
+          )
+        end)
+
+      result = Task.yield(task, 1000) || Task.shutdown(task, :brutal_kill)
+      assert {:ok, {:ok, []}} = result
     end
   end
 end

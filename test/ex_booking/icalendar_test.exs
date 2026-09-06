@@ -139,6 +139,7 @@ defmodule ExBooking.ICalendarTest do
     end
   end
 
+  @tag audit_finding: "A15"
   test "empty FREEBUSY periods are malformed even when marked FREE" do
     for values <- ["", ",,", ",20260713T090000Z/PT30M", "20260713T090000Z/PT30M,"],
         property <- ["FREEBUSY", "FREEBUSY;FBTYPE=FREE"] do

@@ -437,6 +437,7 @@ defmodule ExBooking.AvailabilityTest do
     end
   end
 
+  @tag audit_finding: "A03"
   test "collective preferences cannot remove a required busy resource" do
     slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
     resources = [%{resource() | id: "a"}, %{resource([slot]) | id: "b"}]
@@ -451,6 +452,7 @@ defmodule ExBooking.AvailabilityTest do
              )
   end
 
+  @tag audit_finding: "A17"
   property "consecutive reservations do not consume seats simultaneously" do
     check all(split <- integer(1..29)) do
       slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
@@ -486,6 +488,7 @@ defmodule ExBooking.AvailabilityTest do
     end
   end
 
+  @tag audit_finding: "A17"
   test "pool capacity remains available across both spring gaps" do
     for {zone, date} <- [
           {"Europe/Stockholm", ~D[2026-03-29]},
@@ -521,5 +524,73 @@ defmodule ExBooking.AvailabilityTest do
                  now: ~U[2026-03-01 00:00:00Z]
                )
     end
+  end
+
+  @tag audit_finding: "A10"
+  test "availability deduplicates equivalent timestamp precision in one and pool modes" do
+    windows = [%{weekday: 1, start_time: ~T[09:00:00], end_time: ~T[10:00:00]}]
+    precise = [%{weekday: 1, start_time: ~T[09:00:00.000000], end_time: ~T[10:00:00.000000]}]
+    resources = [%{resource() | id: "a"}, %{resource() | id: "b"}]
+
+    for participants <- [:one, :pool] do
+      assert {:ok, slots} =
+               Availability.assemble(
+                 meeting_type(participants: participants),
+                 resources,
+                 [rule(windows: windows), rule(windows: precise)],
+                 @horizon
+               )
+
+      assert Enum.map(slots, &DateTime.to_unix(&1.start_at, :microsecond)) ==
+               Enum.map(
+                 [~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:15:00Z], ~U[2026-07-13 09:30:00Z]],
+                 &DateTime.to_unix(&1, :microsecond)
+               )
+    end
+  end
+
+  @tag audit_finding: "A17"
+  test "pool capacity sums simultaneous consumption and clips buffered boundaries" do
+    slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+
+    reservations = [
+      reservation(~U[2026-07-13 08:00:00Z], ~U[2026-07-13 09:10:00Z], 2),
+      reservation(~U[2026-07-13 09:05:00Z], ~U[2026-07-13 10:00:00Z], 3)
+    ]
+
+    pooled = %{resource() | capacity: 6, reservations: reservations}
+    meeting = meeting_type(participants: :pool, capacity_required: 2)
+
+    assert {:error, _} =
+             Availability.validate(request(slot), meeting, [pooled], [rule()], now: @now)
+
+    assert :ok =
+             Availability.validate(
+               request(slot),
+               %{meeting | capacity_required: 1},
+               [pooled],
+               [rule()],
+               now: @now
+             )
+
+    boundary = %{
+      resource()
+      | capacity: 2,
+        reservations: [
+          reservation(~U[2026-07-13 08:00:00Z], ~U[2026-07-13 08:55:00Z], 2)
+        ]
+    }
+
+    buffered = meeting_type(participants: :pool, buffers: %{before_min: 5, after_min: 0})
+    assert :ok = Availability.validate(request(slot), buffered, [boundary], [rule()], now: @now)
+
+    assert {:error, _} =
+             Availability.validate(
+               request(slot),
+               %{buffered | buffers: %{before_min: 6, after_min: 0}},
+               [boundary],
+               [rule()],
+               now: @now
+             )
   end
 end

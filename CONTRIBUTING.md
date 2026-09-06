@@ -40,6 +40,11 @@ maintained manually and require the full gate.
   corpus in `test/support/dst_fixtures.ex` (spring-forward and fall-back for
   at least `Europe/Stockholm` and `America/New_York`).
 
+The September audit regressions are individually traceable in
+[SP.07](docs/specs/SP.07-validation.md#audit-regression-traceability). Run all
+of them with `mix test --only audit_finding`, or one finding with
+`mix test --only audit_finding:A10`.
+
 ## Commit style
 
 Conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`); releases

@@ -747,6 +747,7 @@ defmodule ExBookingTest do
     Interval.new!(start_utc, DateTime.add(start_utc, 30, :minute))
   end
 
+  @tag audit_finding: "A06"
   test "alternatives retain preferred resource constraints" do
     slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
     unavailable = Interval.new!(slot.start_at, ~U[2026-07-13 11:00:00Z])
@@ -775,6 +776,7 @@ defmodule ExBookingTest do
     end
   end
 
+  @tag audit_finding: "A10"
   test "holds compare UTC instants rather than timestamp display precision" do
     slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
 
@@ -803,6 +805,7 @@ defmodule ExBookingTest do
              )
   end
 
+  @tag audit_finding: "A13"
   test "lifecycle options reject malformed lists and empty identities" do
     for opts <- [:bad, [:bad], [now: @now, now: @now]] do
       assert {:error, {:invalid, :opts, _}} =
@@ -820,5 +823,116 @@ defmodule ExBookingTest do
                  Keyword.put(opts, :now, @now)
                )
     end
+  end
+
+  @tag audit_finding: "A02"
+  test "duplicate resources are rejected by decision and reschedule entry points" do
+    request =
+      build(:request, slot: Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z]))
+
+    resource = build(:resource)
+    resources = [resource, resource]
+    rules = List.duplicate(build(:rule), 2)
+    meeting = build(:meeting_type, participants: :pool, capacity_required: 2)
+
+    assert {:error, {:invalid, :resource_id, {:duplicate, "res_1"}}} =
+             ExBooking.decide(request, meeting, resources, rules, now: @now)
+
+    assert {:error, {:invalid, :resource_id, {:duplicate, "res_1"}}} =
+             ExBooking.reschedule(request.slot, request, meeting, resources, rules, now: @now)
+  end
+
+  @tag audit_finding: "A03"
+  test "accepted collective decisions keep every participant despite preferences" do
+    request =
+      build(:request,
+        slot: Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z]),
+        preferred_resource_ids: ["a"]
+      )
+
+    resources = [build(:resource, id: "a"), build(:resource, id: "b")]
+
+    assert {:ok, %{status: :ok, resource_ids: ["a", "b"]}} =
+             ExBooking.decide(
+               request,
+               build(:meeting_type, participants: :collective),
+               resources,
+               List.duplicate(build(:rule), 2),
+               now: @now
+             )
+  end
+
+  @tag audit_finding: "A06"
+  test "pool and collective alternatives revalidate for decisions and reschedules" do
+    slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+    blocked = Interval.new!(slot.start_at, ~U[2026-07-13 11:00:00Z])
+    request = build(:request, slot: slot, preferred_resource_ids: ["a"])
+    opts = [now: @now, from: slot.start_at, until: ~U[2026-07-13 12:00:00Z]]
+    rules = List.duplicate(build(:rule), 2)
+
+    for mode <- [:pool, :collective] do
+      meeting = build(:meeting_type, participants: mode, capacity_required: 2)
+
+      resources = [
+        build(:resource, id: "a", capacity: 2, busy: if(mode == :pool, do: [blocked], else: [])),
+        build(:resource,
+          id: "b",
+          capacity: 2,
+          busy: if(mode == :collective, do: [blocked], else: [])
+        )
+      ]
+
+      results = [
+        ExBooking.decide(request, meeting, resources, rules, opts),
+        ExBooking.reschedule(slot, request, meeting, resources, rules, opts)
+      ]
+
+      for result <- results do
+        assert {:ok, %{status: :conflict, alternatives: alternatives}} = result
+        assert alternatives != []
+
+        for alternative <- alternatives do
+          assert :ok =
+                   ExBooking.validate_request(
+                     %{request | slot: alternative},
+                     meeting,
+                     resources,
+                     rules,
+                     now: @now
+                   )
+        end
+      end
+    end
+  end
+
+  @tag audit_finding: "A10"
+  test "nearest alternatives distinguish fractional-second distances" do
+    request =
+      build(:request,
+        slot: Interval.new!(~U[2026-07-13 10:00:00.500000Z], ~U[2026-07-13 10:01:00.500000Z])
+      )
+
+    rule =
+      build(:rule,
+        timezone: "Etc/UTC",
+        windows: [
+          %{weekday: 1, start_time: ~T[09:00:00.100000], end_time: ~T[09:01:00.100000]},
+          %{weekday: 1, start_time: ~T[11:00:00.600000], end_time: ~T[11:01:00.600000]}
+        ]
+      )
+
+    assert {:ok, %{alternatives: [closer, farther]}} =
+             ExBooking.decide(
+               request,
+               build(:meeting_type, duration_min: 1, slot_interval_min: 1),
+               [build(:resource)],
+               [rule],
+               now: @now,
+               from: ~U[2026-07-13 08:00:00Z],
+               until: ~U[2026-07-13 12:00:00Z]
+             )
+
+    assert closer.start_at == ~U[2026-07-13 11:00:00.600000Z]
+    assert farther.start_at == ~U[2026-07-13 09:00:00.100000Z]
   end
 end

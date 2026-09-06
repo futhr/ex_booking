@@ -285,6 +285,7 @@ defmodule ExBooking.JSCalendarTest do
     end
   end
 
+  @tag audit_finding: "A05"
   test "rejects recurrence additions and exclusions even on a free base event" do
     base = %{
       "@type" => "Event",
@@ -301,6 +302,16 @@ defmodule ExBooking.JSCalendarTest do
         |> Map.put("freeBusyStatus", status)
 
       assert {:error, {:unsupported, :jscalendar, :recurrence}} = JSCalendar.busy_intervals(event)
+    end
+  end
+
+  @tag audit_finding: "A05"
+  test "cancelled events and nested groups cannot hide unsupported recurrence" do
+    for field <- ["recurrenceRules", "excludedRecurrenceRules", "recurrenceOverrides"] do
+      event = %{"@type" => "Event", "status" => "cancelled", field => %{}}
+      group = %{"@type" => "Group", "entries" => [event]}
+      assert {:error, {:unsupported, :jscalendar, :recurrence}} = JSCalendar.busy_intervals(event)
+      assert {:error, {:unsupported, :jscalendar, :recurrence}} = JSCalendar.busy_intervals(group)
     end
   end
 end

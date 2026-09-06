@@ -226,11 +226,13 @@ defmodule ExBooking.AssignmentTest do
     end
   end
 
+  @tag audit_finding: "A02"
   test "assignment rejects duplicate identities before selection" do
     assert {:error, {:invalid, :resource_id, {:duplicate, "a"}}} =
              winner([resource("a"), resource("a")], participants: :pool, capacity_required: 2)
   end
 
+  @tag audit_finding: "A11"
   test "missing fairness ranks after any supplied magnitude" do
     assert {:ok, [%Resource{id: "b"}]} =
              winner(
@@ -269,6 +271,7 @@ defmodule ExBooking.AssignmentTest do
              )
   end
 
+  @tag audit_finding: "A12"
   test "weighted ranking accepts extreme positive numeric weights" do
     resources = [
       resource("a", %{assignments_count: 2, weight: 1.0e-320}),
@@ -294,17 +297,24 @@ defmodule ExBooking.AssignmentTest do
              )
   end
 
+  @tag audit_finding: "A12"
   test "assignment retains microseconds in recency comparisons" do
-    assert {:ok, [%Resource{id: "b"}]} =
-             winner(
-               [
-                 resource("a", %{last_assigned_at: ~U[2026-07-12 00:00:00.900000Z]}),
-                 resource("b", %{last_assigned_at: ~U[2026-07-12 00:00:00.100000Z]})
-               ],
-               strategy: :least_recently_booked
-             )
+    resources = [
+      resource("a", fairness(last_assigned_at: ~U[2026-07-12 00:00:00.900000Z])),
+      resource("b", fairness(last_assigned_at: ~U[2026-07-12 00:00:00.100000Z]))
+    ]
+
+    for strategy <- [
+          :least_recently_booked,
+          :round_robin,
+          :priority,
+          {:owner_first, owner_id: "absent", fallback: :round_robin}
+        ] do
+      assert {:ok, [%Resource{id: "b"}]} = winner(resources, strategy: strategy)
+    end
   end
 
+  @tag audit_finding: "A13"
   test "standalone assignment validates participant options and resource capacity" do
     for opts <- [
           [participants: :bogus],
@@ -319,6 +329,7 @@ defmodule ExBooking.AssignmentTest do
              winner([%{resource("a") | capacity: 0}], [])
   end
 
+  @tag audit_finding: "A12"
   property "weighted winners minimize proportional load regardless of input order" do
     check all(
             count_a <- integer(0..1_000_000),
@@ -335,6 +346,7 @@ defmodule ExBooking.AssignmentTest do
     end
   end
 
+  @tag audit_finding: "A11"
   property "a missing counter ranks behind every supplied nonnegative count" do
     check all(count <- integer(0..1_000_000), exponent <- integer(0..400)) do
       known = resource("z", %{assignments_count: count * Integer.pow(10, exponent)})

@@ -167,6 +167,7 @@ defmodule ExBooking.SlottingTest do
     end
   end
 
+  @tag audit_finding: "A10"
   property "equal instants deduplicate regardless of display precision" do
     check all(precision <- integer(0..6)) do
       free = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z])
@@ -177,6 +178,7 @@ defmodule ExBooking.SlottingTest do
     end
   end
 
+  @tag audit_finding: "A10"
   test "deduplication preserves distinct fall-back instants in both DST zones" do
     fixtures = [
       {"Europe/Stockholm", ~D[2026-10-25], ~T[02:30:00]},

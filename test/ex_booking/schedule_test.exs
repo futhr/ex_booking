@@ -178,8 +178,14 @@ defmodule ExBooking.ScheduleTest do
     end
   end
 
-  test "closed dates suppress overnight spill across both spring DST transitions" do
-    fixtures = [{"Europe/Stockholm", ~D[2026-03-29]}, {"America/New_York", ~D[2026-03-08]}]
+  @tag audit_finding: "A14"
+  test "closed dates suppress overnight spill across spring and autumn DST transitions" do
+    fixtures = [
+      {"Europe/Stockholm", ~D[2026-03-29]},
+      {"America/New_York", ~D[2026-03-08]},
+      {"Europe/Stockholm", ~D[2026-10-25]},
+      {"America/New_York", ~D[2026-11-01]}
+    ]
 
     for {zone, closed} <- fixtures do
       previous = Date.add(closed, -1)

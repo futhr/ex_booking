@@ -180,6 +180,7 @@ defmodule ExBooking.PolicyTest do
     assert Enum.any?(reasons, &match?({:outside_window, _}, &1))
   end
 
+  @tag audit_finding: "A09"
   test "lead time rejects subsecond shortfalls and allows the exact boundary" do
     now = ~U[2026-07-13 09:00:00.500000Z]
 
@@ -194,6 +195,7 @@ defmodule ExBooking.PolicyTest do
     assert [] = Policy.violations(slot(now), rule(lead_time_min: 0), resource(), now)
   end
 
+  @tag audit_finding: "A09"
   property "every positive subsecond lead-time deficit rejects, while the boundary accepts" do
     check all(lead <- integer(0..1440), deficit <- integer(1..999_999)) do
       boundary = DateTime.add(@now, lead, :minute)

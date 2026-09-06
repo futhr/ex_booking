@@ -257,6 +257,7 @@ defmodule ExBooking.IntervalTest do
     end
   end
 
+  @tag audit_finding: "A16"
   property "set subtraction equals the normalized reference and retains all free time" do
     check all(minuends <- intervals(), subtrahends <- intervals()) do
       expected =
@@ -268,11 +269,13 @@ defmodule ExBooking.IntervalTest do
     end
   end
 
+  @tag audit_finding: "A16"
   test "set subtraction normalizes overlapping minuends" do
     value = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z], meta: %{id: 1})
     assert Interval.subtract_all([value, value], []) == [value]
   end
 
+  @tag audit_finding: "A16"
   test "subtraction preserves elapsed time across both spring DST gaps" do
     for {zone, date} <- [
           {"Europe/Stockholm", ~D[2026-03-29]},
