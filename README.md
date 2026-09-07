@@ -46,7 +46,7 @@ calendar-data normalization easy to test and safe to replay.
 ```elixir
 def deps do
   [
-    {:ex_booking, "~> 0.2.0"}
+    {:ex_booking, "~> 0.2.1"}
   ]
 end
 ```

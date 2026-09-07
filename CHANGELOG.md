@@ -5,6 +5,51 @@ See [Conventional Commits](https://www.conventionalcommits.org) for commit guide
 
 <!-- changelog -->
 
+## [v0.2.1](https://github.com/futhr/ex_booking/compare/v0.2.0...v0.2.1) (2026-09-07)
+
+
+
+
+### Bug Fixes:
+
+* capacity: account for peak concurrent reservations by Tobias Bohwalli
+
+* icalendar: reject empty free-busy periods by Tobias Bohwalli
+
+* schedule: remove overnight spill on closed dates by Tobias Bohwalli
+
+* validation: enforce consistent public option boundaries by Tobias Bohwalli
+
+* assignment: compare exact weights and precise timestamps by Tobias Bohwalli
+
+* assignment: rank missing fairness without numeric sentinels by Tobias Bohwalli
+
+* time: compare and deduplicate slots by exact instants by Tobias Bohwalli
+
+* policy: preserve precision at lead-time boundaries by Tobias Bohwalli
+
+* rrule: skip DST gaps and reject conflicting bounds by Tobias Bohwalli
+
+* rrule: anchor weekly intervals to Monday by Tobias Bohwalli
+
+* decisions: retain request constraints in alternatives by Tobias Bohwalli
+
+* jscalendar: reject unsupported recurrence before filtering by Tobias Bohwalli
+
+* rrule: bound traversal and jump between active weeks by Tobias Bohwalli
+
+* availability: preserve collective participant requirements by Tobias Bohwalli
+
+* resources: reject duplicate identities before allocation by Tobias Bohwalli
+
+* security: update Mint and enforce Hex advisory audit by Tobias Bohwalli
+
+* types: resolve membership dialyzer findings by futhr
+
+### Performance Improvements:
+
+* interval: subtract normalized sets with a linear sweep by Tobias Bohwalli
+
 ## Unreleased
 
 ### Changed
