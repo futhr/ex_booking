@@ -39,6 +39,10 @@ defmodule ExBooking.ICalendar do
   """
   @spec free_busy(ics()) :: {:ok, [Interval.t()]} | {:error, term()}
   def free_busy(ics) when is_binary(ics) do
+    if String.valid?(ics), do: parse_ics(ics), else: {:error, {:invalid, :freebusy, :encoding}}
+  end
+
+  defp parse_ics(ics) do
     values =
       ics
       |> unfold()
@@ -70,14 +74,30 @@ defmodule ExBooking.ICalendar do
   end
 
   defp period_values(line) do
-    case String.split(line, ":", parts: 2) do
-      [property, values] ->
-        type = fbtype(property)
-        {:ok, Enum.map(String.split(values, ","), &{&1, type})}
-
-      _ ->
-        {:error, {:invalid, :freebusy, :property}}
+    with {:ok, [_ | parameters], values} <- header_parts(line, false, [], []),
+         {:ok, type} <- fbtype(parameters) do
+      {:ok, Enum.map(String.split(values, ","), &{&1, type})}
     end
+  end
+
+  defp header_parts(<<>>, _, _, _), do: {:error, {:invalid, :freebusy, :property}}
+
+  defp header_parts(<<?", rest::binary>>, quoted?, part, parts),
+    do: header_parts(rest, not quoted?, [?" | part], parts)
+
+  defp header_parts(<<?;, rest::binary>>, false, part, parts),
+    do: header_parts(rest, false, [], [header_part(part) | parts])
+
+  defp header_parts(<<?:, rest::binary>>, false, part, parts),
+    do: {:ok, Enum.reverse([header_part(part) | parts]), rest}
+
+  defp header_parts(<<byte, rest::binary>>, quoted?, part, parts),
+    do: header_parts(rest, quoted?, [byte | part], parts)
+
+  defp header_part(bytes) do
+    bytes
+    |> Enum.reverse()
+    |> :erlang.list_to_binary()
   end
 
   defp collect_period_values(lines) do
@@ -95,19 +115,35 @@ defmodule ExBooking.ICalendar do
     end
   end
 
-  defp fbtype(property) do
-    property
-    |> String.split(";")
-    |> Enum.drop(1)
-    |> Enum.find_value(:busy, &fbtype_parameter/1)
-  end
+  defp fbtype(parameters) do
+    result = Enum.reduce_while(parameters, {:ok, nil}, &fbtype_parameter/2)
 
-  defp fbtype_parameter(parameter) do
-    case String.split(parameter, "=", parts: 2) do
-      [name, value] -> if String.upcase(name) == "FBTYPE", do: normalize_fbtype(value)
-      _ -> nil
+    case result do
+      {:ok, nil} -> {:ok, :busy}
+      result -> result
     end
   end
+
+  defp fbtype_parameter(parameter, {:ok, type}) do
+    case String.split(parameter, "=", parts: 2) do
+      [name, value] when name != "" and value != "" ->
+        validate_parameter(String.upcase(name), value, type)
+
+      _ ->
+        {:halt, {:error, {:invalid, :freebusy, :property}}}
+    end
+  end
+
+  defp validate_parameter("FBTYPE", value, nil) do
+    if Regex.match?(~r/\A[A-Za-z0-9-]+\z/, value),
+      do: {:cont, {:ok, normalize_fbtype(value)}},
+      else: {:halt, {:error, {:invalid, :freebusy, :property}}}
+  end
+
+  defp validate_parameter("FBTYPE", _, _),
+    do: {:halt, {:error, {:invalid, :freebusy, :property}}}
+
+  defp validate_parameter(_, _, type), do: {:cont, {:ok, type}}
 
   defp normalize_fbtype(value) do
     if String.upcase(value) == "FREE", do: :free, else: :busy
@@ -203,9 +239,9 @@ defmodule ExBooking.ICalendar do
   defp parse_duration_part(value), do: String.to_integer(value)
 
   defp add_duration(start_at, seconds) do
-    {:ok, DateTime.add(start_at, seconds, :second)}
-  rescue
-    _ -> {:error, {:invalid, :freebusy, :duration}}
+    if seconds <= DateTime.diff(~U[9999-12-31 23:59:59Z], start_at, :second),
+      do: {:ok, DateTime.add(start_at, seconds, :second)},
+      else: {:error, {:invalid, :freebusy, :duration}}
   end
 
   defp parse_date(<<year::binary-size(4), month::binary-size(2), day::binary-size(2)>>) do

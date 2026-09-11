@@ -147,4 +147,48 @@ defmodule ExBooking.ICalendarTest do
                ExBooking.ICalendar.free_busy(property <> ":" <> values)
     end
   end
+
+  test "rejects repeated FBTYPE instead of discarding ambiguous busy time" do
+    for parameters <- [
+          "FBTYPE=FREE;FBTYPE=BUSY",
+          "FBTYPE=BUSY;fbtype=FREE",
+          "FBTYPE=FREE;FBTYPE=FREE"
+        ] do
+      assert {:error, {:invalid, :freebusy, :property}} =
+               ExBooking.import_ics_free_busy("FREEBUSY;#{parameters}:20260713T090000Z/PT30M")
+    end
+  end
+
+  test "quoted extension values cannot split headers or introduce FBTYPE" do
+    for parameters <- [
+          ~s(X-URL="https://example.test/a;b,c"),
+          ~s(X-NOTE="ignored;FBTYPE=FREE:still ignored"),
+          ~s(X-NOTE="ignored";FBTYPE=BUSY;X-NOTE="again")
+        ] do
+      assert {:ok, [busy]} =
+               ICalendar.free_busy("FREEBUSY;#{parameters}:20260713T090000Z/PT30M")
+
+      assert busy.start_at == ~U[2026-07-13 09:00:00Z]
+      assert busy.end_at == ~U[2026-07-13 09:30:00Z]
+    end
+  end
+
+  test "rejects malformed headers and invalid text encoding" do
+    for parameters <- [~s(X-NOTE="unclosed), "FBTYPE", "FBTYPE=", ";FBTYPE=BUSY"] do
+      assert {:error, {:invalid, :freebusy, :property}} =
+               ICalendar.free_busy("FREEBUSY;#{parameters}:20260713T090000Z/PT30M")
+    end
+
+    assert {:error, {:invalid, :freebusy, :encoding}} = ICalendar.free_busy(<<255>>)
+  end
+
+  test "duration endpoints remain representable and the final second is allowed" do
+    for period <- ["20260713T090000Z/PT99999999999999999999S", "99991231T235959Z/PT1S"] do
+      assert {:error, {:invalid, :freebusy, :duration}} =
+               ICalendar.free_busy("FREEBUSY:" <> period)
+    end
+
+    assert {:ok, [busy]} = ICalendar.free_busy("FREEBUSY:99991231T235958Z/PT1S")
+    assert busy.end_at == ~U[9999-12-31 23:59:59Z]
+  end
 end

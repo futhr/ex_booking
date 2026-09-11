@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: medium
   created: "2026-07-08"
-  updated: "2026-09-05"
+  updated: "2026-09-11"
   tags: ["rrule", "ics", "jscalendar", "interop"]
   depends_on: ["R.02", "SP.01", "SP.03"]
 ---
@@ -92,6 +92,11 @@ Constraints:
 - unrecognized `FBTYPE` tokens are treated as busy as the kernel's conservative
   normalization rule;
 - other property parameters are accepted and ignored;
+- quoted parameter values may contain colons, semicolons and commas without
+  changing the property/value boundary or the FREEBUSY type;
+- FBTYPE may occur at most once, case-insensitively; repeated FBTYPE, malformed
+  parameter shapes and unclosed quotes return `{:invalid, :freebusy, :property}`;
+- input must be valid UTF-8; invalid bytes return `{:invalid, :freebusy, :encoding}`;
 - malformed properties without the required `:` value separator fail as
   `{:invalid, :freebusy, :property}`;
 - malformed periods fail explicitly.
@@ -100,6 +105,11 @@ Property and parameter names and registered token values are matched
 case-insensitively. Period syntax is validated even for `FBTYPE=FREE`, then the
 free periods are discarded. The helper returns merged, sorted `Interval` values
 with `kind: :busy`.
+
+Duration endpoints must remain within the four-digit calendar year range
+`0000..9999`. Check the maximum elapsed duration before datetime arithmetic;
+overflow returns the existing `{:invalid, :freebusy, :duration}` error. This
+is a representability boundary, not an arbitrary limit on calendar input size.
 
 ## `ExBooking.JSCalendar`
 
