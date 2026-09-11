@@ -11,6 +11,9 @@ background material, not normative contracts. Normative behavior lives in
 R.01  market/kernel rationale
 R.02  standards interop spike
 R.03  post-build kernel audit
+R.04  availability performance profile
+R.05  September audit
+R.06  production hardening and consumer evidence
 ```
 
 ## Documents
@@ -22,6 +25,12 @@ R.03  post-build kernel audit
 - `R.03-post-build-kernel-audit.md` — records the audit that added rejected-slot
   alternatives and pure lifecycle transition helpers while keeping orchestration
   concerns out.
+- `R.04-availability-performance-profile.md` — records measured availability
+  costs and the earlier optimization decisions.
+- `R.05-september-audit.md` — records the preceding correctness and maintenance
+  audit; R.06 continues from the resulting 0.2.1 source.
+- [R.06-production-hardening.md](R.06-production-hardening.md) — records boundary
+  reproductions, fixes, dependency/runtime consumers and comparable measurements.
 
 ## How To Use Research
 

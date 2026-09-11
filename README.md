@@ -105,8 +105,8 @@ request = %ExBooking.Request{
 :ok = decision.status
 [%ExBooking.Event{type: :booking_confirmed}] = decision.events
 [
-  {:calendar_event, :create, _payload},
-  {:notify, :booking_confirmation, _payload},
+  {:calendar_event, :create, payload},
+  {:notify, :booking_confirmation, payload},
   {:emit, _event}
 ] = decision.intents
 ```

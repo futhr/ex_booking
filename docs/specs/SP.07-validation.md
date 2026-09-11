@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-07-08"
-  updated: "2026-09-06"
+  updated: "2026-09-11"
   tags: ["tests", "quality-gates", "coverage", "properties"]
   depends_on: ["SP.03"]
 ---
@@ -107,6 +107,22 @@ Generators include arbitrary seconds and microseconds. Clock-grid properties pro
 `mix verify.package`, included in `mix check --no-retry` and every CI runtime-matrix job, builds and extracts an actual Hex archive into temporary directories. A fresh production consumer resolves only the runtime dependencies, compiles and exercises timezone-aware availability and decisions, and verifies the application dependency list and absence of an application callback. Packaged notebooks are required. Their actual setup cells run in fresh Elixir processes before every example and saved output is checked. Identical setup sources may share a process. The archive/local-source setup branch is executed; the released-version branch is pin-checked and its registry contents remain release-specific hosted evidence. Temporary artifacts are removed on success or failure.
 
 ## Performance and maintenance evidence
+
+`mix verify.package --matrix` additionally exercises isolated archive consumers
+with the repository's lock, freshly resolved dependencies, the selected compatible
+minimum direct runtime versions (`tz 0.28.0`, `nimble_options 1.1.0`), and optional
+Mint/CAStore dependencies present. The ordinary consumer checks their absence.
+The matrix must never rewrite the repository lockfile or override incompatible
+dependency constraints. Every consumer runs the README quick start and boundary
+regressions against extracted package code. This samples compatible dependency
+sets; it is not an exhaustive proof of every permitted transitive combination.
+README example evaluation must produce no compiler diagnostics.
+
+For changed hot paths, `mix run bench/hardening.exs` supplies prebuilt, identical
+inputs outside timed work, runs one worker, and records elapsed time and cumulative
+process allocation separately. Compare the baseline and changed source on the
+same runtime without another test, build or benchmark workload running. Timing
+ratios are local evidence and are never assertions in correctness tests.
 
 A full benchmark run uses 2 seconds of warmup, 5 seconds of timing, and 1 second of memory measurement per scenario. The tracked report is produced only by full runs. Smoke output is ignored and separate. Scenarios must return successful nonempty results before timing; the JSCalendar Group fixture uses the standard entries array. Recorded input construction is part of workload cost. Weekly CI checks security independently of new commits. Mix and GitHub Actions version updates are maintained manually and require the full gate. Hosted workflow execution, registry publication and release provenance cannot be certified by local gates.
 

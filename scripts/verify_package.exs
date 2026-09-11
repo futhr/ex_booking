@@ -25,7 +25,16 @@ defmodule ExBooking.PackageVerification do
       command!("mix", ["hex.build", "--output", archive], source)
       command!("tar", ["-xf", archive, "-C", package], temporary)
       command!("tar", ["-xzf", "contents.tar.gz"], package)
-      verify_consumer!(consumer, package)
+
+      modes =
+        if "--matrix" in System.argv(), do: [:locked, :fresh, :minimum, :optional], else: [:fresh]
+
+      Enum.each(modes, fn mode ->
+        directory = Path.join(consumer, Atom.to_string(mode))
+        File.mkdir!(directory)
+        verify_consumer!(directory, package, mode)
+      end)
+
       verify_notebooks!(package, temporary)
       IO.puts("Packaged consumer and all notebook setup/example cells verified.")
     after
@@ -33,19 +42,31 @@ defmodule ExBooking.PackageVerification do
     end
   end
 
-  defp verify_consumer!(consumer, package) do
+  defp verify_consumer!(consumer, package, mode) do
     File.write!(Path.join(consumer, "mix.exs"), """
     defmodule PackageConsumer.MixProject do
       use Mix.Project
       def project do
         [app: :package_consumer, version: "0.0.0",
-         deps: [{:ex_booking, path: #{inspect(package)}}]]
+         deps: [{:ex_booking, path: #{inspect(package)}}#{consumer_dependencies(mode)}]]
       end
     end
     """)
 
+    if mode == :locked,
+      do: File.cp!(Path.expand("../mix.lock", __DIR__), Path.join(consumer, "mix.lock"))
+
+    [_, quick_start] =
+      File.read!(Path.join(package, "README.md")) |> String.split("## Quick Start", parts: 2)
+
+    [_, example] = Regex.run(~r/```elixir\n(.*?)\n```/s, quick_start)
+    File.write!(Path.join(consumer, "readme_example.exs"), example)
+
     File.write!(Path.join(consumer, "verify.exs"), """
     Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
+    #{mode == :optional} = Code.ensure_loaded?(Mint.HTTP)
+    #{mode == :optional} = Code.ensure_loaded?(CAStore)
+    false = Code.ensure_loaded?(Jason)
     expected = [:elixir, :kernel, :logger, :nimble_options, :stdlib, :tz]
     ^expected = :ex_booking |> Application.spec(:applications) |> Enum.sort()
     [] = Application.spec(:ex_booking, :mod)
@@ -63,12 +84,34 @@ defmodule ExBooking.PackageVerification do
       invitee_timezone: "America/New_York"}
     {:ok, %ExBooking.Decision{status: :ok, resource_ids: ["host"]}} =
       ExBooking.decide(request, meeting, [resource], [rule], now: now)
-    IO.puts("Fresh production consumer passed.")
+    {_, []} = Code.with_diagnostics(fn -> Code.require_file("readme_example.exs", __DIR__) end)
+    {:error, {:invalid, :freebusy, :property}} = ExBooking.import_ics_free_busy(
+      "FREEBUSY;FBTYPE=FREE;FBTYPE=BUSY:20260713T090000Z/PT30M")
+    {:error, {:invalid, :jscalendar, :duration}} = ExBooking.import_jscalendar_busy(%{
+      "@type" => "Event", "start" => "9999-12-31T23:59:59",
+      "timeZone" => "Etc/UTC", "duration" => "P99999999999999999D"})
+    {:error, {:invalid, :rrule, :part}} = ExBooking.RRule.parse("FREQ=DAILY;")
+    invalid = %{now | month: 13}
+    {:error, {:invalid, :now, ^invalid}} = ExBooking.available_slots(meeting, [], [],
+      now: invalid, from: now, until: first.start_at)
+    versions = for app <- [:tz, :nimble_options, :mint, :castore],
+      do: {app, Application.spec(app, :vsn)}
+    IO.inspect(versions, label: "#{mode} consumer dependencies")
+    IO.puts("#{mode} production consumer and README quick start passed.")
     """)
 
     command!("mix", ["deps.get"], consumer, [{"MIX_ENV", "prod"}])
-    command!("mix", ["run", "verify.exs"], consumer, [{"MIX_ENV", "prod"}])
+    command!("mix", ["compile", "--warnings-as-errors"], consumer, [{"MIX_ENV", "prod"}])
+    command!("mix", ["run", "--no-compile", "verify.exs"], consumer, [{"MIX_ENV", "prod"}])
   end
+
+  defp consumer_dependencies(:minimum),
+    do: ~s(, {:tz, "== 0.28.0"}, {:nimble_options, "== 1.1.0"})
+
+  defp consumer_dependencies(:optional),
+    do: ~s(, {:mint, "~> 1.6"}, {:castore, "~> 1.0"})
+
+  defp consumer_dependencies(_), do: ""
 
   defp verify_notebooks!(package, temporary) do
     notebooks = Path.wildcard(Path.join(package, "notebooks/*.livemd"))

@@ -158,3 +158,7 @@ code as it exists and the contracts it must keep.
 - `R.01` — booking-space and kernel rationale.
 - `R.02` — standards interop spike.
 - `R.03` — post-build kernel audit.
+- `R.04` — availability performance profile.
+- `R.05` — September correctness and maintenance audit.
+- [R.06](research/R.06-production-hardening.md) — production hardening findings,
+  resolutions, runtime/package verification and comparable measurements.

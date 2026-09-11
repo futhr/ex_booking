@@ -18,8 +18,8 @@ Legend:
 
 ## September 11 production hardening
 
-Progress: 6/7 batches verified. The audit reproductions describe existing defects;
-the unchecked items below are planned fixes, not completion claims.
+Progress: 7/7 batches verified. The [findings and resolution report](../research/R.06-production-hardening.md)
+records reproductions, commit evidence, measurements and remaining limitations.
 
 - [x] Validate temporal fields before arithmetic across intervals, options,
   schedule windows/overrides, daily counts, fairness, holds and recurrence (SP.02/SP.03).
@@ -31,7 +31,7 @@ the unchecked items below are planned fixes, not completion claims.
 - [x] Preflight supplied hold shape before availability rejection (SP.05).
 - [x] Correct snapshot, metadata, precision and grid documentation; retain
   executable evidence for existing non-divisor clock steps (SP.00/SP.02/SP.03/SP.05).
-- [ ] Verify final archive consumers with locked, fresh and compatible minimum
+- [x] Verify final archive consumers with locked, fresh and compatible minimum
   runtime dependencies, optional timezone dependencies present/absent, runtime
   matrix, notebooks, complete gate and comparable hot-path measurements (SP.07).
 
