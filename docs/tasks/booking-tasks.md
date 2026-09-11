@@ -18,14 +18,14 @@ Legend:
 
 ## September 11 production hardening
 
-Progress: 2/7 batches verified. The audit reproductions describe existing defects;
+Progress: 3/7 batches verified. The audit reproductions describe existing defects;
 the unchecked items below are planned fixes, not completion claims.
 
 - [x] Validate temporal fields before arithmetic across intervals, options,
   schedule windows/overrides, daily counts, fairness, holds and recurrence (SP.02/SP.03).
 - [x] Parse ICS quoted parameters, reject ambiguous FBTYPE and malformed encoding,
   and bound duration arithmetic (SP.06).
-- [ ] Validate native JSCalendar keys and exact tokens, bound duration arithmetic,
+- [x] Validate native JSCalendar keys and exact tokens, bound duration arithmetic,
   and traverse nested Groups without repeated merges (SP.06).
 - [ ] Reject empty RRULE parts and BYDAY elements (SP.06).
 - [ ] Preflight supplied hold shape before availability rejection (SP.05).

@@ -149,6 +149,25 @@ is deliberately different from availability-window gap snapping.
 JSON decoding, complete JSCalendar recurrence support, provider-specific shapes,
 and calendar transport belong in consumer/adaptor repositories.
 
+Each supported Event/Group must be a plain map whose keys are valid UTF-8
+strings. Atom/string aliases are rejected as `{:invalid, :jscalendar, :object}`,
+never converted or silently defaulted. The consumer's JSON decoder must reject
+duplicate raw JSON keys before constructing a map; the kernel cannot recover
+discarded duplicates. Native values are consumed directly without encoding them.
+Duration and LocalDateTime tokens must match the entire string, including its end.
+
+Calendar-day additions are checked against `9999-12-31` before `Date.add/2`;
+elapsed additions and normalized UTC starts/ends must stay within years
+`0000..9999`. An unrepresentable start uses `:start`; an unrepresentable duration
+uses `:duration` in the existing JSCalendar invalid-input error. Valid fractional
+precision, zero durations, and DST day-versus-elapsed semantics remain unchanged.
+
+Nested Groups are visited depth first in entries order using an explicit work
+stack. Each Event is parsed once and all intervals are merged once at the end.
+The first malformed entry is returned without partial success. This avoids
+copying and sorting every descendant interval at every Group ancestor. There is
+no kernel-imposed nesting or input-size limit; consumers bound decoded input size.
+
 ## Sources
 
 - R.02 (standards and ecosystem research).

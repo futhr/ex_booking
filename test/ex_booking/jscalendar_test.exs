@@ -2,6 +2,7 @@ defmodule ExBooking.JSCalendarTest do
   @moduledoc false
 
   use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias ExBooking.JSCalendar
 
@@ -312,6 +313,111 @@ defmodule ExBooking.JSCalendarTest do
       group = %{"@type" => "Group", "entries" => [event]}
       assert {:error, {:unsupported, :jscalendar, :recurrence}} = JSCalendar.busy_intervals(event)
       assert {:error, {:unsupported, :jscalendar, :recurrence}} = JSCalendar.busy_intervals(group)
+    end
+  end
+
+  test "rejects atom keys, ambiguous aliases and non-UTF8 keys before defaults" do
+    base = %{
+      "@type" => "Event",
+      "start" => "2026-07-13T09:00:00",
+      "timeZone" => "Etc/UTC"
+    }
+
+    for key <- [:duration, <<255>>] do
+      event = Map.put(base, key, "PT30M")
+
+      assert {:error, {:invalid, :jscalendar, :object}} = JSCalendar.busy_intervals(event)
+
+      assert {:error, {:invalid, :jscalendar, :object}} =
+               JSCalendar.busy_intervals(Map.put(event, "duration", "PT0S"))
+    end
+  end
+
+  test "duration parsing requires the entire token" do
+    event = %{
+      "@type" => "Event",
+      "start" => "2026-07-13T09:00:00",
+      "timeZone" => "Etc/UTC",
+      "duration" => "PT30M\n"
+    }
+
+    assert {:error, {:invalid, :jscalendar, :duration}} = JSCalendar.busy_intervals(event)
+  end
+
+  test "checks duration bounds before calendar arithmetic" do
+    base = %{
+      "@type" => "Event",
+      "start" => "9999-12-31T23:59:59",
+      "timeZone" => "Etc/UTC"
+    }
+
+    for duration <- ["PT1S", "P1D", "PT99999999999999999999S", "P99999999999999999D"] do
+      assert {:error, {:invalid, :jscalendar, :duration}} =
+               JSCalendar.busy_intervals(Map.put(base, "duration", duration))
+    end
+
+    assert {:ok, [busy]} =
+             JSCalendar.busy_intervals(Map.put(base, "duration", "PT0.999999S"))
+
+    assert busy.end_at == ~U[9999-12-31 23:59:59.999999Z]
+  end
+
+  test "nested traversal preserves the first error in entry order" do
+    first = %{"@type" => "Event", "duration" => "bad"}
+    second = %{"@type" => "Task"}
+
+    assert {:error, {:invalid, :jscalendar, :event}} =
+             JSCalendar.busy_intervals(%{
+               "@type" => "Group",
+               "entries" => [%{"@type" => "Group", "entries" => [first]}, second]
+             })
+  end
+
+  test "calendar-day durations preserve both zones' spring and autumn transitions" do
+    for {zone, start, hours} <- [
+          {"Europe/Stockholm", "2026-03-28T09:00:00", 23},
+          {"America/New_York", "2026-03-07T09:00:00", 23},
+          {"Europe/Stockholm", "2026-10-24T09:00:00", 25},
+          {"America/New_York", "2026-10-31T09:00:00", 25}
+        ] do
+      event = %{"@type" => "Event", "start" => start, "timeZone" => zone, "duration" => "P1D"}
+      assert {:ok, [busy]} = JSCalendar.busy_intervals(event)
+      assert DateTime.diff(busy.end_at, busy.start_at, :hour) == hours
+    end
+  end
+
+  test "rejects starts whose timezone offset leaves the four-digit UTC year range" do
+    for {zone, start} <- [
+          {"Etc/GMT-1", "0000-01-01T00:00:00"},
+          {"Etc/GMT+1", "9999-12-31T23:59:59"}
+        ] do
+      event = %{"@type" => "Event", "start" => start, "timeZone" => zone, "duration" => "PT1S"}
+      assert {:error, {:invalid, :jscalendar, :start}} = JSCalendar.busy_intervals(event)
+    end
+  end
+
+  property "group nesting preserves the complete busy union" do
+    check all(offsets <- list_of(integer(0..120), min_length: 1, max_length: 40)) do
+      events =
+        Enum.map(offsets, fn offset ->
+          %{
+            "@type" => "Event",
+            "start" =>
+              ~N[2026-07-13 09:00:00]
+              |> NaiveDateTime.add(offset, :minute)
+              |> NaiveDateTime.to_iso8601(),
+            "timeZone" => "Etc/UTC",
+            "duration" => "PT30M"
+          }
+        end)
+
+      nested =
+        Enum.reduce(events, %{"@type" => "Group", "entries" => []}, fn event, group ->
+          %{"@type" => "Group", "entries" => [event, group]}
+        end)
+
+      assert JSCalendar.busy_intervals(nested) ==
+               JSCalendar.busy_intervals(%{"@type" => "Group", "entries" => events})
     end
   end
 end

@@ -49,36 +49,38 @@ defmodule ExBooking.JSCalendar do
 
   """
   @spec busy_intervals(object()) :: {:ok, [Interval.t()]} | {:error, term()}
-  def busy_intervals(%{"@type" => "Event"} = event), do: event_interval(event)
+  def busy_intervals(object), do: parse_entries([[object]], [])
 
-  def busy_intervals(%{"@type" => "Group", "entries" => entries}) do
-    entries
-    |> normalize_entries()
-    |> parse_entries()
+  defp parse_entries([], intervals), do: {:ok, Interval.merge(Enum.reverse(intervals))}
+  defp parse_entries([[] | rest], intervals), do: parse_entries(rest, intervals)
+
+  defp parse_entries([[entry | entries] | rest], intervals) do
+    if valid_object?(entry),
+      do: parse_entry(entry, [entries | rest], intervals),
+      else: {:error, {:invalid, :jscalendar, :object}}
   end
 
-  def busy_intervals(%{"@type" => type}), do: {:error, {:unsupported, :jscalendar, type}}
-  def busy_intervals(_), do: {:error, {:invalid, :jscalendar, :object}}
+  defp valid_object?(object) when is_map(object) and not is_struct(object) do
+    Enum.all?(Map.keys(object), &(is_binary(&1) and String.valid?(&1)))
+  end
 
-  defp normalize_entries(entries) when is_list(entries), do: entries
-  defp normalize_entries(_), do: :invalid
+  defp valid_object?(_), do: false
 
-  defp parse_entries(:invalid), do: {:error, {:invalid, :jscalendar, :entries}}
-
-  defp parse_entries(entries) do
-    result =
-      Enum.reduce_while(entries, {:ok, []}, fn entry, {:ok, acc} ->
-        case busy_intervals(entry) do
-          {:ok, intervals} -> {:cont, {:ok, intervals ++ acc}}
-          {:error, reason} -> {:halt, {:error, reason}}
-        end
-      end)
-
-    case result do
-      {:ok, intervals} -> {:ok, Interval.merge(intervals)}
-      {:error, reason} -> {:error, reason}
+  defp parse_entry(%{"@type" => "Event"} = event, rest, intervals) do
+    with {:ok, parsed} <- event_interval(event) do
+      parse_entries(rest, Enum.reverse(parsed, intervals))
     end
   end
+
+  defp parse_entry(%{"@type" => "Group", "entries" => entries}, rest, intervals)
+       when is_list(entries),
+       do: parse_entries([entries | rest], intervals)
+
+  defp parse_entry(%{"@type" => "Group", "entries" => _}, _, _),
+    do: {:error, {:invalid, :jscalendar, :entries}}
+
+  defp parse_entry(%{"@type" => type}, _, _), do: {:error, {:unsupported, :jscalendar, type}}
+  defp parse_entry(_, _, _), do: {:error, {:invalid, :jscalendar, :object}}
 
   defp event_interval(event)
        when is_map_key(event, "recurrenceRules") or is_map_key(event, "excludedRecurrenceRules") or
@@ -96,6 +98,7 @@ defmodule ExBooking.JSCalendar do
   defp event_interval(%{"start" => start_value, "timeZone" => timezone} = event)
        when is_binary(start_value) and is_binary(timezone) do
     with {:ok, start_at} <- parse_local_datetime(start_value, timezone),
+         :ok <- validate_start_range(start_at),
          {:ok, duration} <- parse_duration(Map.get(event, "duration", "PT0S")),
          {:ok, end_at} <- add_duration(start_at, duration, timezone) do
       build_interval(start_at, end_at)
@@ -131,7 +134,7 @@ defmodule ExBooking.JSCalendar do
   end
 
   defp valid_local_datetime_format?(value) do
-    Regex.match?(~r/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?$/, value) and
+    Regex.match?(~r/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?\z/, value) and
       canonical_fraction?(fraction(value))
   end
 
@@ -164,7 +167,7 @@ defmodule ExBooking.JSCalendar do
 
   defp parse_duration(value) when is_binary(value) do
     pattern =
-      ~r/^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)(?:\.(\d{1,6}))?S)?)?$/
+      ~r/\AP(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)(?:\.(\d{1,6}))?S)?)?\z/
 
     case Regex.run(pattern, value) do
       nil ->
@@ -218,23 +221,47 @@ defmodule ExBooking.JSCalendar do
   end
 
   defp add_duration(start_at, %{days: 0, microseconds: microseconds}, _) do
-    {:ok, add_elapsed(start_at, microseconds)}
+    add_elapsed(start_at, microseconds)
   end
 
   defp add_duration(start_at, %{days: days, microseconds: microseconds}, timezone) do
+    start_date = DateTime.to_date(start_at)
+
+    if days <= Date.diff(~D[9999-12-31], start_date),
+      do: add_calendar_days(start_at, days, microseconds, timezone),
+      else: {:error, {:invalid, :jscalendar, :duration}}
+  end
+
+  defp add_calendar_days(start_at, days, microseconds, timezone) do
     start_date = DateTime.to_date(start_at)
     shifted_date = Date.add(start_date, days)
     local_time = DateTime.to_time(start_at)
 
     with {:ok, day_shifted} <- resolve_datetime(shifted_date, local_time, timezone) do
-      {:ok, add_elapsed(day_shifted, microseconds)}
+      add_elapsed(day_shifted, microseconds)
     end
   end
 
-  defp add_elapsed(datetime, microseconds) when rem(microseconds, 1_000_000) == 0,
+  defp validate_start_range(datetime) do
+    if DateTime.compare(datetime, ~U[0000-01-01 00:00:00Z]) != :lt and
+         DateTime.compare(datetime, ~U[9999-12-31 23:59:59.999999Z]) != :gt,
+       do: :ok,
+       else: {:error, {:invalid, :jscalendar, :start}}
+  end
+
+  defp add_elapsed(datetime, microseconds) do
+    remaining = DateTime.diff(~U[9999-12-31 23:59:59.999999Z], datetime, :microsecond)
+
+    if microseconds <= remaining,
+      do: {:ok, add_elapsed_valid(datetime, microseconds)},
+      else: {:error, {:invalid, :jscalendar, :duration}}
+  end
+
+  defp add_elapsed_valid(datetime, microseconds) when rem(microseconds, 1_000_000) == 0,
     do: DateTime.add(datetime, div(microseconds, 1_000_000), :second)
 
-  defp add_elapsed(datetime, microseconds), do: DateTime.add(datetime, microseconds, :microsecond)
+  defp add_elapsed_valid(datetime, microseconds),
+    do: DateTime.add(datetime, microseconds, :microsecond)
 
   defp build_interval(start_at, end_at) do
     if DateTime.compare(start_at, end_at) == :lt do
