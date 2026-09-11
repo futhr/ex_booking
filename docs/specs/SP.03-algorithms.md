@@ -100,6 +100,14 @@ Supported alignment:
   minute boundary (`second == 0` and `microsecond == {0, 0}`); a free interval
   beginning at `09:07:30` on a 15-minute grid first offers `09:15:00`.
 
+Clock alignment uses midnight UTC on the date containing the free interval's
+start as its initial anchor, then advances by exactly `step_min`. It does not
+reset at later midnights. For steps that do not divide 1,440 minutes, the phase
+therefore moves relative to later midnights: a seven-minute grid starting after
+23:57 first offers 00:02, then 00:09. Separate free intervals establish their own
+initial anchors. This describes existing behavior; a daily reset would be a
+separate public contract decision.
+
 Output is sorted by `start_at` and de-duplicated by start time by callers that
 merge resource results.
 

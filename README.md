@@ -58,6 +58,11 @@ application:
 config :elixir, :time_zone_database, Tz.TimeZoneDatabase
 ```
 
+The declared Elixir requirement is `~> 1.18`; CI covers Elixir 1.18/OTP 28,
+1.19/OTP 28, and 1.20/OTP 29. The runtime dependencies are `tz` and
+`nimble_options`. Timezone lookup works without `tz`'s optional Mint/CAStore
+HTTP dependencies. Timezone downloading and updates belong to the consumer.
+
 ## Quick Start
 
 ```elixir
@@ -156,6 +161,11 @@ ExBooking deliberately stops at decisions. Your application remains responsible
 for persistence, transactions, auth, tenancy, UI, calendar sync, notifications,
 CRM enrichment, routing forms, analytics, payments, retries, webhooks, and AI.
 
+A decision does not reserve capacity. Revalidate and persist against a coherent
+snapshot in your transaction. Retain the original rules, resource facts, policies,
+scorer and timezone data versions when you need to explain or replay a decision;
+the result contains ids and outcomes, not a complete input snapshot.
+
 That split is the point: keep reusable booking math in one deterministic library,
 and keep product-specific orchestration in the product.
 
@@ -176,6 +186,13 @@ The interop modules are intentionally small:
 
 Provider auth, transport, JSON decoding, full recurrence sync, and calendar
 writeback belong outside this package.
+
+Decoded JSCalendar objects use string keys. Configure the JSON decoder to reject
+duplicate keys before constructing maps; the kernel cannot detect duplicates
+already discarded by a decoder. Calendar duration endpoints must fit years
+0000–9999. Consumers remain responsible for bounding input sizes and search
+horizons. Returned intervals and events are native Elixir values; this library
+does not define a JSON encoder or wire format.
 
 ## Benchmarks
 

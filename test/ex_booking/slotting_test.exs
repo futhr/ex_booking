@@ -100,6 +100,24 @@ defmodule ExBooking.SlottingTest do
   end
 
   describe "slotting properties" do
+    property "clock steps keep their initial phase for arbitrary positive steps" do
+      check all(step <- integer(1..2_000), duration <- integer(1..120)) do
+        midnight = ~U[2026-07-13 00:00:00Z]
+        start = ~U[2026-07-13 23:57:00.000001Z]
+        free = Interval.new!(start, DateTime.add(start, 4, :day))
+        slots = Slotting.generate_slots(free, duration, step, align: :clock)
+        assert length(slots) >= 2
+
+        for slot <- slots do
+          assert rem(DateTime.diff(slot.start_at, midnight, :microsecond), step * 60_000_000) == 0
+          assert Interval.contains?(free, slot)
+        end
+
+        first = hd(slots).start_at
+        assert DateTime.compare(DateTime.add(first, -step, :minute), start) == :lt
+      end
+    end
+
     property "every slot fits inside its free interval" do
       check all(free <- interval(), {duration_min, step_min} <- duration_and_step()) do
         for slot <- Slotting.generate_slots(free, duration_min, step_min) do

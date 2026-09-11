@@ -85,8 +85,8 @@ structural invariants:
 ```text
 request.meeting_type_id == meeting_type.id
 request.slot is a valid Interval
-DateTime.diff(request.slot.end_at, request.slot.start_at, :second)
-  == meeting_type.duration_min * 60
+DateTime.diff(request.slot.end_at, request.slot.start_at, :microsecond)
+  == meeting_type.duration_min * 60_000_000
 ```
 
 Failure returns a tagged `{:invalid, _, _}` error. These failures are not
@@ -201,7 +201,7 @@ rejected. In particular, `:hold` is accepted only by `decide/5`, while
         existing :: ExBooking.Interval.t(),
         ExBooking.MeetingType.t(),
         keyword()
-      ) :: {:ok, %{allowed?: boolean(), reason: atom() | nil}}
+      ) :: {:ok, %{allowed?: boolean(), reason: atom() | nil}} | {:error, term()}
 ```
 
 Pure policy check against `cancellation_policy` and `:now`. Refund/fee semantics

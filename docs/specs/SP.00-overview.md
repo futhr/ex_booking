@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: critical
   created: "2026-07-08"
-  updated: "2026-07-29"
+  updated: "2026-09-11"
   tags: ["scope", "boundary", "purity", "determinism"]
   depends_on: ["R.01"]
 ---
@@ -63,9 +63,13 @@ or product-specific orchestration. They must not be implemented in this repo:
 - generic reservation-system behavior such as rooms, equipment, inventory,
   waitlists, quota credits, or check-in/out.
 
-A consumer may store any product-specific fields in `meta`, `metadata`, or
-`routing_context`. The kernel must round-trip those fields without interpreting
-product semantics.
+A consumer may store product-specific fields in `meta`, `metadata`, or
+`routing_context`. The kernel does not interpret their product semantics.
+Operations returning resources retain resource metadata; interval operations
+follow the metadata rules in SP.03. Requests' routing context is passed unchanged
+to scorers and accepted events. Request metadata and meeting metadata are not
+automatically copied into decisions or event payloads. Consumers retain original
+inputs when they need those fields later.
 
 ## Purity Contract
 

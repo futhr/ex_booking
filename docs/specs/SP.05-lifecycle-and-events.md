@@ -142,10 +142,18 @@ invitee contact data at execution time rather than persisting it in an intent.
 
 ## Snapshotting
 
-A `Decision` embeds everything in force at decision time (slot, resources,
-meeting type id, pool seat allocations, reasons). Consumers persist the
-decision alongside the booking so later disputes ("why was this resource
-chosen?") are answerable without replaying rules that have since changed.
+A `Decision` records the selected slot, resource ids, meeting type id, pool seat
+allocations, reasons, events and intents. It does not embed the resource structs,
+rules, fairness counters, meeting policies, request metadata, scorer implementation,
+or timezone database version. A decision alone cannot explain or reproduce all
+assignment choices. Consumers needing replay or audit evidence must retain those
+inputs and versions alongside the decision, from a coherent snapshot.
+
+Decision creation does not reserve capacity or commit a transaction. Consumers
+must atomically revalidate and persist against their authoritative state, including
+removal of an old reservation and insertion of its replacement on reschedule.
+Returned intents are data; their order provides no rollback or exactly-once
+execution guarantee. Identity/shape checks are consistency checks, not authentication.
 
 ## Alternatives
 

@@ -7,6 +7,10 @@ defmodule ExBooking.Slotting do
   grid starts at the free interval boundary, while `align: :clock` snaps to
   UTC clock boundaries such as `:00`, `:15`, `:30`, and `:45`.
 
+  Clock alignment anchors the first start to midnight UTC on the free interval's
+  starting date, then advances by the exact step without resetting at midnight.
+  Steps that do not divide a day retain that initial phase across later dates.
+
   ## Example
 
       iex> free = ExBooking.Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 10:00:00Z])

@@ -254,6 +254,27 @@ defmodule ExBookingTest do
   end
 
   describe "decide/5" do
+    test "routing context retains native types through the scorer and emitted event" do
+      context = %{"integer" => 1, "float" => 1.0, "false" => false, "null" => nil, "array" => []}
+      slot = build(:interval, end_at: ~U[2026-07-13 09:30:00Z])
+      request = build(:request, slot: slot, routing_context: context)
+
+      scorer = fn _, received ->
+        if received === context, do: 1, else: :changed_context
+      end
+
+      assert {:ok, decision} =
+               ExBooking.decide(request, build(:meeting_type), [build(:resource)], [build(:rule)],
+                 now: @now,
+                 scorer: scorer
+               )
+
+      assert decision.status == :ok
+      assert hd(decision.events).routing_context === context
+      assert {:emit, event} = List.last(decision.intents)
+      assert event.routing_context === context
+    end
+
     test "malformed hold shapes cannot be hidden by availability rejection" do
       slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
       meeting = %ExBooking.MeetingType{id: "intro", duration_min: 30}
