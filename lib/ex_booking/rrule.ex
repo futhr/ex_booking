@@ -97,8 +97,9 @@ defmodule ExBooking.RRule do
   def expand(rrule, %DateTime{} = dtstart, duration_min, %DateTime{} = from, %DateTime{} = until) do
     with :ok <- validate_datetimes([dtstart, from, until]),
          :ok <- validate_expand_inputs(duration_min, from, until),
-         {:ok, rule} <- coerce_rule(rrule) do
-      {:ok, expand_rule(rule, dtstart, duration_min, from, until)}
+         {:ok, rule} <- coerce_rule(rrule),
+         {:ok, local_until} <- local_horizon(until, dtstart.time_zone) do
+      {:ok, expand_rule(rule, dtstart, duration_min, {from, until, local_until})}
     end
   end
 
@@ -107,9 +108,11 @@ defmodule ExBooking.RRule do
   defp normalize("RRULE:" <> value), do: value
   defp normalize(value), do: value
 
+  defp split_parts(""), do: []
+
   defp split_parts(value) do
     value
-    |> String.split(";", trim: true)
+    |> String.split(";")
     |> Enum.map(&String.split(&1, "=", parts: 2))
   end
 
@@ -175,7 +178,7 @@ defmodule ExBooking.RRule do
   defp parse_byday(value, :weekly) do
     days =
       value
-      |> String.split(",", trim: true)
+      |> String.split(",")
       |> Enum.map(&Map.get(@weekdays, &1))
 
     if days != [] and Enum.all?(days, &is_integer/1) do
@@ -253,12 +256,19 @@ defmodule ExBooking.RRule do
     end
   end
 
-  defp expand_rule(rule, dtstart, duration_min, from, until) do
+  defp local_horizon(until, timezone) do
+    case DateTime.shift_zone(until, timezone) do
+      {:ok, local_until} -> {:ok, local_until}
+      {:error, _} -> {:error, {:invalid, :rrule, :arguments}}
+    end
+  end
+
+  defp expand_rule(rule, dtstart, duration_min, {from, until, local_until}) do
     utc_from = DateTime.shift_zone!(from, "Etc/UTC")
     utc_until = DateTime.shift_zone!(until, "Etc/UTC")
 
     rule
-    |> occurrence_stream(dtstart, until)
+    |> occurrence_stream(dtstart, local_until)
     |> Stream.reject(&is_nil/1)
     |> Stream.take_while(&within_rule_bounds?(&1, rule, until))
     |> Stream.with_index(1)
@@ -272,12 +282,8 @@ defmodule ExBooking.RRule do
     |> Enum.sort_by(& &1.start_at, DateTime)
   end
 
-  defp occurrence_stream(rule, dtstart, horizon_until) do
-    last_date =
-      horizon_until
-      |> DateTime.shift_zone!(dtstart.time_zone)
-      |> DateTime.to_date()
-
+  defp occurrence_stream(rule, dtstart, local_until) do
+    last_date = DateTime.to_date(local_until)
     last_offset = Date.diff(last_date, DateTime.to_date(dtstart))
 
     rule

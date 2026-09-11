@@ -12,6 +12,26 @@ defmodule ExBooking.RRuleTest do
   @from ~U[2026-07-13 00:00:00Z]
   @until ~U[2026-07-20 00:00:00Z]
 
+  test "rejects empty recurrence parts and weekday elements" do
+    for rule <- ["FREQ=DAILY;", ";FREQ=DAILY", "FREQ=DAILY;;COUNT=1"] do
+      assert {:error, {:invalid, :rrule, :part}} = RRule.parse(rule)
+    end
+
+    for days <- ["MO,", ",MO", "MO,,WE"] do
+      assert {:error, {:invalid, :rrule, :byday}} = RRule.parse("FREQ=WEEKLY;BYDAY=" <> days)
+    end
+
+    assert {:error, {:invalid, :rrule, :freq}} = RRule.parse("")
+    assert {:error, {:invalid, :rrule, :freq}} = RRule.parse("RRULE:")
+  end
+
+  test "an unresolved DTSTART zone returns an argument error" do
+    invalid = %{@dtstart | time_zone: "Missing/Zone"}
+
+    assert {:error, {:invalid, :rrule, :arguments}} =
+             RRule.expand("FREQ=DAILY", invalid, 30, @from, @until)
+  end
+
   describe "parse/1" do
     test "parses the supported weekly subset" do
       assert {:ok, rule} = RRule.parse("RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4;BYDAY=MO,WE")

@@ -18,7 +18,7 @@ Legend:
 
 ## September 11 production hardening
 
-Progress: 3/7 batches verified. The audit reproductions describe existing defects;
+Progress: 4/7 batches verified. The audit reproductions describe existing defects;
 the unchecked items below are planned fixes, not completion claims.
 
 - [x] Validate temporal fields before arithmetic across intervals, options,
@@ -27,7 +27,7 @@ the unchecked items below are planned fixes, not completion claims.
   and bound duration arithmetic (SP.06).
 - [x] Validate native JSCalendar keys and exact tokens, bound duration arithmetic,
   and traverse nested Groups without repeated merges (SP.06).
-- [ ] Reject empty RRULE parts and BYDAY elements (SP.06).
+- [x] Reject empty RRULE parts and BYDAY elements; check DTSTART zone conversion (SP.06).
 - [ ] Preflight supplied hold shape before availability rejection (SP.05).
 - [ ] Correct snapshot, metadata, precision and grid documentation; retain
   executable evidence for existing non-divisor clock steps (SP.00/SP.02/SP.03/SP.05).

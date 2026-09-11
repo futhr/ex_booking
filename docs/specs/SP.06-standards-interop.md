@@ -62,6 +62,13 @@ sorted by `start_at` and clipped to an increasing UTC-comparable horizon.
 Unsupported parts fail as `{:unsupported, :rrule, part}` rather than being
 ignored.
 
+Empty semicolon-separated parts return `{:invalid, :rrule, :part}`; empty
+comma-separated BYDAY elements return `{:invalid, :rrule, :byday}`. An entirely
+empty rule retains its existing `:freq` error. The DTSTART zone must resolve when
+converting the supplied horizon, otherwise expansion returns
+`{:invalid, :rrule, :arguments}`. The checked conversion is reused for the local
+date bound; it is not repeated solely for validation.
+
 Full RFC 5545 recurrence semantics (`RDATE`, `EXDATE`, `BYSETPOS`, `WKST`,
 `VTIMEZONE`, local recurrence sets) are adapter-layer concerns unless a future
 repo task explicitly expands this module.
