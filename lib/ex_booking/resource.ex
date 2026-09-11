@@ -17,6 +17,7 @@ defmodule ExBooking.Resource do
 
   alias ExBooking.Interval
   alias ExBooking.Reservation
+  alias ExBooking.Temporal
 
   @enforce_keys [:id, :timezone]
   defstruct [
@@ -104,7 +105,7 @@ defmodule ExBooking.Resource do
   defp invalid_fairness?({:assignments_count, value}), do: not is_integer(value) or value < 0
 
   defp invalid_fairness?({:last_assigned_at, value}),
-    do: value != nil and not is_struct(value, DateTime)
+    do: value != nil and not Temporal.datetime?(value)
 
   defp invalid_fairness?({:weight, value}), do: not is_number(value) or value <= 0
   defp invalid_fairness?({:priority, value}), do: not is_integer(value)

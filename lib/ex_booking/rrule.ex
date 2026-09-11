@@ -23,6 +23,7 @@ defmodule ExBooking.RRule do
   """
 
   alias ExBooking.Interval
+  alias ExBooking.Temporal
 
   @weekdays %{
     "MO" => 1,
@@ -94,7 +95,8 @@ defmodule ExBooking.RRule do
   @spec expand(String.t() | t(), DateTime.t(), pos_integer(), DateTime.t(), DateTime.t()) ::
           {:ok, [Interval.t()]} | {:error, term()}
   def expand(rrule, %DateTime{} = dtstart, duration_min, %DateTime{} = from, %DateTime{} = until) do
-    with :ok <- validate_expand_inputs(duration_min, from, until),
+    with :ok <- validate_datetimes([dtstart, from, until]),
+         :ok <- validate_expand_inputs(duration_min, from, until),
          {:ok, rule} <- coerce_rule(rrule) do
       {:ok, expand_rule(rule, dtstart, duration_min, from, until)}
     end
@@ -213,8 +215,16 @@ defmodule ExBooking.RRule do
   defp validate_optional_positive(value, field), do: validate_positive(value, field)
 
   defp validate_optional_datetime(nil), do: :ok
-  defp validate_optional_datetime(%DateTime{}), do: :ok
-  defp validate_optional_datetime(_), do: {:error, {:invalid, :rrule, :until}}
+
+  defp validate_optional_datetime(value) do
+    if Temporal.datetime?(value), do: :ok, else: {:error, {:invalid, :rrule, :until}}
+  end
+
+  defp validate_datetimes(values) do
+    if Enum.all?(values, &Temporal.datetime?/1),
+      do: :ok,
+      else: {:error, {:invalid, :rrule, :arguments}}
+  end
 
   defp validate_rule_byday(nil, _), do: {:ok, nil}
   defp validate_rule_byday(_, :daily), do: {:error, {:unsupported, :rrule, :byday}}

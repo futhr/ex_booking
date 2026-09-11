@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: critical
   created: "2026-07-08"
-  updated: "2026-09-05"
+  updated: "2026-09-11"
   tags: ["api", "facade", "options", "error-vocabulary"]
   depends_on: ["R.01", "SP.01"]
 ---
@@ -49,6 +49,15 @@ errors, `{:invalid, :hold, detail}`, and `{:invalid, :scorer_result, detail}`.
 The `detail` identifies the offending value or indexed nested field. These tags
 are public vocabulary; malformed nested data never becomes a conflict or gets
 silently ignored.
+
+Temporal validation checks calendar date/time fields, microsecond shape and range,
+and datetime offset/zone field types, not merely the struct tag. Invalid datetime
+endpoints reuse `:datetime_required`; malformed `:now`, `:from`, or `:until`
+options return `{:invalid, field, value}` before comparison. Nested dates and
+times reuse their owning field's error. Valid custom calendars remain supported
+through their Calendar callbacks; callback implementation failures are programming
+errors, not malformed-data errors. These checks do not authenticate timezone
+offsets or caller facts against an external source.
 
 The nested-validation vocabulary is exactly:
 

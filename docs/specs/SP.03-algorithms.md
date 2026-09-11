@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: critical
   created: "2026-07-08"
-  updated: "2026-09-05"
+  updated: "2026-09-11"
   tags: ["interval", "schedule", "availability", "slotting", "policy"]
   depends_on: ["SP.01"]
 ---
@@ -60,6 +60,10 @@ the SP.02 tagged malformed-input vocabulary and never reach timezone conversion
 or window expansion.
 
 Wall-time resolution is fixed:
+
+Window times and override dates must also have valid calendar fields. A malformed
+time such as hour 25 must be rejected during validation, never discarded as a
+collapsed DST window. Only valid windows collapsed by gap resolution may vanish.
 
 ```text
 DateTime.new(date, time, timezone)

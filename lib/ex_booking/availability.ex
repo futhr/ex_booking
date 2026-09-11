@@ -42,6 +42,7 @@ defmodule ExBooking.Availability do
   alias ExBooking.Resource
   alias ExBooking.Schedule
   alias ExBooking.Slotting
+  alias ExBooking.Temporal
 
   @assemble_opts NimbleOptions.new!(
                    now: [type: {:struct, DateTime}, required: true],
@@ -289,7 +290,8 @@ defmodule ExBooking.Availability do
         rules,
         %DateTime{} = now
       ) do
-    with :ok <- validate_request_shape(request, meeting_type),
+    with {:ok, _} <- Options.validate([now: now], @now_opts),
+         :ok <- validate_request_shape(request, meeting_type),
          {:ok, pairs} <- validated_pairs(resources, rules) do
       pairs
       |> candidates(request.preferred_resource_ids, meeting_type.participants)
@@ -613,7 +615,7 @@ defmodule ExBooking.Availability do
 
   defp validate_daily_counts(id, counts) when is_map(counts) and not is_struct(counts) do
     case Enum.find(counts, fn {date, count} ->
-           not is_struct(date, Date) or not is_integer(count) or count < 0
+           not Temporal.date?(date) or not is_integer(count) or count < 0
          end) do
       nil -> :ok
       invalid -> {:error, {:invalid, :daily_booking_counts, {id, invalid}}}

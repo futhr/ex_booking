@@ -16,6 +16,25 @@ Legend:
 [-] delegated / not an in-repo task
 ```
 
+## September 11 production hardening
+
+Progress: 1/7 batches verified. The audit reproductions describe existing defects;
+the unchecked items below are planned fixes, not completion claims.
+
+- [x] Validate temporal fields before arithmetic across intervals, options,
+  schedule windows/overrides, daily counts, fairness, holds and recurrence (SP.02/SP.03).
+- [ ] Parse ICS quoted parameters, reject ambiguous FBTYPE and malformed encoding,
+  and bound duration arithmetic (SP.06).
+- [ ] Validate native JSCalendar keys and exact tokens, bound duration arithmetic,
+  and traverse nested Groups without repeated merges (SP.06).
+- [ ] Reject empty RRULE parts and BYDAY elements (SP.06).
+- [ ] Preflight supplied hold shape before availability rejection (SP.05).
+- [ ] Correct snapshot, metadata, precision and grid documentation; retain
+  executable evidence for existing non-divisor clock steps (SP.00/SP.02/SP.03/SP.05).
+- [ ] Verify final archive consumers with locked, fresh and compatible minimum
+  runtime dependencies, optional timezone dependencies present/absent, runtime
+  matrix, notebooks, complete gate and comparable hot-path measurements (SP.07).
+
 ## Operating Rules
 
 ```text

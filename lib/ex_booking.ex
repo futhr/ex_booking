@@ -53,6 +53,7 @@ defmodule ExBooking do
   alias ExBooking.Request
   alias ExBooking.Resource
   alias ExBooking.RRule
+  alias ExBooking.Temporal
 
   @search_opts NimbleOptions.new!(
                  now: [type: {:struct, DateTime}, required: true],
@@ -731,8 +732,11 @@ defmodule ExBooking do
   defp validate_hold_meeting_type_id(_),
     do: {:error, {:invalid, :hold, {:invalid, :meeting_type_id}}}
 
-  defp validate_hold_expiry(%DateTime{}), do: :ok
-  defp validate_hold_expiry(_), do: {:error, {:invalid, :hold, {:invalid, :expires_at}}}
+  defp validate_hold_expiry(value) do
+    if Temporal.datetime?(value),
+      do: :ok,
+      else: {:error, {:invalid, :hold, {:invalid, :expires_at}}}
+  end
 
   defp hold_mismatch(hold, request, meeting_type, resource_ids) do
     cond do

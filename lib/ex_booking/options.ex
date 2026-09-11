@@ -1,6 +1,8 @@
 defmodule ExBooking.Options do
   @moduledoc "Shared option validation for the booking kernel's public boundaries."
 
+  alias ExBooking.Temporal
+
   @doc """
   Validates keyword shape, schema, and common identity/context fields.
 
@@ -44,6 +46,10 @@ defmodule ExBooking.Options do
   defp invalid_field?({:resource_ids, ids}) when is_list(ids), do: Enum.any?(ids, &(&1 == ""))
   defp invalid_field?({:release_hold_id, id}), do: id == ""
   defp invalid_field?({:routing_context, context}), do: is_struct(context)
+
+  defp invalid_field?({key, %DateTime{} = value}) when key in [:now, :from, :until],
+    do: not Temporal.datetime?(value)
+
   defp invalid_field?(_), do: false
 
   @doc """
@@ -57,7 +63,9 @@ defmodule ExBooking.Options do
   @spec validate_horizon(term(), :required | :optional) :: :ok | {:error, term()}
   def validate_horizon(opts, requirement) when is_list(opts) do
     if Keyword.keyword?(opts) do
-      validate_keyword_horizon(opts, requirement)
+      with {:ok, opts} <- validate_fields(opts) do
+        validate_keyword_horizon(opts, requirement)
+      end
     else
       {:error, {:invalid, :opts, :not_a_keyword_list}}
     end

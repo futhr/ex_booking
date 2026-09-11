@@ -24,6 +24,7 @@ defmodule ExBooking.Schedule do
 
   alias ExBooking.AvailabilityRule
   alias ExBooking.Interval
+  alias ExBooking.Temporal
 
   @utc "Etc/UTC"
   @timezone_validation_instant ~U[2026-01-01 00:00:00Z]
@@ -167,8 +168,17 @@ defmodule ExBooking.Schedule do
   defp validate_overrides(overrides),
     do: {:error, {:invalid, :overrides, {:not_a_list, overrides}}}
 
-  defp validate_override(%{date: %Date{}, windows: windows}, override_index)
+  defp validate_override(%{date: %Date{} = date, windows: windows} = override, override_index)
        when is_list(windows) do
+    if Temporal.date?(date),
+      do: validate_override_windows(windows, override_index),
+      else: {:error, {:invalid, :overrides, {:entry, override_index, override}}}
+  end
+
+  defp validate_override(override, index),
+    do: {:error, {:invalid, :overrides, {:entry, index, override}}}
+
+  defp validate_override_windows(windows, override_index) do
     windows
     |> Enum.with_index()
     |> Enum.reduce_while(:ok, fn {window, window_index}, :ok ->
@@ -181,19 +191,14 @@ defmodule ExBooking.Schedule do
     end)
   end
 
-  defp validate_override(override, index),
-    do: {:error, {:invalid, :overrides, {:entry, index, override}}}
-
-  defp weekly_window?(%{
-         weekday: weekday,
-         start_time: %Time{},
-         end_time: %Time{}
-       }),
-       do: is_integer(weekday) and weekday in 1..7
+  defp weekly_window?(%{weekday: weekday} = window),
+    do: is_integer(weekday) and weekday in 1..7 and override_window?(window)
 
   defp weekly_window?(_), do: false
 
-  defp override_window?(%{start_time: %Time{}, end_time: %Time{}}), do: true
+  defp override_window?(%{start_time: start_time, end_time: end_time}),
+    do: Temporal.time?(start_time) and Temporal.time?(end_time)
+
   defp override_window?(_), do: false
 
   defp candidate_dates(rule, from, until) do

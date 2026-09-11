@@ -16,6 +16,8 @@ defmodule ExBooking.Interval do
 
   """
 
+  alias ExBooking.Temporal
+
   @enforce_keys [:start_at, :end_at]
   defstruct [:start_at, :end_at, :kind, :meta]
 
@@ -50,6 +52,16 @@ defmodule ExBooking.Interval do
   def new(start_at, end_at, opts \\ [])
 
   def new(%DateTime{} = start_at, %DateTime{} = end_at, opts) do
+    if Temporal.datetime?(start_at) and Temporal.datetime?(end_at) do
+      new_valid(start_at, end_at, opts)
+    else
+      {:error, {:invalid, :interval, :datetime_required}}
+    end
+  end
+
+  def new(_, _, _), do: {:error, {:invalid, :interval, :datetime_required}}
+
+  defp new_valid(start_at, end_at, opts) do
     start_at = DateTime.shift_zone!(start_at, "Etc/UTC")
     end_at = DateTime.shift_zone!(end_at, "Etc/UTC")
 
@@ -59,8 +71,6 @@ defmodule ExBooking.Interval do
       {:error, {:invalid, :interval, :empty_or_reversed}}
     end
   end
-
-  def new(_, _, _), do: {:error, {:invalid, :interval, :datetime_required}}
 
   @doc """
   Validates a caller-built interval has increasing UTC `DateTime` endpoints.
@@ -80,6 +90,9 @@ defmodule ExBooking.Interval do
           | {:error, {:invalid, :interval, :datetime_required | :empty_or_reversed | :not_utc}}
   def validate(%__MODULE__{start_at: %DateTime{} = start_at, end_at: %DateTime{} = end_at}) do
     cond do
+      not Temporal.datetime?(start_at) or not Temporal.datetime?(end_at) ->
+        {:error, {:invalid, :interval, :datetime_required}}
+
       not utc?(start_at) or not utc?(end_at) ->
         {:error, {:invalid, :interval, :not_utc}}
 
