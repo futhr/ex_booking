@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-07-08"
-  updated: "2026-07-29"
+  updated: "2026-09-11"
   tags: ["lifecycle", "events", "intents", "holds"]
   depends_on: ["R.01", "SP.01"]
 ---
@@ -64,6 +64,13 @@ must be a `DateTime`, and cancellation/reschedule policies must have an exact
 inputs return SP.02 tagged errors and emit no decision, event, or intent.
 
 ### Supplied hold consistency
+
+The supplied hold's shape is checked before availability, including when no
+resource is eligible or a policy would reject the request. An invalid hold must
+return its tagged error instead of being hidden inside a normal rejected
+decision. Shape validation does not check expiry against `now`; the consumer
+retains that responsibility. Assignment-dependent consistency is checked only
+after winners exist, as follows.
 
 After request validation and deterministic assignment, but before building a
 reservation event or intents, `decide/5` validates a supplied hold against the

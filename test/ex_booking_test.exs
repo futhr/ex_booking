@@ -254,6 +254,42 @@ defmodule ExBookingTest do
   end
 
   describe "decide/5" do
+    test "malformed hold shapes cannot be hidden by availability rejection" do
+      slot = Interval.new!(~U[2026-07-13 09:00:00Z], ~U[2026-07-13 09:30:00Z])
+      meeting = %ExBooking.MeetingType{id: "intro", duration_min: 30}
+
+      request = %ExBooking.Request{
+        meeting_type_id: "intro",
+        invitee_timezone: "Etc/UTC",
+        slot: slot
+      }
+
+      hold = %ExBooking.Hold{
+        id: "hold",
+        slot: slot,
+        resource_ids: ["a"],
+        meeting_type_id: "intro",
+        expires_at: ~U[2026-07-13 08:00:00Z]
+      }
+
+      resource = %ExBooking.Resource{id: "a", timezone: "Etc/UTC"}
+      rule = %ExBooking.AvailabilityRule{timezone: "Etc/UTC", windows: []}
+
+      for {field, invalid} <- [id: "", slot: nil, resource_ids: nil, expires_at: nil],
+          {resources, rules} <- [{[], []}, {[resource], [rule]}] do
+        malformed = struct!(hold, [{field, invalid}])
+
+        assert {:error, {:invalid, :hold, _}} =
+                 ExBooking.decide(request, meeting, resources, rules,
+                   now: ~U[2026-07-13 08:00:00Z],
+                   hold: malformed
+                 )
+      end
+
+      assert {:ok, %ExBooking.Decision{status: :needs_routing}} =
+               ExBooking.decide(request, meeting, [], [], now: hold.expires_at, hold: nil)
+    end
+
     setup do
       %{request: build(:request, slot: monday_slot(~T[09:00:00]))}
     end

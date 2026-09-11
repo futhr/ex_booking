@@ -265,6 +265,7 @@ defmodule ExBooking do
   def decide(%Request{} = request, %MeetingType{} = meeting_type, resources, rules, opts) do
     with :ok <- Options.validate_horizon(opts, :optional),
          {:ok, opts} <- validate_opts(opts, @decide_opts),
+         :ok <- validate_hold_shape(opts[:hold]),
          :ok <- Assignment.validate_options(opts) do
       decision(request, meeting_type, {resources, rules}, opts, nil)
     end
@@ -686,16 +687,16 @@ defmodule ExBooking do
          resource_ids,
          nil
        ) do
-    with :ok <- validate_hold_shape(hold),
-         true <- hold.meeting_type_id == meeting_type.id,
+    with true <- hold.meeting_type_id == meeting_type.id,
          true <- hold.resource_ids == resource_ids,
          true <- same_interval?(hold.slot, request.slot) do
       :ok
     else
       false -> hold_mismatch(hold, request, meeting_type, resource_ids)
-      {:error, _} = error -> error
     end
   end
+
+  defp validate_hold_shape(nil), do: :ok
 
   defp validate_hold_shape(%Hold{id: id}) when not is_binary(id) or id == "",
     do: {:error, {:invalid, :hold, {:invalid, :id}}}
