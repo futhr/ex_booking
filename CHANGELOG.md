@@ -5,6 +5,23 @@ See [Conventional Commits](https://www.conventionalcommits.org) for commit guide
 
 <!-- changelog -->
 
+## [v0.2.2](https://github.com/futhr/ex_booking/compare/v0.2.1...v0.2.2) (2026-09-16)
+
+
+
+
+### Bug Fixes:
+
+* lifecycle: validate holds before availability rejection by Tobias Bohwalli
+
+* rrule: reject malformed parts and unresolved start zones by Tobias Bohwalli
+
+* jscalendar: validate inputs and merge nested groups once by Tobias Bohwalli
+
+* icalendar: reject ambiguous freebusy properties by Tobias Bohwalli
+
+* validation: check temporal fields before arithmetic by Tobias Bohwalli
+
 ## [v0.2.1](https://github.com/futhr/ex_booking/compare/v0.2.0...v0.2.1) (2026-09-07)
 
 
