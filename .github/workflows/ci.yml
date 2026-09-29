@@ -136,6 +136,12 @@ jobs:
           elixir-version: "1.18"
           otp-version: "28"
 
+      - name: Identify BEAM versions for the PLT cache
+        id: beam
+        run: |
+          echo "erts=$(erl -noshell -eval 'io:format("~s", [erlang:system_info(version)]), halt().')" >> "$GITHUB_OUTPUT"
+          echo "elixir=$(elixir -e 'IO.write(System.version())')" >> "$GITHUB_OUTPUT"
+
       - name: Restore deps cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -149,7 +155,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: priv/plts
-          key: plt-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
+          key: plt-${{ runner.os }}-${{ steps.beam.outputs.erts }}-${{ steps.beam.outputs.elixir }}-${{ hashFiles('**/mix.lock') }}
 
       - name: Remove stale PLTs
         if: steps.plt-cache.outputs.cache-hit != 'true'
