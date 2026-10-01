@@ -9,7 +9,7 @@ ex_booking-*.tar
 .elixir_ls/
 .cache/
 .vscode/
-.agents/
+/.claude/
 .codex/
 priv/plts/
 

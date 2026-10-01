@@ -29,7 +29,7 @@ Completion state belongs to the [task list](../tasks/booking-tasks.md#september-
 
 ## Method and support surface
 
-The audit read `AGENTS.md`, `CLAUDE.md`, the applicable `.claude/` standards and
+The audit read the repository contract, applicable engineering standards and
 skills, README, contributing guidance, research usage rules, all eight specs,
 implementation tasks, library modules, tests and generators, notebooks, Mix
 declarations and lock, quality configuration, package scripts, and CI/release

@@ -38,7 +38,7 @@ records reproductions, commit evidence, measurements and remaining limitations.
 ## Operating Rules
 
 ```text
-[x] Read CLAUDE.md before changing code.
+[x] Read AGENTS.md before changing code.
 [x] Keep lib/ex_booking.ex as the public facade.
 [x] Keep implementation in flat modules under lib/ex_booking/.
 [x] Keep specs descriptive, not roadmap-shaped.

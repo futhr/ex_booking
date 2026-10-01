@@ -20,7 +20,7 @@ Legend:
 ## Operating Rules
 
 ```text
-[ ] Read CLAUDE.md before changing code.
+[ ] Read AGENTS.md before changing code.
 [ ] Keep specs descriptive, not roadmap-shaped.
 [ ] Keep this file as the single roadmap.
 [ ] Update the matching SP.NN spec with behavior changes.
@@ -34,10 +34,12 @@ Legend:
 [ ] mix compile --warnings-as-errors
 [ ] mix credo --strict
 [ ] mix deps.audit
+[ ] mix hex.audit
 [ ] mix dialyzer
 [ ] mix doctor
 [ ] mix docs
 [ ] mix test --cover
+[ ] mix verify.package
 [ ] mix check --no-retry
 ```
 

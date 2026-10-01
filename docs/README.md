@@ -132,8 +132,8 @@ Relevant spec: `docs/specs/SP.06-standards-interop.md`.
 
 ## How To Continue Development
 
-1. Read the relevant `SP.NN` spec for the module group being changed.
-2. Add or update exactly one roadmap item in `docs/tasks/booking-tasks.md`.
+1. Follow `AGENTS.md` and read the relevant `SP.NN` spec for the affected modules.
+2. Update the affected roadmap items in `docs/tasks/booking-tasks.md`.
 3. Change code in the matching flat module under `lib/ex_booking/`.
 4. Add module-level examples or properties under `test/`.
 5. Run `mix check --no-retry` before committing.
