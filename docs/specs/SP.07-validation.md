@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-07-08"
-  updated: "2026-09-11"
+  updated: "2026-10-09"
   tags: ["tests", "quality-gates", "coverage", "properties"]
   depends_on: ["SP.03"]
 ---
@@ -105,6 +105,13 @@ Generators include arbitrary seconds and microseconds. Clock-grid properties pro
 ## Archive and notebook verification
 
 `mix verify.package`, included in `mix check --no-retry` and every CI runtime-matrix job, builds and extracts an actual Hex archive into temporary directories. A fresh production consumer resolves only the runtime dependencies, compiles and exercises timezone-aware availability and decisions, and verifies the application dependency list and absence of an application callback. Packaged notebooks are required. Their actual setup cells run in fresh Elixir processes before every example and saved output is checked. Identical setup sources may share a process. The archive/local-source setup branch is executed; the released-version branch is pin-checked and its registry contents remain release-specific hosted evidence. Temporary artifacts are removed on success or failure.
+
+Every child command clears inherited `MIX_BUILD_PATH`, `MIX_BUILD_ROOT`,
+`MIX_DEPS_PATH` and `MIX_LOCKFILE` so archive consumers and notebook installs
+use their own build, dependencies and lockfile. A regression runs the actual
+archive helper with all four inherited paths pointing to regular sentinel
+files, requires the consumer and notebook assertions to pass, and verifies
+that every sentinel remains unchanged.
 
 ## Performance and maintenance evidence
 

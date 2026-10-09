@@ -232,6 +232,8 @@ Files: `test/**`, `mix.exs`, `.doctor.exs`, `.credo.exs`, `.formatter.exs`
 [x] Coverage gate stays >= 95% excluding test/support.
 [x] Doctor keeps moduledoc and public specs complete.
 [x] mix check --no-retry is the final local gate.
+[x] Verify archive consumers and notebook installs ignore all four inherited
+    Mix path variables with the sentinel regression and complete local gate.
 [x] Add regression tests for request/offerability/hold validation, malformed
     strategy/horizon/weight inputs, and iCalendar FBTYPE behavior.
 [x] Add facade and Schedule regressions for malformed meeting fields,

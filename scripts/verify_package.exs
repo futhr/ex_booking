@@ -145,6 +145,7 @@ defmodule ExBooking.PackageVerification do
   defp command!(executable, args, directory, environment \\ []) do
     clean_environment = [
       {"MIX_BUILD_PATH", nil},
+      {"MIX_BUILD_ROOT", nil},
       {"MIX_DEPS_PATH", nil},
       {"MIX_LOCKFILE", nil}
     ]
