@@ -96,8 +96,8 @@ jobs:
       - name: Setup Elixir
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          elixir-version: "1.18"
-          otp-version: "28"
+          elixir-version: "1.20"
+          otp-version: "29"
 
       - name: Restore deps cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -133,8 +133,8 @@ jobs:
       - name: Setup Elixir
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          elixir-version: "1.18"
-          otp-version: "28"
+          elixir-version: "1.20"
+          otp-version: "29"
 
       - name: Identify BEAM versions for the PLT cache
         id: beam
@@ -190,8 +190,8 @@ jobs:
       - name: Setup Elixir
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          elixir-version: "1.18"
-          otp-version: "28"
+          elixir-version: "1.20"
+          otp-version: "29"
 
       - name: Restore deps cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
