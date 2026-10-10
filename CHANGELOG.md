@@ -5,6 +5,19 @@ See [Conventional Commits](https://www.conventionalcommits.org) for commit guide
 
 <!-- changelog -->
 
+## [v0.2.3](https://github.com/futhr/ex_booking/compare/v0.2.2...v0.2.3) (2026-10-10)
+
+
+
+
+### Bug Fixes:
+
+* package: isolate consumers from inherited Mix build roots by futhr
+
+* ci: key Dialyzer PLTs by exact BEAM versions by Tobias Bohwalli
+
+* deps: update Mint past security advisories by Tobias Bohwalli
+
 ## [v0.2.2](https://github.com/futhr/ex_booking/compare/v0.2.1...v0.2.2) (2026-09-16)
 
 
