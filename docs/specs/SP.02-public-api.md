@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: critical
   created: "2026-07-08"
-  updated: "2026-09-11"
+  updated: "2026-10-13"
   tags: ["api", "facade", "options", "error-vocabulary"]
   depends_on: ["R.01", "SP.01"]
 ---
@@ -19,6 +19,11 @@ SP.03, SP.04, and SP.06 are also supported for consumers that need to compose
 the kernel below the facade.
 
 ## Common options
+
+The additive `occurrences/3` API uses its own closed option table in
+[SP.08](SP.08-occurrence-enumeration.md). It requires a query horizon and explicit
+time-zone database/basis, without `:now` or a booking resource. SP.08 owns its
+values, additional errors and continuation semantics.
 
 Every time-relative function takes a keyword list with:
 

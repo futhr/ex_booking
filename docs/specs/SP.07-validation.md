@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-07-08"
-  updated: "2026-10-09"
+  updated: "2026-10-13"
   tags: ["tests", "quality-gates", "coverage", "properties"]
   depends_on: ["SP.03"]
 ---
@@ -46,6 +46,13 @@ test/support/dst_fixtures.ex          pinned DST transition corpus
   busy while absent, recognized busy, and unknown `FBTYPE` values do.
 
 ## Required Properties
+
+[SP.08](SP.08-occurrence-enumeration.md) additionally requires independent
+calendar-day occurrence/ordinal comparison, full-versus-paged equality,
+horizon invariance, exact candidate work ceilings and changed/incorrect cursor
+refusal in `test/ex_booking/occurrences_test.exs`. Explicit Stockholm/New York
+fold/gap vectors complement the generated reference. The archive consumer
+exercises original starts and query-bound continuation through the public facade.
 
 The property suite must cover:
 

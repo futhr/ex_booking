@@ -21,6 +21,10 @@ the kernel. State the status word (normative / informative) in prose if useful.
 - What this spec covers.
 - What it explicitly does not (link the responsible layer: consumer / adapter).
 
+Make the document usable without the originating chat or research narrative.
+Distinguish a normative target from currently executable APIs and evidence.
+Use stable requirement/case IDs for substantial additions.
+
 ## Data Model
 
 Structs and types introduced or referenced (link `SP.01` rather than
@@ -43,10 +47,22 @@ the common-options table in `SP.02` instead of repeating it.
 Tagged tuples this spec adds to the stable vocabulary (`SP.02`). Additions are
 minor-version changes; removals/renames are breaking.
 
+## Bounds, Continuation and Compatibility
+
+Define defaults, unknown/duplicate fields, native-struct validation, precision,
+ordering and finite work/input/output limits where applicable. Specify empty
+results and retries. For continuation, bind the complete semantic query and
+define stale/tampered input and exhaustion. State which existing public behavior
+is unchanged. Pure kernel results cannot authorize or commit consumer effects.
+
 ## Testing Strategy
 
 Doctests, example tests, StreamData properties, and DST fixtures required for
 this behavior (per `SP.07`). Name the laws that must hold.
+
+Map each requirement to reproducible input, expected observation and a concrete
+falsifier. Keep the oracle independent of the production mechanism. Planned
+cases remain obligations until commands and outcomes are actually observed.
 
 ## Sources
 

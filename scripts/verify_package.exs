@@ -91,6 +91,24 @@ defmodule ExBooking.PackageVerification do
       "@type" => "Event", "start" => "9999-12-31T23:59:59",
       "timeZone" => "Etc/UTC", "duration" => "P99999999999999999D"})
     {:error, {:invalid, :rrule, :part}} = ExBooking.RRule.parse("FREQ=DAILY;")
+    occurrence_opts = [
+      from: ~U[2026-07-13 06:05:00Z], until: ~U[2026-07-16 00:00:00Z],
+      time_zone_database: Calendar.UTCOnlyTimeZoneDatabase, time_zone_basis: "utc-v1",
+      limit: 1
+    ]
+    {:ok, %ExBooking.OccurrencePage{occurrences: [original], next_cursor: cursor}} =
+      ExBooking.occurrences("FREQ=DAILY;COUNT=3", ~U[2026-07-13 06:00:00Z], occurrence_opts)
+    ~U[2026-07-14 06:00:00Z] = original.starts_at
+    ~N[2026-07-14 06:00:00] = original.nominal
+    2 = original.ordinal
+    {:ok, %ExBooking.OccurrencePage{occurrences: [last], next_cursor: nil}} =
+      ExBooking.occurrences("FREQ=DAILY;COUNT=3", ~U[2026-07-13 06:00:00Z],
+        Keyword.put(occurrence_opts, :cursor, cursor))
+    ~U[2026-07-15 06:00:00Z] = last.starts_at
+    3 = last.ordinal
+    {:error, {:stale, :occurrences, :cursor_basis}} =
+      ExBooking.occurrences("FREQ=DAILY;COUNT=3", ~U[2026-07-13 06:00:00Z],
+        Keyword.merge(occurrence_opts, cursor: cursor, time_zone_basis: "utc-v2"))
     invalid = %{now | month: 13}
     {:error, {:invalid, :now, ^invalid}} = ExBooking.available_slots(meeting, [], [],
       now: invalid, from: now, until: first.start_at)

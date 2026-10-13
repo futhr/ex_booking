@@ -48,6 +48,7 @@ defmodule ExBooking do
   alias ExBooking.Interval
   alias ExBooking.JSCalendar
   alias ExBooking.MeetingType
+  alias ExBooking.OccurrencePage
   alias ExBooking.Options
   alias ExBooking.Policy
   alias ExBooking.Request
@@ -567,6 +568,41 @@ defmodule ExBooking do
       RRule.expand(rrule, dtstart, duration_min, opts[:from], opts[:until])
     end
   end
+
+  @doc """
+  Enumerates original recurrence starts over a bounded half-open horizon.
+
+  Pass `:from`, `:until`, an explicit `:time_zone_database` and a nonempty
+  `:time_zone_basis` identifying its immutable data. `:limit` defaults to
+  128 (maximum 1024); `:work_limit` defaults to 4096 (maximum 100000).
+  Continue with the returned `:cursor` and unchanged semantic query inputs.
+
+  Occurrences have no duration and are never clipped to the query start.
+  Ordinals count globally from DTSTART; gaps do not consume COUNT. The caller
+  owns cursor custody, time-zone data identity, persistence and later effects.
+  Work includes prefix verification on subsequent pages; a distant query can
+  return `{:error, {:limit, :occurrences, :work}}` rather than scan without bound.
+  Other errors distinguish invalid inputs and stale cursor bases; existing
+  RRULE validation errors are returned unchanged.
+
+  ## Example
+
+      iex> {:ok, page} =
+      ...>   ExBooking.occurrences(
+      ...>     "FREQ=DAILY;COUNT=2",
+      ...>     ~U[2026-07-13 06:00:00Z],
+      ...>     from: ~U[2026-07-13 06:05:00Z],
+      ...>     until: ~U[2026-07-15 00:00:00Z],
+      ...>     time_zone_database: Calendar.UTCOnlyTimeZoneDatabase,
+      ...>     time_zone_basis: "utc-v1"
+      ...>   )
+      ...>
+      ...> Enum.map(page.occurrences, &{&1.starts_at, &1.ordinal})
+      [{~U[2026-07-14 06:00:00Z], 2}]
+  """
+  @spec occurrences(String.t() | RRule.t(), DateTime.t(), keyword()) ::
+          {:ok, OccurrencePage.t()} | {:error, term()}
+  def occurrences(rule, dtstart, opts), do: RRule.occurrences(rule, dtstart, opts)
 
   @doc """
   Normalizes iCalendar `FREEBUSY` periods into busy intervals.

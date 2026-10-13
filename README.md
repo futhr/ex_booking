@@ -187,6 +187,14 @@ The interop modules are intentionally small:
 Provider auth, transport, JSON decoding, full recurrence sync, and calendar
 writeback belong outside this package.
 
+The unreleased development addition `ExBooking.occurrences/3` takes explicit
+`:from`, `:until`, `:time_zone_database` and `:time_zone_basis`. It returns
+nominal local time, resolved UTC start and global ordinal without a duration
+or horizon clipping. Pages use a query-bound cursor; `:limit` and
+`:work_limit` bound output and candidate traversal. Gaps do not consume COUNT.
+The consumer owns time-zone data identity, cursor progression and any jobs or
+effects; a distant query can return a work-limit error.
+
 Decoded JSCalendar objects use string keys. Configure the JSON decoder to reject
 duplicate keys before constructing maps; the kernel cannot detect duplicates
 already discarded by a decoder. Calendar duration endpoints must fit years

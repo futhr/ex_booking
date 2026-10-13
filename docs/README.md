@@ -151,6 +151,8 @@ code as it exists and the contracts it must keep.
 - `SP.05` — lifecycle events and intents.
 - `SP.06` — standards interop helpers.
 - `SP.07` — validation gates and test rules.
+- [SP.08](specs/SP.08-occurrence-enumeration.md) — original recurrence occurrences,
+  explicit time-zone basis and bounded deterministic pagination.
 
 ## Research Index
 

@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: critical
   created: "2026-07-08"
-  updated: "2026-09-05"
+  updated: "2026-10-13"
   tags: ["data-model", "structs", "public-api"]
   depends_on: ["R.01"]
 ---
@@ -15,6 +15,13 @@ ex_booking:
 
 All structs are immutable inputs/outputs. Consumers map their persistence models
 into these shapes at the boundary. Struct fields are public API.
+
+## Occurrence values
+
+[SP.08](SP.08-occurrence-enumeration.md) owns the additive Occurrence,
+OccurrencePage and OccurrenceCursor contracts: original nominal/UTC start and
+global ordinal, ordered bounded pages and a complete query-bound continuation.
+They are recurrence values, not Intervals, booking reservations or job records.
 
 ## ExBooking.Interval
 

@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: medium
   created: "2026-07-08"
-  updated: "2026-09-11"
+  updated: "2026-10-13"
   tags: ["rrule", "ics", "jscalendar", "interop"]
   depends_on: ["R.02", "SP.01", "SP.03"]
 ---
@@ -18,6 +18,11 @@ They are pure normalizers over caller-supplied data. They do not fetch calendars
 decode JSON, sync providers, write files, or execute network calls.
 
 ## `ExBooking.RRule`
+
+[SP.08](SP.08-occurrence-enumeration.md) adds original-occurrence enumeration.
+It reuses this recurrence grammar and default recurring gap/fold policy while
+returning original starts instead of duration-bearing clipped intervals.
+Its explicit database, bounds and cursor affect only the new API.
 
 File: `lib/ex_booking/rrule.ex`.
 

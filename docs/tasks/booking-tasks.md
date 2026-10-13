@@ -16,6 +16,32 @@ Legend:
 [-] delegated / not an in-repo task
 ```
 
+## Original recurrence occurrences
+
+Contract: [SP.08](../specs/SP.08-occurrence-enumeration.md).
+
+- [x] Add immutable Occurrence/Page/Cursor values and public facade/domain API;
+  validate the closed options, explicit time-zone database/basis and native inputs.
+- [x] Implement original calendar enumeration, global COUNT/UNTIL and bounded
+  query/cursor traversal; retain existing availability and interval APIs.
+- [x] Exercise OCC-T1–T7 with independent calendar-day properties, both DST
+  zones, tampered cursors, precision/year boundaries and exact work ceilings.
+- [x] Exercise OCC-T8 through the real archive consumer; run the existing full
+  validation gate and record actual limitations before completion.
+
+Development validation on 2026-10-13 used the working tree based on `f73193c`,
+Elixir 1.20.4/OTP 29.0.4 and unchanged repository locks. The complete
+`mix check --no-retry` passed 401 tests (78 doctests, 29 properties, 294 tests)
+with 97.0% line coverage, compiler/format/Credo/Dialyzer/Doctor/ExDoc, security
+audits and the actual archive consumer/notebook setup corpus. Optional checks
+for absent ex_knigge/gettext/knigge/sobelow/usage_rules packages were skipped;
+they are not this repository's required tools. This is local software evidence,
+not registry publication or a real application's durable scheduling.
+The final pre-commit run repeated the full gate successfully and also passed
+`mix verify.package --matrix` in locked, fresh, minimum-direct-dependency and
+optional-Mint/CAStore modes, including all packaged notebook examples. Reference,
+skill/discovery, whitespace and unchanged lock/toolchain checks also passed.
+
 ## September 11 production hardening
 
 Progress: 7/7 batches verified. The [findings and resolution report](../research/R.06-production-hardening.md)

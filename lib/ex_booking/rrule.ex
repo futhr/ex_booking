@@ -23,6 +23,9 @@ defmodule ExBooking.RRule do
   """
 
   alias ExBooking.Interval
+  alias ExBooking.Occurrence
+  alias ExBooking.OccurrenceCursor
+  alias ExBooking.OccurrencePage
   alias ExBooking.Temporal
 
   @weekdays %{
@@ -104,6 +107,372 @@ defmodule ExBooking.RRule do
   end
 
   def expand(_, _, _, _, _), do: {:error, {:invalid, :rrule, :arguments}}
+
+  @doc """
+  Enumerates original starts with explicit time-zone inputs and finite work.
+
+  Uses the options and native page/cursor values documented by
+  `ExBooking.occurrences/3`. Dates in gaps are skipped without consuming COUNT;
+  later fold dates choose the first instant. A supplied second-fold DTSTART
+  retains its actual instant. Cursor validation replays the prefix within
+  `:work_limit`; changing the query basis returns a stale-cursor error.
+
+  ## Example
+
+      iex> {:ok, page} =
+      ...>   ExBooking.RRule.occurrences(
+      ...>     "FREQ=DAILY;COUNT=1",
+      ...>     ~U[2026-07-13 06:00:00Z],
+      ...>     from: ~U[2026-07-13 05:55:00Z],
+      ...>     until: ~U[2026-07-13 07:00:00Z],
+      ...>     time_zone_database: Calendar.UTCOnlyTimeZoneDatabase,
+      ...>     time_zone_basis: "utc-v1"
+      ...>   )
+      ...>
+      ...> hd(page.occurrences).starts_at
+      ~U[2026-07-13 06:00:00Z]
+  """
+  @spec occurrences(String.t() | t(), DateTime.t(), keyword()) ::
+          {:ok, OccurrencePage.t()} | {:error, term()}
+  def occurrences(rule, dtstart, opts) do
+    with {:ok, opts} <- validate_occurrence_options(opts),
+         :ok <- validate_occurrence_rule_shape(rule),
+         {:ok, rule} <- coerce_rule(rule),
+         :ok <- validate_occurrence_datetimes(rule, dtstart, opts),
+         {:ok, start, resolution} <- resolve_occurrence_start(dtstart, opts.time_zone_database),
+         {:ok, basis, last_offset} <- occurrence_query(rule, start, opts),
+         :ok <- validate_occurrence_cursor(opts.cursor, basis) do
+      state = %{
+        basis: basis,
+        start_resolution: resolution,
+        offset: first_occurrence_offset(rule, start),
+        last_offset: last_offset,
+        count: 0,
+        previous: nil,
+        work: 0,
+        results: [],
+        returned: 0,
+        cursor: opts.cursor,
+        ready: is_nil(opts.cursor),
+        limit: opts.limit,
+        work_limit: opts.work_limit
+      }
+
+      enumerate_occurrences(state)
+    end
+  end
+
+  defp validate_occurrence_options(opts) do
+    keys = [:from, :until, :time_zone_database, :time_zone_basis, :limit, :work_limit, :cursor]
+
+    if is_list(opts) and Keyword.keyword?(opts) and
+         Enum.all?(Keyword.keys(opts), &(&1 in keys)) and
+         length(Keyword.keys(opts)) == length(Enum.uniq(Keyword.keys(opts))) do
+      options = Map.merge(%{limit: 128, work_limit: 4096, cursor: nil}, Map.new(opts))
+
+      with :ok <- validate_occurrence_option(options, :limit, &(&1 in 1..1024)),
+           :ok <- validate_occurrence_option(options, :work_limit, &(&1 in 1..100_000)),
+           :ok <- validate_occurrence_option(options, :time_zone_basis, &valid_time_zone_basis?/1),
+           :ok <-
+             validate_occurrence_option(options, :time_zone_database, &time_zone_database?/1) do
+        {:ok, options}
+      end
+    else
+      occurrence_error(:options)
+    end
+  end
+
+  defp validate_occurrence_option(options, key, valid?) do
+    if valid?.(Map.get(options, key)), do: :ok, else: occurrence_error(key)
+  end
+
+  defp valid_time_zone_basis?(basis),
+    do: is_binary(basis) and byte_size(basis) in 1..256 and String.valid?(basis)
+
+  defp time_zone_database?(database),
+    do:
+      is_atom(database) and
+        Code.ensure_loaded?(database) and
+        function_exported?(database, :time_zone_periods_from_wall_datetime, 2) and
+        function_exported?(database, :time_zone_period_from_utc_iso_days, 2)
+
+  defp validate_occurrence_rule_shape(rule) when is_binary(rule) do
+    if byte_size(rule) <= 4096 and String.valid?(rule),
+      do: :ok,
+      else: occurrence_error(:rule_size)
+  end
+
+  defp validate_occurrence_rule_shape(%__MODULE__{} = rule) do
+    shape = Map.keys(rule) |> Enum.sort()
+    expected = Map.keys(%__MODULE__{freq: :daily}) |> Enum.sort()
+
+    if shape == expected and
+         (is_nil(rule.byday) or (is_list(rule.byday) and length(rule.byday) <= 7)),
+       do: :ok,
+       else: occurrence_error(:arguments)
+  end
+
+  defp validate_occurrence_rule_shape(_), do: occurrence_error(:arguments)
+
+  defp validate_occurrence_datetimes(rule, dtstart, opts) do
+    horizon = [Map.get(opts, :from), Map.get(opts, :until)]
+
+    if occurrence_datetime?(dtstart) and Enum.all?(horizon, &occurrence_datetime?/1) and
+         (is_nil(rule.until) or occurrence_until?(rule.until)) and
+         DateTime.compare(opts.from, opts.until) == :lt do
+      :ok
+    else
+      occurrence_error(:arguments)
+    end
+  end
+
+  defp occurrence_datetime?(%DateTime{calendar: Calendar.ISO, year: year} = value),
+    do:
+      Temporal.datetime?(value) and year in 0..9999 and
+        abs(value.utc_offset) <= 86_400 and abs(value.std_offset) <= 86_400 and
+        abs(value.utc_offset + value.std_offset) <= 86_400
+
+  defp occurrence_datetime?(_), do: false
+
+  defp occurrence_until?(%DateTime{time_zone: "Etc/UTC", utc_offset: 0, std_offset: 0} = value),
+    do: occurrence_datetime?(value)
+
+  defp occurrence_until?(_), do: false
+
+  defp resolve_occurrence_start(start, database) do
+    nominal = DateTime.to_naive(start)
+
+    case DateTime.from_naive(nominal, start.time_zone, database) do
+      {:ok, actual} ->
+        match_occurrence_start(start, [{actual, :unique}])
+
+      {:ambiguous, first, second} ->
+        match_occurrence_start(start, [{first, :first_fold}, {second, :second_fold}])
+
+      _ ->
+        occurrence_error(:dtstart)
+    end
+  end
+
+  defp match_occurrence_start(start, candidates) do
+    case Enum.find(candidates, fn {actual, _} ->
+           DateTime.compare(start, actual) == :eq and
+             start.utc_offset + start.std_offset == actual.utc_offset + actual.std_offset
+         end) do
+      {actual, resolution} -> {:ok, %{actual | microsecond: start.microsecond}, resolution}
+      nil -> occurrence_error(:dtstart)
+    end
+  end
+
+  defp occurrence_query(rule, start, opts) do
+    with {:ok, from} <- occurrence_utc(opts.from),
+         {:ok, until} <- occurrence_utc(opts.until),
+         {:ok, local_until} <-
+           DateTime.shift_zone(until, start.time_zone, opts.time_zone_database),
+         true <- occurrence_datetime?(local_until) do
+      basis = %{
+        rule: rule,
+        dtstart: start,
+        from: from,
+        until: until,
+        time_zone_database: opts.time_zone_database,
+        time_zone_basis: opts.time_zone_basis
+      }
+
+      {:ok, basis, Date.diff(DateTime.to_date(local_until), DateTime.to_date(start))}
+    else
+      _ -> occurrence_error(:arguments)
+    end
+  end
+
+  defp occurrence_utc(value) do
+    case DateTime.shift_zone(value, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase) do
+      {:ok, utc} when utc.year in 0..9999 -> {:ok, utc}
+      _ -> occurrence_error(:arguments)
+    end
+  end
+
+  defp validate_occurrence_cursor(nil, _), do: :ok
+
+  defp validate_occurrence_cursor(%OccurrenceCursor{} = cursor, basis) do
+    expected = Map.keys(%OccurrenceCursor{basis: nil, next_offset_days: 0, emitted_count: 0})
+
+    cond do
+      Enum.sort(Map.keys(cursor)) != Enum.sort(expected) ->
+        occurrence_error(:cursor)
+
+      not is_map(cursor.basis) or not is_integer(cursor.next_offset_days) or
+        cursor.next_offset_days < 0 or not is_integer(cursor.emitted_count) or
+          cursor.emitted_count < 0 ->
+        occurrence_error(:cursor)
+
+      cursor.basis != basis ->
+        {:error, {:stale, :occurrences, :cursor_basis}}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_occurrence_cursor(_, _), do: occurrence_error(:cursor)
+
+  defp enumerate_occurrences(state) do
+    with {:ok, state} <- verify_occurrence_position(state) do
+      consider_occurrence_position(state)
+    end
+  end
+
+  defp verify_occurrence_position(%{ready: true} = state), do: {:ok, state}
+
+  defp verify_occurrence_position(state) do
+    cond do
+      state.offset > state.cursor.next_offset_days ->
+        occurrence_error(:cursor)
+
+      state.offset == state.cursor.next_offset_days ->
+        if state.count == state.cursor.emitted_count,
+          do: {:ok, %{state | ready: true}},
+          else: occurrence_error(:cursor)
+
+      true ->
+        {:ok, state}
+    end
+  end
+
+  defp consider_occurrence_position(state) do
+    cond do
+      state.offset > state.last_offset or
+          (state.basis.rule.count != nil and state.count >= state.basis.rule.count) ->
+        finish_occurrence_page(state)
+
+      state.work >= state.work_limit ->
+        {:error, {:limit, :occurrences, :work}}
+
+      true ->
+        resolve_occurrence_position(%{state | work: state.work + 1})
+    end
+  end
+
+  defp resolve_occurrence_position(state) do
+    start = state.basis.dtstart
+    date = Date.add(DateTime.to_date(start), state.offset)
+
+    resolved =
+      if state.offset == 0 do
+        {:ok, start, state.start_resolution}
+      else
+        resolve_occurrence_date(date, start, state.basis.time_zone_database)
+      end
+
+    case resolved do
+      :gap -> advance_occurrence_position(state)
+      {:ok, datetime, resolution} -> accept_occurrence_position(state, datetime, resolution)
+      {:error, _} = error -> error
+    end
+  end
+
+  defp resolve_occurrence_date(date, start, database) do
+    case DateTime.new(date, DateTime.to_time(start), start.time_zone, database) do
+      {:ok, datetime} -> {:ok, datetime, :unique}
+      {:ambiguous, first, _} -> {:ok, first, :first_fold}
+      {:gap, _, _} -> :gap
+      {:error, _} -> occurrence_error(:arguments)
+    end
+  end
+
+  defp accept_occurrence_position(state, datetime, resolution) do
+    with {:ok, utc} <- occurrence_utc(datetime) do
+      cond do
+        state.previous != nil and DateTime.compare(utc, state.previous) != :gt ->
+          occurrence_error(:time_zone_order)
+
+        DateTime.compare(utc, state.basis.until) != :lt or
+            (state.basis.rule.until != nil and
+               DateTime.compare(utc, state.basis.rule.until) == :gt) ->
+          finish_occurrence_page(state)
+
+        true ->
+          retain_occurrence_position(state, datetime, utc, resolution)
+      end
+    end
+  end
+
+  defp retain_occurrence_position(state, datetime, utc, resolution) do
+    state = %{state | count: state.count + 1, previous: utc}
+
+    state =
+      if state.ready and DateTime.compare(utc, state.basis.from) != :lt do
+        occurrence = %Occurrence{
+          nominal: DateTime.to_naive(datetime),
+          starts_at: utc,
+          ordinal: state.count,
+          resolution: resolution
+        }
+
+        %{state | results: [occurrence | state.results], returned: state.returned + 1}
+      else
+        state
+      end
+
+    if state.returned == state.limit do
+      offset = next_occurrence_offset(state.basis.rule, state.basis.dtstart, state.offset)
+
+      cursor = occurrence_next_cursor(state, offset)
+
+      {:ok, %OccurrencePage{occurrences: Enum.reverse(state.results), next_cursor: cursor}}
+    else
+      advance_occurrence_position(state)
+    end
+  end
+
+  defp advance_occurrence_position(state) do
+    offset = next_occurrence_offset(state.basis.rule, state.basis.dtstart, state.offset)
+    enumerate_occurrences(%{state | offset: offset})
+  end
+
+  defp occurrence_next_cursor(state, offset) do
+    if offset > state.last_offset or
+         (state.basis.rule.count != nil and state.count >= state.basis.rule.count) do
+      nil
+    else
+      %OccurrenceCursor{basis: state.basis, next_offset_days: offset, emitted_count: state.count}
+    end
+  end
+
+  defp finish_occurrence_page(%{ready: false}), do: occurrence_error(:cursor)
+
+  defp finish_occurrence_page(state),
+    do: {:ok, %OccurrencePage{occurrences: Enum.reverse(state.results)}}
+
+  defp first_occurrence_offset(%{byday: nil}, _), do: 0
+
+  defp first_occurrence_offset(rule, start) do
+    monday = 1 - Date.day_of_week(DateTime.to_date(start))
+
+    Enum.find_value(rule.byday, monday + rule.interval * 7 + hd(rule.byday) - 1, fn weekday ->
+      offset = monday + weekday - 1
+      if offset >= 0, do: offset
+    end)
+  end
+
+  defp next_occurrence_offset(%{freq: :daily, interval: interval}, _, offset),
+    do: offset + interval
+
+  defp next_occurrence_offset(%{byday: nil, interval: interval}, _, offset),
+    do: offset + interval * 7
+
+  defp next_occurrence_offset(rule, start, offset) do
+    monday = 1 - Date.day_of_week(DateTime.to_date(start))
+    block = div(offset - monday, rule.interval * 7)
+    beginning = monday + block * rule.interval * 7
+
+    Enum.find_value(rule.byday, beginning + rule.interval * 7 + hd(rule.byday) - 1, fn weekday ->
+      candidate = beginning + weekday - 1
+      if candidate > offset, do: candidate
+    end)
+  end
+
+  defp occurrence_error(reason), do: {:error, {:invalid, :occurrences, reason}}
 
   defp normalize("RRULE:" <> value), do: value
   defp normalize(value), do: value
@@ -292,21 +661,11 @@ defmodule ExBooking.RRule do
     |> Stream.map(&calendar_occurrence(dtstart, &1))
   end
 
-  defp occurrence_offsets(%__MODULE__{freq: :daily, interval: interval}, _) do
-    Stream.iterate(0, &(&1 + interval))
-  end
-
-  defp occurrence_offsets(%__MODULE__{freq: :weekly, byday: nil, interval: interval}, _) do
-    Stream.iterate(0, &(&1 + interval * 7))
-  end
-
-  defp occurrence_offsets(%__MODULE__{freq: :weekly, byday: byday, interval: interval}, dtstart) do
-    weekday = Date.day_of_week(DateTime.to_date(dtstart))
-    offsets = Enum.map(byday, &(&1 - weekday))
-
-    Stream.iterate(0, &(&1 + interval * 7))
-    |> Stream.flat_map(fn week -> Enum.map(offsets, &(&1 + week)) end)
-    |> Stream.drop_while(&(&1 < 0))
+  defp occurrence_offsets(rule, dtstart) do
+    Stream.iterate(
+      first_occurrence_offset(rule, dtstart),
+      &next_occurrence_offset(rule, dtstart, &1)
+    )
   end
 
   defp calendar_occurrence(dtstart, 0), do: dtstart

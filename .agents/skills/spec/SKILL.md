@@ -20,6 +20,9 @@ criteria, and explicit unresolved decisions where evidence or authority is missi
 3. Define accepted inputs, outputs, errors, boundary cases, deterministic
    ordering, and consumer responsibilities. Use exact algorithms or pseudocode
    only where needed to make behavior unambiguous.
+   Make the spec usable without its originating conversation: include defaults,
+   bounds, malformed native values, continuation/retry behavior and preserved
+   compatibility. Map stable requirements to independent acceptance cases.
 4. Specify mechanism-specific temporal behavior: UTC versus local-day arithmetic,
    interval inclusion, DST gaps/ambiguities, independent slot grids, buffers,
    concurrent seat accounting, and precision where affected. For lifecycle or
