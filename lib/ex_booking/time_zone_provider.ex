@@ -60,7 +60,8 @@ defmodule ExBooking.TimeZoneProvider do
   Resolves an ISO local label through an explicit provider or Calendar database.
 
   Provider gap output is `:gap`; Calendar module gaps retain their native tuple.
-  Malformed provider outputs refuse; callback implementation faults propagate.
+  Malformed provider outputs refuse; callback error payloads become the fixed
+  `:time_zone_provider_refused` code. Callback implementation faults propagate.
 
   ## Example
 
@@ -95,6 +96,7 @@ defmodule ExBooking.TimeZoneProvider do
   Localizes an instant through an explicit provider or Calendar database.
 
   Provider success must preserve the complete instant and its precision.
+  Callback error payloads become `:time_zone_provider_refused`, without context.
 
   ## Example
 
@@ -136,7 +138,7 @@ defmodule ExBooking.TimeZoneProvider do
   end
 
   defp resolution(:gap, _, _), do: :gap
-  defp resolution({:error, _} = error, _, _), do: error
+  defp resolution({:error, _}, _, _), do: {:error, :time_zone_provider_refused}
   defp resolution(_, _, _), do: invalid_result()
 
   defp localization({:ok, local}, datetime, zone) do
@@ -146,7 +148,7 @@ defmodule ExBooking.TimeZoneProvider do
        else: invalid_result()
   end
 
-  defp localization({:error, _} = error, _, _), do: error
+  defp localization({:error, _}, _, _), do: {:error, :time_zone_provider_refused}
   defp localization(_, _, _), do: invalid_result()
 
   defp matches?(datetime, nominal, zone),

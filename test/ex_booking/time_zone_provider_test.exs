@@ -37,6 +37,7 @@ defmodule ExBooking.TimeZoneProviderTest do
     end
 
     def resolve(_, _, "malformed"), do: {:ok, %{}}
+    def resolve(_, _, "PRIVATE_PROVIDER_CANARY" = context), do: {:error, {:foreign, context}}
     def resolve(_, _, "error"), do: {:error, :time_zone_not_found}
     def resolve(_, _, "gap"), do: :gap
 
@@ -58,6 +59,7 @@ defmodule ExBooking.TimeZoneProviderTest do
       do: {:ok, %{datetime | time_zone: zone, microsecond: {0, 6}}}
 
     def localize(_, _, "malformed"), do: {:ok, nil}
+    def localize(_, _, "PRIVATE_PROVIDER_CANARY" = context), do: {:error, {:foreign, context}}
     def localize(_, _, "error"), do: {:error, :time_zone_not_found}
 
     def localize(datetime, zone, <<offset::signed-big-32>>) do
@@ -224,10 +226,10 @@ defmodule ExBooking.TimeZoneProviderTest do
 
     {:ok, errors} = TimeZoneProvider.new(ExplicitZone, "error")
 
-    assert {:error, :time_zone_not_found} =
+    assert {:error, :time_zone_provider_refused} =
              TimeZoneProvider.from_naive(~N[2026-07-13 06:00:00], "Etc/UTC", errors)
 
-    assert {:error, :time_zone_not_found} =
+    assert {:error, :time_zone_provider_refused} =
              TimeZoneProvider.shift_zone(~U[2026-07-13 06:00:00Z], "Etc/UTC", errors)
 
     {:ok, gap} = TimeZoneProvider.new(ExplicitZone, "gap")
@@ -251,6 +253,16 @@ defmodule ExBooking.TimeZoneProviderTest do
       assert {:error, :invalid_time_zone_result} =
                TimeZoneProvider.shift_zone(~U[2026-07-13 06:00:00Z], "Fixture/Fixed", provider)
     end
+  end
+
+  test "foreign callback errors cannot copy private context into public helper results" do
+    {:ok, provider} = TimeZoneProvider.new(ExplicitZone, "PRIVATE_PROVIDER_CANARY")
+
+    assert TimeZoneProvider.from_naive(~N[2026-07-13 06:00:00], "Etc/UTC", provider) ==
+             {:error, :time_zone_provider_refused}
+
+    assert TimeZoneProvider.shift_zone(~U[2026-07-13 06:00:00Z], "Etc/UTC", provider) ==
+             {:error, :time_zone_provider_refused}
   end
 
   defp options(provider, updates) do

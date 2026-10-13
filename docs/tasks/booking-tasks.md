@@ -371,3 +371,11 @@ occurrence focused evidence passes 55 checks, including five properties and both
 DST zones. Locks/dependencies are unchanged. Optional absent-package checks for
 ex_knigge/gettext/knigge/sobelow/usage_rules remain skipped, not passed. These are
 pure/software archive checks, with no consumer scheduling or publication claim.
+
+Provider-helper refusal redaction subsequently passed the complete local gate:
+411 tests (82 doctests, 30 properties, 299 tests), 97.0% coverage, all required
+compiler/format/Credo/type/documentation/security/archive/notebook components.
+A discriminating private-context canary failed before normalization and now
+passes for both public helpers. Existing Calendar database-module errors and
+all original-occurrence/availability behavior retain their contract. Optional
+absent-package checks retain the same explicit skips. No dependency changed.

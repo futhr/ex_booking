@@ -208,7 +208,9 @@ converted into a module atom. Consumer code implements this public behaviour:
 Returned datetimes must satisfy OCC-01's ISO/year/offset bounds. Invalid return
 shapes, changed wall/instant coordinates, reversed/duplicate folds or malformed
 values return `{:error, :invalid_time_zone_result}` through the public provider
-helpers. Callback exceptions remain implementation faults, as for Calendar's
+helpers. Callback refusal payloads normalize to `{:error, :time_zone_provider_refused}`
+in both public helpers, without copying foreign values or context.
+Callback exceptions remain implementation faults, as for Calendar's
 module interface; no fault becomes a missing occurrence. Providers are trusted
 installed pure code, not executable profile input. They must not read clocks,
 application environment or mutable registries, fetch data or perform I/O.
