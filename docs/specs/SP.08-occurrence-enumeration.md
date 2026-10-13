@@ -50,7 +50,7 @@ Offset components and their sum must each lie within ±86400 seconds.
 | Option | Required / default | Contract |
 | --- | --- | --- |
 | `:from`, `:until` | Required together | Structurally valid ISO DateTimes; normalize to UTC; increasing half-open query horizon |
-| `:time_zone_database` | Required | Explicit module implementing Calendar.TimeZoneDatabase callbacks; no application-environment selection |
+| `:time_zone_database` | Required | Explicit Calendar.TimeZoneDatabase module or validated TimeZoneProvider value; no application-environment selection |
 | `:time_zone_basis` | Required | Nonempty valid UTF-8 binary, at most 256 bytes; caller's identifier for the exact installed database data |
 | `:limit` | Default 128 | Integer 1–1024; maximum occurrences returned per page |
 | `:work_limit` | Default 4096 | Integer 1–100000; maximum candidate positions resolved in this call, including prefix/cursor validation |
@@ -58,7 +58,7 @@ Offset components and their sum must each lie within ±86400 seconds.
 
 Unknown/duplicate option keys, malformed containers, forged temporal fields,
 out-of-range bounds and invalid native structs reject before recurrence traversal.
-No `:now`, duration, callback, consumer identity or booking resource is required.
+No `:now`, duration, consumer identity or booking resource is required.
 The basis identifier attributes caller-selected data; it is not authentication
 of the database contents. The consumer must hold that data immutable while
 using a cursor. The library performs no I/O to verify or acquire it.
@@ -74,7 +74,7 @@ using a cursor. The library performs no I/O to verify or acquire it.
 | OccurrenceCursor | `basis`: complete normalized query basis; `next_offset_days`: next calendar candidate offset from DTSTART; `emitted_count`: valid occurrences before that candidate |
 
 The basis contains normalized rule, validated DTSTART, UTC from/until, database
-module and time-zone basis identifier. Limit/work_limit may change between pages;
+module/provider (including its exact context) and time-zone basis identifier. Limit/work_limit may change between pages;
 semantic query fields may not. The cursor is neither a signed token nor proof
 that a consumer processed previous results.
 
@@ -188,3 +188,50 @@ SP.06 owns the existing narrow recurrence grammar and gap policy.
 defines recurrence COUNT and exclusion of nonexistent local times. Pagination,
 work budgets and the native cursor are package-defined additions, not an RFC
 interchange format or a complete recurrence-set implementation.
+
+## Explicit immutable timezone providers
+
+**OCC-07.** `ExBooking.TimeZoneProvider.new(module, context)` accepts an existing
+loaded module implementing `resolve/3` and `localize/3`, plus an explicit opaque
+binary context of 0–1048576 bytes. It returns a TimeZoneProvider with exactly
+module/context fields or `{:error, :invalid_time_zone_provider}`. No binary is
+converted into a module atom. Consumer code implements this public behaviour:
+
+- `resolve(nominal, zone_name, context)` returns `{:ok, local_datetime}`,
+  `{:ambiguous, first_local_datetime, second_local_datetime}`, `:gap`, or
+  `{:error, reason}`. Successful datetimes preserve the exact nominal fields/
+  precision and zone name. Fold candidates increase strictly by UTC instant.
+- `localize(datetime, zone_name, context)` returns `{:ok, local_datetime}` or
+  `{:error, reason}`; success preserves the exact UTC instant/precision and has
+  the requested zone name.
+
+Returned datetimes must satisfy OCC-01's ISO/year/offset bounds. Invalid return
+shapes, changed wall/instant coordinates, reversed/duplicate folds or malformed
+values return `{:error, :invalid_time_zone_result}` through the public provider
+helpers. Callback exceptions remain implementation faults, as for Calendar's
+module interface; no fault becomes a missing occurrence. Providers are trusted
+installed pure code, not executable profile input. They must not read clocks,
+application environment or mutable registries, fetch data or perform I/O.
+Context is explicit immutable data, retained in the native cursor basis; it is
+not a credential store or a portable token. The caller owns its custody.
+
+`TimeZoneProvider.valid?/1` rechecks the complete native struct and module seams.
+`TimeZoneProvider.from_naive/3` and `shift_zone/3` take the same arguments as the
+corresponding DateTime operations, with the explicit module/provider as their
+last argument. They also retain ordinary Calendar database module behavior.
+The provider gap result is `:gap`; occurrence enumeration skips it. No gap
+boundary or availability snapping is inferred from this recurrence-only seam.
+
+SP.08 accepts that provider as :time_zone_database. Its full module/context is
+bound alongside the caller's time_zone_basis. A changed context invalidates old
+cursors even if the basis string is accidentally reused. Existing module input,
+DTSTART fold selection, recurrence policies, limits and all availability/interval
+APIs stay unchanged. This addition supplies no default timezone implementation,
+TZif parser, global zone registry or application identity.
+
+OCC-T9 exercises two independent provider contexts in one process, immutable
+cursor binding, malformed/oversize/native provider refusal, invalid output and
+fold ordering. Explicit providers for Stockholm/New York agree with the existing
+module-based DST corpus and independent UTC expectations, including second-fold
+DTSTART, skipped gaps, COUNT and changing page limits. Archive consumers exercise
+this public seam without application configuration or shared mutable state.

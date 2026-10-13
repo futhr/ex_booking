@@ -27,6 +27,7 @@ defmodule ExBooking.RRule do
   alias ExBooking.OccurrenceCursor
   alias ExBooking.OccurrencePage
   alias ExBooking.Temporal
+  alias ExBooking.TimeZoneProvider
 
   @weekdays %{
     "MO" => 1,
@@ -189,6 +190,8 @@ defmodule ExBooking.RRule do
   defp valid_time_zone_basis?(basis),
     do: is_binary(basis) and byte_size(basis) in 1..256 and String.valid?(basis)
 
+  defp time_zone_database?(%TimeZoneProvider{} = provider), do: TimeZoneProvider.valid?(provider)
+
   defp time_zone_database?(database),
     do:
       is_atom(database) and
@@ -242,7 +245,7 @@ defmodule ExBooking.RRule do
   defp resolve_occurrence_start(start, database) do
     nominal = DateTime.to_naive(start)
 
-    case DateTime.from_naive(nominal, start.time_zone, database) do
+    case TimeZoneProvider.from_naive(nominal, start.time_zone, database) do
       {:ok, actual} ->
         match_occurrence_start(start, [{actual, :unique}])
 
@@ -268,7 +271,7 @@ defmodule ExBooking.RRule do
     with {:ok, from} <- occurrence_utc(opts.from),
          {:ok, until} <- occurrence_utc(opts.until),
          {:ok, local_until} <-
-           DateTime.shift_zone(until, start.time_zone, opts.time_zone_database),
+           TimeZoneProvider.shift_zone(until, start.time_zone, opts.time_zone_database),
          true <- occurrence_datetime?(local_until) do
       basis = %{
         rule: rule,
@@ -372,10 +375,13 @@ defmodule ExBooking.RRule do
   end
 
   defp resolve_occurrence_date(date, start, database) do
-    case DateTime.new(date, DateTime.to_time(start), start.time_zone, database) do
+    {:ok, nominal} = NaiveDateTime.new(date, DateTime.to_time(start))
+
+    case TimeZoneProvider.from_naive(nominal, start.time_zone, database) do
       {:ok, datetime} -> {:ok, datetime, :unique}
       {:ambiguous, first, _} -> {:ok, first, :first_fold}
       {:gap, _, _} -> :gap
+      :gap -> :gap
       {:error, _} -> occurrence_error(:arguments)
     end
   end

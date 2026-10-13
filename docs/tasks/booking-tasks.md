@@ -29,6 +29,9 @@ Contract: [SP.08](../specs/SP.08-occurrence-enumeration.md).
 - [x] Exercise OCC-T8 through the real archive consumer; run the existing full
   validation gate and record actual limitations before completion.
 
+- [x] Add bounded explicit immutable timezone providers and OCC-T9 independent
+  contexts/DST/cursor/archive checks without changing module-based APIs.
+
 Development validation on 2026-10-13 used the working tree based on `f73193c`,
 Elixir 1.20.4/OTP 29.0.4 and unchanged repository locks. The complete
 `mix check --no-retry` passed 401 tests (78 doctests, 29 properties, 294 tests)
@@ -355,3 +358,16 @@ Progress: 22/22 findings completed.
 
 - [x] Verify each logical finding A02–A17 has a discriminating regression; extend
   public-facade and boundary coverage, record mutation evidence, and run SP.07 gates.
+
+## Immutable timezone provider validation
+
+The OCC-T9 addition passes the complete local `mix check --no-retry` on
+2026-10-13, Elixir 1.20.4/OTP 29.0.4: 410 tests (82 doctests, 30 properties,
+298 tests), 97.1% line coverage, warnings-as-errors compilation, format, strict
+Credo, Dialyzer, Doctor, ExDoc and both dependency audits. Its extracted fresh
+production consumer exercises the public provider and changed-context cursor
+refusal; every packaged notebook setup/example still executes. Existing RRULE/
+occurrence focused evidence passes 55 checks, including five properties and both
+DST zones. Locks/dependencies are unchanged. Optional absent-package checks for
+ex_knigge/gettext/knigge/sobelow/usage_rules remain skipped, not passed. These are
+pure/software archive checks, with no consumer scheduling or publication claim.

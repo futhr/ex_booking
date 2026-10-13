@@ -23,6 +23,11 @@ OccurrencePage and OccurrenceCursor contracts: original nominal/UTC start and
 global ordinal, ordered bounded pages and a complete query-bound continuation.
 They are recurrence values, not Intervals, booking reservations or job records.
 
+
+SP.08 also owns the bounded immutable `TimeZoneProvider` module/context value;
+its callbacks and complete cursor binding supply explicit data without a global
+timezone registry. This is a recurrence-only provider, not an availability policy.
+
 ## ExBooking.Interval
 
 A half-open interval `[start_at, end_at)` in UTC-normalized `DateTime`s.

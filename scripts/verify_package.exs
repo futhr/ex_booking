@@ -109,6 +109,24 @@ defmodule ExBooking.PackageVerification do
     {:error, {:stale, :occurrences, :cursor_basis}} =
       ExBooking.occurrences("FREQ=DAILY;COUNT=3", ~U[2026-07-13 06:00:00Z],
         Keyword.merge(occurrence_opts, cursor: cursor, time_zone_basis: "utc-v2"))
+    defmodule ImmutableConsumerZone do
+      @moduledoc false
+      @behaviour ExBooking.TimeZoneProvider
+      @impl ExBooking.TimeZoneProvider
+      def resolve(nominal, zone, _context),
+        do: DateTime.from_naive(nominal, zone, Calendar.UTCOnlyTimeZoneDatabase)
+      @impl ExBooking.TimeZoneProvider
+      def localize(datetime, zone, _context),
+        do: DateTime.shift_zone(datetime, zone, Calendar.UTCOnlyTimeZoneDatabase)
+    end
+    {:ok, provider} = ExBooking.TimeZoneProvider.new(ImmutableConsumerZone, "immutable-utc-one")
+    provider_opts = Keyword.put(occurrence_opts, :time_zone_database, provider)
+    {:ok, %{occurrences: [^original], next_cursor: provider_cursor}} =
+      ExBooking.occurrences("FREQ=DAILY;COUNT=3", ~U[2026-07-13 06:00:00Z], provider_opts)
+    {:error, {:stale, :occurrences, :cursor_basis}} =
+      ExBooking.occurrences("FREQ=DAILY;COUNT=3", ~U[2026-07-13 06:00:00Z],
+        Keyword.merge(provider_opts, cursor: provider_cursor,
+          time_zone_database: %{provider | context: "immutable-utc-two"}))
     invalid = %{now | month: 13}
     {:error, {:invalid, :now, ^invalid}} = ExBooking.available_slots(meeting, [], [],
       now: invalid, from: now, until: first.start_at)

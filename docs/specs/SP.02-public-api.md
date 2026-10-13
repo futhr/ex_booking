@@ -25,6 +25,13 @@ The additive `occurrences/3` API uses its own closed option table in
 time-zone database/basis, without `:now` or a booking resource. SP.08 owns its
 values, additional errors and continuation semantics.
 
+
+Original recurrence accepts either an explicit Calendar.TimeZoneDatabase module
+or a checked `ExBooking.TimeZoneProvider` with caller-supplied immutable binary
+context. The provider public constructors/helpers and callback/result refusals
+are defined in [SP.08](SP.08-occurrence-enumeration.md#explicit-immutable-timezone-providers).
+Other public availability/interval APIs continue using their existing database seams.
+
 Every time-relative function takes a keyword list with:
 
 | Option | Type | Required | Meaning |
