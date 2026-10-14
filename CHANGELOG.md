@@ -5,6 +5,13 @@ See [Conventional Commits](https://www.conventionalcommits.org) for commit guide
 
 <!-- changelog -->
 
+## Unreleased
+
+### Maintenance
+
+- Update the pinned Codecov action to 7.1.1 and upload-artifact to 7.0.2.
+
+
 ## [v0.2.3](https://github.com/futhr/ex_booking/compare/v0.2.2...v0.2.3) (2026-10-10)
 
 
