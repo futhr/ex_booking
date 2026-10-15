@@ -64,6 +64,12 @@ defmodule ExBooking.PackageVerification do
 
     File.write!(Path.join(consumer, "civil_verify.exs"), """
     false = Enum.any?(Application.started_applications(), fn {app, _, _} -> app in [:ex_booking, :tz] end)
+    dated = %ExBooking.DatedOccurrence{on: ~D[2024-02-29],
+      starts_at: ~U[2024-02-28 23:30:00.123456Z], reference: "no-start"}
+    {:ok, [^dated]} = ExBooking.date_window([dated], dated.on, dated.on)
+    {:ok, []} = ExBooking.date_window([dated], ~D[2024-02-28], ~D[2024-02-28], limit: 1)
+    {:error, {:limit, :date_window, :output}} =
+      ExBooking.date_window([dated, dated], dated.on, dated.on, limit: 1)
     opts = [days: 5, weekdays: [1, 3],
       from: ~U[2026-07-13 09:00:00.000001Z], until: ~U[2026-07-17 00:00:00Z],
       time_zone: "Etc/UTC", time_zone_database: Calendar.UTCOnlyTimeZoneDatabase,
@@ -102,7 +108,7 @@ defmodule ExBooking.PackageVerification do
       Enum.map([first, second, third], & &1.starts_at)
     {:error, :time_zone_provider_refused} = ExBooking.TimeZoneProvider.from_naive(~N[2026-07-13 09:00:00], "Synthetic/Multiple", provider)
     false = Enum.any?(Application.started_applications(), fn {app, _, _} -> app in [:ex_booking, :tz] end)
-    IO.puts("#{mode} civil query without application startup passed.")
+    IO.puts("#{mode} date-window and civil queries without application startup passed.")
     """)
 
     File.write!(Path.join(consumer, "verify.exs"), """
@@ -113,6 +119,11 @@ defmodule ExBooking.PackageVerification do
     expected = [:elixir, :kernel, :logger, :nimble_options, :stdlib, :tz]
     ^expected = :ex_booking |> Application.spec(:applications) |> Enum.sort()
     [] = Application.spec(:ex_booking, :mod)
+    dated = %ExBooking.DatedOccurrence{on: ~D[2024-02-29],
+      starts_at: ~U[2024-02-28 23:30:00.123456Z], reference: "consumer"}
+    {:ok, [^dated]} = ExBooking.date_window([dated], ~D[2024-02-29], ~D[2024-02-29])
+    {:error, {:limit, :date_window, :output}} =
+      ExBooking.date_window([dated, dated], dated.on, dated.on, limit: 1)
     meeting = %ExBooking.MeetingType{id: "intro", duration_min: 30}
     resource = %ExBooking.Resource{id: "host", timezone: "Europe/Stockholm"}
     rule = %ExBooking.AvailabilityRule{

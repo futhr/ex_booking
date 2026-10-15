@@ -155,6 +155,8 @@ code as it exists and the contracts it must keep.
   explicit time-zone basis and bounded deterministic pagination.
 - [SP.09](specs/SP.09-civil-occurrences.md) — bounded civil weekday/time queries
   with explicit gap/fold policies and no DTSTART ordinal.
+- [SP.10](specs/SP.10-date-windows.md) - explicit date-only occurrences and
+  bounded inclusive window selection without invented times or recurrence.
 
 ## Research Index
 

@@ -136,6 +136,7 @@ defmodule ExBooking.MixProject do
           ExBooking.Schedule,
           ExBooking.Slotting,
           ExBooking.Availability,
+          ExBooking.CalendarWindow,
           ExBooking.RRule,
           ExBooking.ICalendar,
           ExBooking.JSCalendar
@@ -144,7 +145,8 @@ defmodule ExBooking.MixProject do
           ExBooking.AvailabilityRule,
           ExBooking.MeetingType,
           ExBooking.Reservation,
-          ExBooking.Resource
+          ExBooking.Resource,
+          ExBooking.DatedOccurrence
         ],
         "Assignment & Policy": [
           ExBooking.Assignment,

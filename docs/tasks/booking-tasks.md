@@ -108,6 +108,37 @@ consumer checkout was not modified. This verifies public integration with that
 exact development archive; it does not claim registry publication or host
 scheduling qualification.
 
+## Explicit date windows
+
+Contract: [SP.10](../specs/SP.10-date-windows.md).
+
+- [x] Add DatedOccurrence and bounded inclusive date-window selection through
+  the public facade; preserve optional instants and consumer input order.
+- [x] Exercise DW-T1-T6, independent properties, malformed native inputs,
+  exact bounds and the extracted archive consumer; pass the full quality gate.
+
+Integration with the incoming civil-time queries passes the complete local
+`mix check --no-retry --no-parallel` on 2026-10-15, Elixir 1.20.4/OTP 29.0.4:
+448 checks (90 doctests, 34 properties, 324 tests), 97.2% project line coverage,
+warnings-as-errors compilation, format, strict Credo, Dialyzer, Doctor, ExDoc,
+both dependency audits and the extracted consumer/notebook corpus. CalendarWindow
+has 100% reported line coverage; Doctor reports 100% docs, moduledocs and specs.
+Additional regressions exercise the 100000-entry boundary, per-entry error
+precedence and UTF-8 reference byte limits. The independent generated date
+oracle spans years 0000-9999. Both new query APIs execute from the extracted
+archive without starting ExBooking or Tz.
+
+`mix verify.package --matrix` passes locked, fresh, minimum and optional-runtime
+dependency consumers, including every packaged notebook setup/example cell.
+Optional absent-package checks for ex_knigge, gettext, knigge, sobelow and
+usage_rules remain skipped under the existing configuration. These are local
+library/archive results; runtime dependencies and the lockfile remain unchanged.
+
+The same 448 checks, warnings-as-errors compilation, fresh extracted consumer
+and all notebook setup/examples also pass on Elixir 1.18.4/OTP 28.5.0.7 and
+Elixir 1.19.6/OTP 28.5.0.7. The 1.18 coverage gate reports 97.2%. These local
+runtime lanes do not certify hosted CI, downstream applications or publication.
+
 ## Original recurrence occurrences
 
 Contract: [SP.08](../specs/SP.08-occurrence-enumeration.md).

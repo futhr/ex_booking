@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: critical
   created: "2026-07-08"
-  updated: "2026-10-13"
+  updated: "2026-10-15"
   tags: ["api", "facade", "options", "error-vocabulary"]
   depends_on: ["R.01", "SP.01"]
 ---
@@ -19,6 +19,10 @@ SP.03, SP.04, and SP.06 are also supported for consumers that need to compose
 the kernel below the facade.
 
 ## Common options
+
+`date_window/3,4` selects explicit DatedOccurrence values using inclusive ISO
+Dates and its own input/output bounds, without `:now` or timezone conversion.
+[SP.10](SP.10-date-windows.md) owns its values, options and closed errors.
 
 The additive `occurrences/3` API uses its own closed option table in
 [SP.08](SP.08-occurrence-enumeration.md). It requires a query horizon and explicit

@@ -41,6 +41,7 @@ defmodule ExBooking do
   alias ExBooking.Assignment
   alias ExBooking.Availability
   alias ExBooking.AvailabilityRule
+  alias ExBooking.CalendarWindow
   alias ExBooking.Decision
   alias ExBooking.Event
   alias ExBooking.Hold
@@ -646,6 +647,25 @@ defmodule ExBooking do
           {:ok, [ExBooking.CivilOccurrence.t()]} | {:error, term()}
   def civil_occurrences(time, first_date, opts),
     do: ExBooking.CivilRecurrence.occurrences(time, first_date, opts)
+
+  @doc """
+  Selects explicit occurrences by their supplied dates, with inclusive edges.
+
+  Preserves input order, references and optional independent UTC instants.
+  `:input_limit` defaults to 10000 and `:limit` to 1000; either accepts 1-100000.
+  Malformed values and exceeded bounds return errors without partial results.
+  No clock, timezone database, duration or recurrence rule is required.
+
+  ## Example
+
+      iex> entry = %ExBooking.DatedOccurrence{on: ~D[2026-10-14]}
+      ...> ExBooking.date_window([entry], ~D[2026-10-14], ~D[2026-10-14])
+      {:ok, [entry]}
+  """
+  @spec date_window([ExBooking.DatedOccurrence.t()], Date.t(), Date.t(), keyword()) ::
+          {:ok, [ExBooking.DatedOccurrence.t()]} | {:error, term()}
+  def date_window(occurrences, from, to, opts \\ []),
+    do: CalendarWindow.select(occurrences, from, to, opts)
 
   @doc """
   Normalizes iCalendar `FREEBUSY` periods into busy intervals.

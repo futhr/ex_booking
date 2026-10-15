@@ -171,6 +171,17 @@ and keep product-specific orchestration in the product.
 
 ## Calendar Data
 
+Explicit calendar days need no booking duration or recurrence rule:
+
+```elixir
+entry = %ExBooking.DatedOccurrence{on: ~D[2026-10-14], reference: "event-1"}
+{:ok, [^entry]} = ExBooking.date_window([entry], ~D[2026-10-01], ~D[2026-10-31])
+```
+
+This unreleased addition preserves input order and optional independently
+supplied UTC instants. Inclusive date windows validate every admitted entry;
+input/output bounds return errors rather than truncated calendars.
+
 The interop modules are intentionally small:
 
 ```elixir
