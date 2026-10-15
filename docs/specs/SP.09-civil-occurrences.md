@@ -46,7 +46,7 @@ are no defaults; unknown, duplicate or missing keys refuse before callbacks.
 | --- | --- |
 | days | Integer 1–366. Enumerate dates first_date through first_date + days - 1, inclusive; the complete span must stay within years 0000–9999. |
 | weekdays | Nonempty ascending unique list of ISO weekdays 1–7, bounded to seven entries before traversal. |
-| from, until | Exact structurally valid ISO DateTimes, years 0000–9999, valid UTF-8 time_zone (1–256 bytes) and zone_abbr (0–256 bytes), each offset component within ±93599 seconds and their total within [-89999, 93599] seconds. Normalize using the explicit UTC-only database; require from < until. Fractional instants preserve their native microsecond value/precision. |
+| from, until | Exact structurally valid ISO DateTimes, years 0000–9999, valid UTF-8 time_zone (1–256 bytes) and zone_abbr (0–256 bytes), each offset component within ±93599 seconds and their total within [-89999, 93599] seconds. Normalize from civil fields and total offset without a database lookup; require from < until. Fractional instants preserve their native microsecond value/precision. |
 | time_zone | Nonempty valid UTF-8 name, 1–256 bytes. |
 | time_zone_database | Explicit Calendar.TimeZoneDatabase module or fully valid immutable SP.08 TimeZoneProvider. No ambient selection or text-to-module conversion. |
 | gap_policy | Exactly skip or reject. |
@@ -92,6 +92,10 @@ applies to every selected label in the local span, including labels outside the
 UTC window. Normalize retained instants to Etc/UTC without clipping or changing
 their nominal labels, then include exactly `from <= starts_at < until`.
 Conversion outside supported UTC years refuses rather than clamping a point.
+Normalization applies the total supplied offset even when the source zone name
+is `Etc/UTC`. Every normalized endpoint and returned instant uses canonical
+`Etc/UTC`, abbreviation `UTC` and zero offsets, preserving microsecond value and
+precision. A matching source zone name cannot bypass coordinate validation.
 
 Return all retained points in strictly increasing UTC order, irrespective of
 local-date order. Duplicate UTC results refuse as inconsistent timezone output;
@@ -164,7 +168,7 @@ replaying an ancient recurrence prefix.
 
 | Case | Requirements and observation / falsifier |
 | --- | --- |
-| CIV-T1 | 01–04: Literal UTC dates, exact weekday masks, both UTC boundaries, fractional query endpoints and the final supported date produce exact original points; a point clipped to from or an extra weekday fails. |
+| CIV-T1 | 01–04: Literal UTC dates, exact weekday masks, both UTC boundaries, fractional query endpoints and the final supported date produce exact original points; UTC-named offset values normalize canonically and out-of-range UTC coordinates refuse before resolution; a point clipped to from or an extra weekday fails. |
 | CIV-T2 | 02–03: Independently stated Stockholm and New York spring gaps and autumn folds cover every policy; first outside/second inside never substitutes under first policy; rejection applies before UTC filtering. |
 | CIV-T3 | 01/05: Unknown/duplicate/missing options, improper/oversized lists, booleans, invalid/native-extra date/time/datetime fields, precision, overflowed spans, bad modules/providers and malformed horizons refuse before any counting callback. |
 | CIV-T4 | 02/04/05: Instrumented immutable providers establish the finite callback bound and independent concurrent contexts. Refused/malformed/reversed-fold/mismatching round-trip/duplicate-UTC output yields fixed errors without private payloads; implementation faults propagate. |

@@ -16,6 +16,50 @@ Legend:
 [-] delegated / not an in-repo task
 ```
 
+## Library boundary and UTC normalization review
+
+Contracts: [SP.08](../specs/SP.08-occurrence-enumeration.md) and
+[SP.09](../specs/SP.09-civil-occurrences.md).
+
+- [x] Verify generic provider/consumer ownership, canonical UTC normalization
+  for offset-bearing UTC-named values, supported-coordinate refusals and
+  concurrent immutable contexts; qualify the full gate, archive dependency
+  matrix and locally available supported runtimes.
+
+Review of `3fa614c` on 2026-10-15 found a normalization defect in both new
+query operations: a timezone shift to an already matching `Etc/UTC` name retained
+supplied offsets and metadata, allowing unsupported UTC coordinates through the
+year check. Independent regressions failed against that revision. Normalization
+now computes the instant from native fields and total offset, emits canonical
+UTC metadata and preserves microsecond value/precision. The regression property
+covers generated offsets and fractional instants; literal cases cover both UTC
+year boundaries and the wider civil offset profile. Thirty-two concurrent
+queries retain independent immutable period tables.
+
+The provider remains a public module/binary-context behaviour. The library owns
+bounded temporal calculation; timezone parsing, clock trust, schedule identity,
+persistence and execution remain consumer-owned. No runtime dependency, process,
+global configuration or consumer-specific branch was introduced.
+
+`mix check --no-retry` passed 436 checks (87 doctests, 33 properties, 316 tests;
+seed 564498) with 97.2% line coverage on Elixir 1.20.4/OTP 29.0.4.
+Compilation, formatter, Credo, Dialyzer, security/dependency audits, Doctor,
+ExDoc and the actual extracted archive consumer passed. Doctor reported 100%
+documentation, module documentation and public specification coverage. The five
+absent optional packages listed in the earlier civil records remain inapplicable.
+`mix verify.package --matrix` passed locked, fresh, minimum and optional
+dependency consumers, no-start civil queries and all six packaged notebooks.
+The same 436 ExUnit checks passed on Elixir 1.18.4 and 1.19.6 with OTP 28.5.0.7
+(seeds 681410 and 294396).
+
+An isolated public consumer snapshot at
+`d1b2e87bdc82bd0138887931a9f40a2236ff2fdc` executed its unchanged archive
+calendar/civil harness against producer archive
+`sha256:47a7b823391e7710d69f10a31c541dd1ba76e60a66e0692802df5d7be6519dae`.
+All 19 cases passed (seed 184799), including a separate no-application-start
+civil query. The active consumer checkout was not modified. This is local
+software evidence; hosted CI, publication and host scheduling remain separate.
+
 ## Bounded civil-time queries
 
 Contract: [SP.09](../specs/SP.09-civil-occurrences.md).

@@ -84,6 +84,32 @@ defmodule ExBooking.CivilPeriodsTest do
              TimeZoneProvider.from_naive(~N[2026-07-13 09:30:00], "Synthetic/Periods", provider)
   end
 
+  test "concurrent queries keep independent immutable period tables" do
+    first = provider(~D[2026-07-13])
+    other = provider(~D[2027-07-14])
+
+    inputs =
+      List.duplicate(
+        [
+          {first, [~U[2026-07-13 07:30:00Z], ~U[2026-07-13 08:30:00Z], ~U[2026-07-13 09:30:00Z]]},
+          {other, [~U[2026-07-13 07:30:00Z]]}
+        ],
+        16
+      )
+      |> List.flatten()
+
+    inputs
+    |> Task.async_stream(
+      fn {provider, expected} ->
+        assert {:ok, points} = query(~D[2026-07-13], ~T[09:30:00], provider)
+        assert Enum.map(points, & &1.starts_at) == expected
+        assert Enum.all?(points, &(&1.nominal == ~N[2026-07-13 09:30:00]))
+      end,
+      max_concurrency: 8
+    )
+    |> Enum.each(fn result -> assert {:ok, true} = result end)
+  end
+
   property "independent immutable period tables do not change another query" do
     check all(day <- integer(0..365), second <- integer(0..3599)) do
       date = Date.add(~D[2026-01-01], day)

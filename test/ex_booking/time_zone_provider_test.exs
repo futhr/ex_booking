@@ -113,6 +113,26 @@ defmodule ExBooking.TimeZoneProviderTest do
     end
   end
 
+  property "original recurrence normalizes offsets independently of a UTC zone label" do
+    check all(offset <- integer(-86_400..86_400), microsecond <- integer(0..999_999)) do
+      {:ok, provider} = TimeZoneProvider.new(ExplicitZone, <<offset::signed-big-32>>)
+      wall = %{~U[2026-07-13 06:00:00Z] | microsecond: {microsecond, 6}}
+      start = %{wall | utc_offset: offset, zone_abbr: "FIXED"}
+
+      assert {:ok, page} =
+               ExBooking.occurrences(
+                 "FREQ=DAILY;COUNT=2",
+                 start,
+                 options(provider, from: ~U[2026-07-11 00:00:00Z])
+               )
+
+      assert Enum.map(page.occurrences, & &1.starts_at) ==
+               [DateTime.add(wall, -offset), DateTime.add(wall, 86_400 - offset)]
+
+      assert Enum.map(page.occurrences, & &1.ordinal) == [1, 2]
+    end
+  end
+
   test "both DST zones preserve independent gap/fold UTC coordinates and module parity" do
     {:ok, provider} = TimeZoneProvider.new(ExplicitZone, "iana")
 

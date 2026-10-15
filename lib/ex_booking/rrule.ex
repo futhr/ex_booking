@@ -289,8 +289,8 @@ defmodule ExBooking.RRule do
   end
 
   defp occurrence_utc(value) do
-    case DateTime.shift_zone(value, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase) do
-      {:ok, utc} when utc.year in 0..9999 -> {:ok, utc}
+    case DateTime.from_unix(DateTime.to_unix(value, :microsecond), :microsecond) do
+      {:ok, utc} when utc.year in 0..9999 -> {:ok, %{utc | microsecond: value.microsecond}}
       _ -> occurrence_error(:arguments)
     end
   end

@@ -150,6 +150,41 @@ defmodule ExBooking.CivilRecurrenceTest do
              )
   end
 
+  test "UTC-named provider values normalize their complete supplied offsets" do
+    for offset <- [-89_999, -86_400, -3600, 0, 3600, 86_400, 93_599] do
+      opts =
+        Keyword.merge(options(),
+          days: 1,
+          weekdays: [1],
+          time_zone_database: provider(<<offset::signed-big-32>>),
+          from: ~U[2026-07-11 00:00:00Z],
+          until: ~U[2026-07-16 00:00:00Z]
+        )
+
+      assert {:ok, [point]} = CivilRecurrence.occurrences(~T[09:00:00], ~D[2026-07-13], opts)
+      assert point.starts_at == DateTime.add(~U[2026-07-13 09:00:00Z], -offset)
+      assert point.nominal == ~N[2026-07-13 09:00:00]
+    end
+  end
+
+  test "UTC-named horizon offsets cannot bypass supported coordinate bounds" do
+    for {key, value} <- [
+          {:from, %{~U[0000-01-01 00:00:00Z] | utc_offset: 1}},
+          {:until, %{~U[9999-12-31 23:59:59Z] | std_offset: -1}}
+        ] do
+      opts =
+        options()
+        |> Keyword.put(:time_zone_database, provider("utc-range-preflight"))
+        |> Keyword.put(key, value)
+
+      assert {:error, {:invalid, :civil_occurrences, :coordinate_range}} =
+               CivilRecurrence.occurrences(~T[09:00:00], ~D[2026-07-13], opts)
+    end
+
+    assert Process.get({Provider, "utc-range-preflight", :resolve}, 0) == 0
+    assert Process.get({Provider, "utc-range-preflight", :localize}, 0) == 0
+  end
+
   test "independent Stockholm and New York gap/fold literals cover every policy" do
     for {zone, date, time, first, second} <- [
           {"Europe/Stockholm", ~D[2026-10-25], ~T[02:30:00], ~U[2026-10-25 00:30:00Z],

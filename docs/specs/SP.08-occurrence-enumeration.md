@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-10-13"
-  updated: "2026-10-13"
+  updated: "2026-10-15"
   tags: ["rrule", "occurrences", "pagination", "bounds"]
   depends_on: ["SP.01", "SP.02", "SP.06", "SP.07"]
 ---
@@ -46,6 +46,12 @@ fold instant; preserve that supplied instant. A nonexistent or mismatched
 DTSTART rejects. Subsequent ambiguous occurrences always use the first instant.
 Existing APIs retain their custom-calendar and datetime contracts.
 Offset components and their sum must each lie within ±86400 seconds.
+
+UTC normalization uses the supplied civil fields and total offset, including
+when the supplied zone name is `Etc/UTC`. Returned instants and retained horizon
+bounds use canonical `Etc/UTC` metadata with zero offsets and abbreviation `UTC`,
+preserving the microsecond value and precision. Normalized UTC coordinates must
+remain in years 0000–9999; a zone-name shortcut cannot bypass this bound.
 
 | Option | Required / default | Contract |
 | --- | --- | --- |
@@ -173,7 +179,7 @@ Existing expand/availability outputs, defaults and errors remain unchanged.
 | OCC-T4 | 01–03 | DAILY/WEEKLY/INTERVAL/BYDAY, Monday anchors, COUNT before filtering and inclusive UNTIL/exclusive horizon agree with an independent calendar-day oracle |
 | OCC-T5 | 01, 04, 06 | Reject duplicate/unknown options, forged dates/rules, mismatched basis, tampered cursor and missing database; no raising or partial success |
 | OCC-T6 | 03–05 | Empty/sparse/ancient horizons and gap-heavy cursor replay exhaust a small budget deterministically; exact boundary succeeds; no work beyond the finite horizon |
-| OCC-T7 | 02–06 | Fractional seconds, year bounds, empty final continuation and retries preserve deterministic ordering and exact values |
+| OCC-T7 | 01–06 | Fractional seconds, year bounds, empty final continuation and retries preserve deterministic ordering and exact values; UTC-named values with supplied offsets normalize canonically or refuse out-of-range UTC coordinates |
 | OCC-T8 | 01, 06 | Existing RRULE/availability corpus is unchanged; independent archive consumer enumerates reminders and calendar previews without application/process/I/O additions |
 
 Examples become runnable doctests once implemented. Properties must be

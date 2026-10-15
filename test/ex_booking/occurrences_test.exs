@@ -51,6 +51,22 @@ defmodule ExBooking.OccurrencesTest do
     assert hd(intervals).start_at == opts[:from]
   end
 
+  test "UTC-named horizon offsets normalize the cursor and enforce coordinate bounds" do
+    supplied = %{~U[2026-07-13 06:00:00.123Z] | utc_offset: 1800, std_offset: 1800}
+    opts = utc_opts(from: supplied, limit: 1)
+
+    assert {:ok, %{next_cursor: cursor}} = ExBooking.occurrences("FREQ=DAILY", @start, opts)
+    assert cursor.basis.from == ~U[2026-07-13 05:00:00.123Z]
+
+    for {key, value} <- [
+          {:from, %{~U[0000-01-01 00:00:00Z] | utc_offset: 1}},
+          {:until, %{~U[9999-12-31 23:59:59Z] | std_offset: -1}}
+        ] do
+      assert {:error, {:invalid, :occurrences, :arguments}} =
+               ExBooking.occurrences("FREQ=DAILY;COUNT=1", @start, Keyword.put(opts, key, value))
+    end
+  end
+
   test "COUNT is global, UNTIL inclusive and query until exclusive" do
     opts = utc_opts(from: ~U[2026-07-14 00:00:00Z])
     assert {:ok, %{occurrences: []}} = ExBooking.occurrences("FREQ=DAILY;COUNT=1", @start, opts)

@@ -77,7 +77,8 @@ defmodule ExBooking.CivilRecurrence do
 
   Query boundaries and resolved DateTimes must have years 0000–9999, UTF-8
   timezone names of 1–256 bytes, abbreviations of 0–256 bytes and offsets within
-  the civil profile documented above. The operation normalizes boundaries to UTC,
+  the civil profile documented above. Boundaries normalize from their supplied
+  fields and total offsets to canonical UTC, even when already named `Etc/UTC`,
   preserving fractional values and native microsecond precision.
   Both normalized endpoints and retained instants must remain in years 0000–9999.
   Returned points satisfy `from <= starts_at < until` without clipping either
@@ -317,9 +318,12 @@ defmodule ExBooking.CivilRecurrence do
       |> Enum.all?(fn [first, second] -> DateTime.compare(first, second) == :lt end)
 
   defp utc(value) do
-    case DateTime.shift_zone(value, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase) do
-      {:ok, %{year: year} = utc} when year in 0..9999 -> {:ok, utc}
-      _ -> invalid(:coordinate_range)
+    case DateTime.from_unix(DateTime.to_unix(value, :microsecond), :microsecond) do
+      {:ok, %{year: year} = utc} when year in 0..9999 ->
+        {:ok, %{utc | microsecond: value.microsecond}}
+
+      _ ->
+        invalid(:coordinate_range)
     end
   end
 

@@ -99,14 +99,16 @@ defmodule ExBooking.PackageVerification do
       end
     end
     {:ok, provider} = ExBooking.TimeZoneProvider.new(CompleteCivilZone, <<>>)
-    complete_opts = Keyword.merge(opts, days: 1, weekdays: [1],
-      from: ~U[2026-07-13 00:00:00Z], until: ~U[2026-07-14 00:00:00Z],
-      time_zone: "Synthetic/Multiple", time_zone_database: provider, fold_policy: :both)
-    {:ok, [first, second, third]} = ExBooking.civil_occurrences(~T[09:00:00], ~D[2026-07-13], complete_opts)
-    [:first_fold, :second_fold, {:fold, 3}] = Enum.map([first, second, third], & &1.resolution)
-    [~U[2026-07-13 08:59:58Z], ~U[2026-07-13 08:59:59Z], ~U[2026-07-13 09:00:00Z]] =
-      Enum.map([first, second, third], & &1.starts_at)
-    {:error, :time_zone_provider_refused} = ExBooking.TimeZoneProvider.from_naive(~N[2026-07-13 09:00:00], "Synthetic/Multiple", provider)
+    for zone <- ["Synthetic/Multiple", "Etc/UTC"] do
+      complete_opts = Keyword.merge(opts, days: 1, weekdays: [1],
+        from: ~U[2026-07-13 00:00:00Z], until: ~U[2026-07-14 00:00:00Z],
+        time_zone: zone, time_zone_database: provider, fold_policy: :both)
+      {:ok, [first, second, third]} = ExBooking.civil_occurrences(~T[09:00:00], ~D[2026-07-13], complete_opts)
+      [:first_fold, :second_fold, {:fold, 3}] = Enum.map([first, second, third], & &1.resolution)
+      [~U[2026-07-13 08:59:58Z], ~U[2026-07-13 08:59:59Z], ~U[2026-07-13 09:00:00Z]] =
+        Enum.map([first, second, third], & &1.starts_at)
+      {:error, :time_zone_provider_refused} = ExBooking.TimeZoneProvider.from_naive(~N[2026-07-13 09:00:00], zone, provider)
+    end
     false = Enum.any?(Application.started_applications(), fn {app, _, _} -> app in [:ex_booking, :tz] end)
     IO.puts("#{mode} date-window and civil queries without application startup passed.")
     """)
