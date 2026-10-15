@@ -46,7 +46,7 @@ are no defaults; unknown, duplicate or missing keys refuse before callbacks.
 | --- | --- |
 | days | Integer 1–366. Enumerate dates first_date through first_date + days - 1, inclusive; the complete span must stay within years 0000–9999. |
 | weekdays | Nonempty ascending unique list of ISO weekdays 1–7, bounded to seven entries before traversal. |
-| from, until | Exact structurally valid ISO DateTimes, years 0000–9999, valid UTF-8 zone metadata, each offset component within ±93599 seconds and their total within -89999–93599 seconds. Normalize using the explicit UTC-only database; require from < until. Fractional instants preserve their native microsecond value/precision. |
+| from, until | Exact structurally valid ISO DateTimes, years 0000–9999, valid UTF-8 time_zone (1–256 bytes) and zone_abbr (0–256 bytes), each offset component within ±93599 seconds and their total within [-89999, 93599] seconds. Normalize using the explicit UTC-only database; require from < until. Fractional instants preserve their native microsecond value/precision. |
 | time_zone | Nonempty valid UTF-8 name, 1–256 bytes. |
 | time_zone_database | Explicit Calendar.TimeZoneDatabase module or fully valid immutable SP.08 TimeZoneProvider. No ambient selection or text-to-module conversion. |
 | gap_policy | Exactly skip or reject. |
@@ -72,7 +72,7 @@ Never snap a nonexistent label forward or silently choose a different fold.
 
 Validate every returned resolution, including both fold alternatives before
 selection: exact native ISO shape, matching nominal and zone, valid UTF-8
-metadata and this civil profile's offset bounds. A fold must be strictly increasing in UTC. Round-trip
+metadata with the same byte bounds and this civil profile's offset bounds. A fold must be strictly increasing in UTC. Round-trip
 each resolved instant through the same supplied database/provider; the instant,
 nominal label, zone and precision must agree. Malformed or refused results become
 the fixed timezone-result error, without retaining callback payloads.
