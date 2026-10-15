@@ -605,6 +605,49 @@ defmodule ExBooking do
   def occurrences(rule, dtstart, opts), do: RRule.occurrences(rule, dtstart, opts)
 
   @doc """
+  Returns civil weekday/time points over an explicit finite local-date span.
+
+  Delegates to `ExBooking.CivilRecurrence.occurrences/3`, returning
+  `{:ok, points}` with UTC-ordered `ExBooking.CivilOccurrence` values, or its fixed
+  `{:error, reason}` without a partial result. Supply a whole-second ISO `Time`,
+  an ISO `Date` and all eight options: `:days`, `:weekdays`, `:from`, `:until`,
+  `:time_zone`, `:time_zone_database`, `:gap_policy` and `:fold_policy`. See the
+  domain function for native-value bounds, offset profiles and error fields.
+
+  The UTC window is half-open; gap/fold policies apply before that filter.
+  Points retain their original local label and UTC instant. This has no DTSTART,
+  COUNT, global ordinal or cursor; an empty list describes only the explicit local
+  span. Returned points provide no duration, booking availability or execution
+  authority.
+
+  ## Examples
+
+      iex> {:ok, [point]} =
+      ...>   ExBooking.civil_occurrences(
+      ...>     ~T[09:00:00],
+      ...>     ~D[2026-07-13],
+      ...>     days: 1,
+      ...>     weekdays: [1],
+      ...>     from: ~U[2026-07-13 00:00:00Z],
+      ...>     until: ~U[2026-07-14 00:00:00Z],
+      ...>     time_zone: "Etc/UTC",
+      ...>     time_zone_database: Calendar.UTCOnlyTimeZoneDatabase,
+      ...>     gap_policy: :skip,
+      ...>     fold_policy: :first
+      ...>   )
+      ...>
+      ...> point.nominal
+      ~N[2026-07-13 09:00:00]
+
+      iex> ExBooking.civil_occurrences(~T[09:00:00], ~D[2026-07-13], [])
+      {:error, {:invalid, :civil_occurrences, :options}}
+  """
+  @spec civil_occurrences(term(), term(), term()) ::
+          {:ok, [ExBooking.CivilOccurrence.t()]} | {:error, term()}
+  def civil_occurrences(time, first_date, opts),
+    do: ExBooking.CivilRecurrence.occurrences(time, first_date, opts)
+
+  @doc """
   Normalizes iCalendar `FREEBUSY` periods into busy intervals.
 
   This is a pure parser over caller-supplied iCalendar text. It performs no file

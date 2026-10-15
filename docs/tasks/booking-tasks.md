@@ -20,17 +20,33 @@ Legend:
 
 Contract: [SP.09](../specs/SP.09-civil-occurrences.md).
 
-- [ ] Implement immutable CivilOccurrence and thin facade/domain operation;
+- [x] Implement immutable CivilOccurrence and thin facade/domain operation;
   validate exact required options and native temporal values before callbacks.
-- [ ] Enumerate the explicit finite weekday/time span with selected gap/fold
+- [x] Enumerate the explicit finite weekday/time span with selected gap/fold
   policy, original UTC filtering, round-trip checks and strict UTC ordering.
-- [ ] Execute independent CIV-T1–T5 UTC/DST, malformed-input, callback-bound,
+- [x] Execute independent CIV-T1–T5 UTC/DST, malformed-input, callback-bound,
   partition and retry cases, including the separately bounded civil offset profile.
-- [ ] Exercise CIV-T6 through doctests and the actual extracted archive consumer;
+- [x] Exercise CIV-T6 through doctests and the actual extracted archive consumer;
   run the full quality milestone and preserve existing recurrence/availability.
 
-This accepted addition has no executed implementation evidence yet. It adds no
-runtime dependency, process, clock confidence or consumer scheduling policy.
+Development validation on 2026-10-15 used the working tree based on `f516b2d`,
+Elixir 1.20.4/OTP 29.0.4 and unchanged repository dependencies/toolchain.
+`mix check --no-retry` passed 425 checks (87 doctests, 31 properties, 307 tests;
+seed 661512), with 97.1% line coverage, compiler/formatter/Credo, dependency and
+security audits, Dialyzer, Doctor and ExDoc. Doctor reports 100% documentation,
+module documentation and public specification coverage. Optional checks for
+absent ex_knigge/gettext/knigge/sobelow/usage_rules packages were skipped.
+The focused suite also exercised existing original occurrences and provider
+compatibility. Civil cases cover both DST zones, maximum 366 resolutions and
+732 localizations, strict ordering, late refusal without partial results and
+independent Gregorian partition/retry properties.
+
+The actual extracted archive passed a fresh production consumer, the README
+quick start and all six notebooks. A separate process executed the civil API
+with neither ex_booking nor tz started. Temporary consumers/archive/notebook
+directories were removed by the verifier. This adds no runtime dependency,
+process, clock confidence or consumer scheduling policy. These are local checks;
+registry publication, hosted CI and downstream scheduling remain separate.
 
 ## Original recurrence occurrences
 

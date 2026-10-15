@@ -62,6 +62,22 @@ defmodule ExBooking.PackageVerification do
     [_, example] = Regex.run(~r/```elixir\n(.*?)\n```/s, quick_start)
     File.write!(Path.join(consumer, "readme_example.exs"), example)
 
+    File.write!(Path.join(consumer, "civil_verify.exs"), """
+    false = Enum.any?(Application.started_applications(), fn {app, _, _} -> app in [:ex_booking, :tz] end)
+    opts = [days: 5, weekdays: [1, 3],
+      from: ~U[2026-07-13 09:00:00.000001Z], until: ~U[2026-07-17 00:00:00Z],
+      time_zone: "Etc/UTC", time_zone_database: Calendar.UTCOnlyTimeZoneDatabase,
+      gap_policy: :skip, fold_policy: :first]
+    {:ok, [%ExBooking.CivilOccurrence{nominal: ~N[2026-07-15 09:00:00],
+      starts_at: ~U[2026-07-15 09:00:00Z], resolution: :unique} = point]} =
+      ExBooking.civil_occurrences(~T[09:00:00], ~D[2026-07-13], opts)
+    false = Map.has_key?(point, :ordinal)
+    {:error, {:invalid, :civil_occurrences, :options}} =
+      ExBooking.civil_occurrences(~T[09:00:00], ~D[2026-07-13], opts ++ [days: 1])
+    false = Enum.any?(Application.started_applications(), fn {app, _, _} -> app in [:ex_booking, :tz] end)
+    IO.puts("#{mode} civil query without application startup passed.")
+    """)
+
     File.write!(Path.join(consumer, "verify.exs"), """
     Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
     #{mode == :optional} = Code.ensure_loaded?(Mint.HTTP)
@@ -138,6 +154,11 @@ defmodule ExBooking.PackageVerification do
 
     command!("mix", ["deps.get"], consumer, [{"MIX_ENV", "prod"}])
     command!("mix", ["compile", "--warnings-as-errors"], consumer, [{"MIX_ENV", "prod"}])
+
+    command!("mix", ["run", "--no-start", "--no-compile", "civil_verify.exs"], consumer, [
+      {"MIX_ENV", "prod"}
+    ])
+
     command!("mix", ["run", "--no-compile", "verify.exs"], consumer, [{"MIX_ENV", "prod"}])
   end
 
