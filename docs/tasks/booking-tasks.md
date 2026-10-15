@@ -16,6 +16,22 @@ Legend:
 [-] delegated / not an in-repo task
 ```
 
+## Bounded civil-time queries
+
+Contract: [SP.09](../specs/SP.09-civil-occurrences.md).
+
+- [ ] Implement immutable CivilOccurrence and thin facade/domain operation;
+  validate exact required options and native temporal values before callbacks.
+- [ ] Enumerate the explicit finite weekday/time span with selected gap/fold
+  policy, original UTC filtering, round-trip checks and strict UTC ordering.
+- [ ] Execute independent CIV-T1–T5 UTC/DST, malformed-input, callback-bound,
+  partition and retry cases, including the separately bounded civil offset profile.
+- [ ] Exercise CIV-T6 through doctests and the actual extracted archive consumer;
+  run the full quality milestone and preserve existing recurrence/availability.
+
+This accepted addition has no executed implementation evidence yet. It adds no
+runtime dependency, process, clock confidence or consumer scheduling policy.
+
 ## Original recurrence occurrences
 
 Contract: [SP.08](../specs/SP.08-occurrence-enumeration.md).

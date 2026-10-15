@@ -153,6 +153,8 @@ code as it exists and the contracts it must keep.
 - `SP.07` — validation gates and test rules.
 - [SP.08](specs/SP.08-occurrence-enumeration.md) — original recurrence occurrences,
   explicit time-zone basis and bounded deterministic pagination.
+- [SP.09](specs/SP.09-civil-occurrences.md) — bounded civil weekday/time queries
+  with explicit gap/fold policies and no DTSTART ordinal.
 
 ## Research Index
 

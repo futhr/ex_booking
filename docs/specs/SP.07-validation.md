@@ -217,3 +217,13 @@ behavior-changing probe silently retained the first duplicate value; the
 regressions reject that behavior. No compile/harness failure counts as detecting
 a fault. New cases were already green because the behavior was implemented;
 the fault injections establish that their assertions distinguish broken behavior.
+
+## Bounded civil-query acceptance
+
+[SP.09 CIV-T1–T6](SP.09-civil-occurrences.md#independent-acceptance) require
+independent UTC/day and Stockholm/New York expectations, explicit gap/fold
+policies, strict native/option preflight, immutable callback bounds/refusals,
+partition/retry properties and an actual extracted archive consumer. Preserve
+SP.08 ordinals/COUNT/second-fold DTSTART and existing availability gap behavior.
+A provider fixture or development archive does not qualify consumer time or
+persistence; record only executed evidence in the task list.

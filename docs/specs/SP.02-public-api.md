@@ -385,3 +385,12 @@ mean absence. `ExBooking.Options` owns shared schema and horizon validation.
 ## Validation ownership
 
 Each public domain operation validates its own inputs. Facade operations validate their option schemas and strategy/scorer options, then delegate resource and request validation to availability. Rescheduling retains preflight before its policy can short-circuit. Availability validates and pairs resources once within each operation. Error selection among multiple independently malformed fields is not an API ordering guarantee. Assignment strategy types enumerate the supported selectors; resource fairness maps have optional keys.
+
+## Bounded civil-time queries
+
+`ExBooking.civil_occurrences(time, first_date, opts)` delegates to the pure
+`ExBooking.CivilRecurrence.occurrences/3` under [SP.09](SP.09-civil-occurrences.md).
+Its eight exact required options have no defaults; its fixed `civil_occurrences`
+invalid/gap/ambiguity vocabulary is independent of existing RRULE errors.
+The result is a complete bounded list of original local/UTC points, without
+DTSTART ordinals, booking duration, availability or execution authority.

@@ -270,3 +270,10 @@ seat identities represent those seats as separate resources.
 ## Fairness map shape
 
 Fairness fields are optional; an empty or partial map is valid. Resource.validate_fairness/2 owns the shared field checks. Assignment preserves its strategy-specific resource_weight error when validating weighted assignment directly.
+
+## Civil occurrence values
+
+[SP.09](SP.09-civil-occurrences.md) adds `ExBooking.CivilOccurrence`, with
+`nominal`, UTC `starts_at` and `resolution`. It has no DTSTART/global ordinal
+or cursor and is distinct from `ExBooking.Occurrence`. Its finite-query bounds
+and exact gap/fold policy are supplied to the owning operation.
