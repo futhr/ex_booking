@@ -82,6 +82,32 @@ The verifier removed its temporary consumer/archive/notebook directories;
 generated local documentation was removed after review. This is local software
 evidence; registry publication, hosted CI and downstream adoption are separate.
 
+An independent review of `16a9d0d` on 2026-10-15 added a coherent synthetic
+period-table fixture: two successive backward transitions produce three valid
+UTC interpretations of one local label. Boundary assertions and a generated
+property check original coordinates, the filtered third fold and independent
+immutable provider contexts. The API remains a pure calculation over supplied
+data; serialization, clock trust, schedule identity, persistence and execution
+policy belong to consumers. No production change or runtime dependency was
+needed for this review.
+
+The final `mix check --no-retry` passed 431 checks (87 doctests, 32 properties,
+312 tests; seed 631696) with 97.1% line coverage and every required component
+green. `mix verify.package --matrix` passed locked, fresh, minimum and optional
+dependency consumers, including no-start civil queries and all six notebooks.
+The same optional package checks listed above remained inapplicable.
+
+An isolated consumer snapshot at `eb1380ae7a7d37d127143c1e0826467d01eda93d`
+also executed its existing public calendar/civil archive harness against the
+extracted producer archive
+`sha256:5e1b12fbe5fa9e72f02ff7e79674dd35e415fb4aea87222f7ea01cfa50ae1fb2`.
+All 19 cases passed (seed 994054), including threefold projection, filtering,
+work refusal and legacy recurrence compatibility. A separate civil query kept
+the producer, consumer library and timezone application unstarted. The active
+consumer checkout was not modified. This verifies public integration with that
+exact development archive; it does not claim registry publication or host
+scheduling qualification.
+
 ## Original recurrence occurrences
 
 Contract: [SP.08](../specs/SP.08-occurrence-enumeration.md).
