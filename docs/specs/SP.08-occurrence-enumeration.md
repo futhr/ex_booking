@@ -237,3 +237,8 @@ fold ordering. Explicit providers for Stockholm/New York agree with the existing
 module-based DST corpus and independent UTC expectations, including second-fold
 DTSTART, skipped gaps, COUNT and changing page limits. Archive consumers exercise
 this public seam without application configuration or shared mutable state.
+
+SP.09 additionally owns an optional resolve_civil/3 callback for complete bounded
+civil ambiguities. SP.08 and the public from_naive/3 helper never select that
+callback; their resolve/3 return shapes, work accounting and original ordinals
+remain unchanged.

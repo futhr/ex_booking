@@ -48,6 +48,19 @@ directories were removed by the verifier. This adds no runtime dependency,
 process, clock confidence or consumer scheduling policy. These are local checks;
 registry publication, hosted CI and downstream scheduling remain separate.
 
+## Complete civil ambiguity
+
+Contract: [SP.09 CIV-06](../specs/SP.09-civil-occurrences.md#optional-complete-civil-resolution).
+
+- [ ] Add the optional complete civil callback and local fold positions while
+  preserving legacy provider helpers and original recurrence behavior.
+- [ ] Enforce the existing total localization budget before each complete label;
+  cover all policies, malformed discarded alternatives, no fallback and exact bounds.
+- [ ] Execute CIV-T7 through independent providers and the actual no-start archive
+  consumer; run the owning public-API quality milestone and record evidence.
+
+This additive contract is accepted; implementation/evidence remain pending.
+
 ## Original recurrence occurrences
 
 Contract: [SP.08](../specs/SP.08-occurrence-enumeration.md).

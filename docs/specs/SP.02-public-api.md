@@ -394,3 +394,9 @@ Its eight exact required options have no defaults; its fixed `civil_occurrences`
 invalid/gap/ambiguity vocabulary is independent of existing RRULE errors.
 The result is a complete bounded list of original local/UTC points, without
 DTSTART ordinals, booking duration, availability or execution authority.
+
+SP.09 additionally admits the optional provider resolve_civil/3 callback and
+local `{:fold, index}` resolutions beyond the second candidate. Its complete
+query retains the 732-localization ceiling and returns the fixed
+`{:error, {:limit, :civil_occurrences, :work}}` on exhaustion. This does not
+extend SP.08 or its public timezone helpers.

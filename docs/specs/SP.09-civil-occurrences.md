@@ -13,7 +13,7 @@ ex_booking:
 
 # SP.09 — Bounded civil-time occurrences
 
-Version: 0.1.0. This is an additive pure calculation contract. The task list
+Version: 0.2.0. This is an additive pure calculation contract. The task list
 records implementation and executed acceptance separately.
 
 ## Scope and distinction from recurrence
@@ -54,7 +54,9 @@ are no defaults; unknown, duplicate or missing keys refuse before callbacks.
 
 The native result is `{:ok, [ExBooking.CivilOccurrence.t()]}`. Each value has
 exactly `nominal` (the original ISO NaiveDateTime), `starts_at` (the original
-UTC DateTime) and `resolution` (`:unique`, `:first_fold` or `:second_fold`). It
+UTC DateTime) and `resolution` (`:unique`, `:first_fold`, `:second_fold` or
+`{:fold, index}` for index 3–732). The index is the position within this one
+local label, never an ordinal counted from DTSTART. It
 contains no query-relative or global ordinal, identifier, grant or callback.
 These are native values, not a serialized format. The value is documented in
 [SP.01](SP.01-data-model.md) and the facade in [SP.02](SP.02-public-api.md).
@@ -66,11 +68,12 @@ callbacks. Visit the at most 366 dates in increasing civil-date order. Skip
 unselected weekdays without a timezone callback. Construct the exact whole-second
 nominal label from each selected date/time and resolve through the supplied
 database/provider. A gap is skipped or returns the fixed gap error, according
-to gap_policy. A fold returns the ordered first/second original instants; apply
-fold_policy to that complete pair. Reject returns the fixed ambiguity error.
+to gap_policy. A fold returns every strictly UTC-ordered original instant; apply
+fold_policy to that complete set. First and second select positions 1 and 2;
+both retains the complete set, including additional folds. Reject returns the fixed ambiguity error.
 Never snap a nonexistent label forward or silently choose a different fold.
 
-Validate every returned resolution, including both fold alternatives before
+Validate every returned resolution, including every fold alternative before
 selection: exact native ISO shape, matching nominal and zone, valid UTF-8
 metadata with the same byte bounds and this civil profile's offset bounds. A fold must be strictly increasing in UTC. Round-trip
 each resolved instant through the same supplied database/provider; the instant,
@@ -96,8 +99,13 @@ do not coalesce them. At most 732 points can be returned. The result is complete
 for the selected finite local span only: an empty list means no matching point
 there, not exhaustion of all later dates. There is no partial result on failure.
 
-**CIV-04 — Work and retry.** The finite span is the complete work budget. There
-are at most 366 local resolutions and 732 round-trip localizations. No hidden
+**CIV-04 — Work and retry.** The finite span and localization ceiling are the
+complete work budget. There are at most 366 local resolutions and 732 round-trip
+localizations across the entire query. Before localizing any alternative of a
+new label, require its complete candidate count to fit the remaining budget;
+otherwise return `{:error, {:limit, :civil_occurrences, :work}}`. Gaps consume
+zero localizations. Policy and UTC filtering do not refund work. Classical
+unique/twofold providers always fit this ceiling for all 366 dates. No hidden
 prefix traversal, cursor validation, network lookup, wall-clock observation or
 random operation occurs. The supplied callback's own implementation/runtime is
 consumer-owned; this operation does not promise a wall-time deadline for it.
@@ -117,10 +125,40 @@ field}}`, where field is one of `:options`, `:time`, `:first_date`, `:days`,
 `:time_zone_database`, `:gap_policy`, `:fold_policy`, `:time_zone_result` or
 `:coordinate_range`. Gap/fold rejection returns respectively
 `{:error, {:gap, :civil_occurrences}}` or
-`{:error, {:ambiguous, :civil_occurrences}}`. Errors embed no supplied values,
+`{:error, {:ambiguous, :civil_occurrences}}`. Exceeding the localization budget
+returns `{:error, {:limit, :civil_occurrences, :work}}`. Errors embed no supplied values,
 provider context or callback reason. Invalid caller-native fields refuse before
 date arithmetic. Existing RRule/occurrence, availability, interval, timezone
 helper and option defaults/errors are unchanged. No dependency is introduced.
+
+## Optional complete civil resolution
+
+**CIV-06.** An immutable TimeZoneProvider module may additionally implement
+`resolve_civil(nominal, zone_name, context)`. It accepts the same explicit inputs
+as resolve/3 and returns its existing unique/twofold/gap/refusal shapes or
+`{:ambiguous, candidates}`, where candidates is a proper list of 2–732 native
+local DateTimes. The list retains every alternative, strictly ordered by UTC;
+empty/singleton/improper/oversized lists refuse. Positions 1/2 retain the old
+first_fold/second_fold tags; later positions use `{:fold, index}`. A callback
+must not silently discard intermediate candidates to fit a twofold interface.
+
+Only SP.09 uses this optional callback, preferring it when exported. Its refusal,
+malformed result or implementation fault must never fall back to resolve/3.
+If absent, call the original resolve/3 once; that legacy callback still accepts
+only its original result shapes. Calendar.TimeZoneDatabase modules retain their
+existing one/twofold interface. The provider value, required resolve/localize
+callbacks and constructor validity are unchanged. SP.08 original occurrences and
+TimeZoneProvider.from_naive/3 still call only resolve/3; shift_zone/3 still calls
+localize/3 with its original offset profile. This additive civil callback cannot
+widen the legacy interfaces through incidental module capability.
+
+Every alternative round-trips before policy and UTC filtering, including one
+that policy will discard. A complete candidate list exceeding the remaining
+732-localization budget refuses before any of that label's localizations; no
+partial output or truncated candidate set is returned. A caller owns splitting
+an intentionally larger finite query, immutable inputs, result ordering and
+identity. Single-label queries can represent every supported candidate without
+replaying an ancient recurrence prefix.
 
 ## Independent acceptance
 
@@ -131,6 +169,7 @@ helper and option defaults/errors are unchanged. No dependency is introduced.
 | CIV-T3 | 01/05: Unknown/duplicate/missing options, improper/oversized lists, booleans, invalid/native-extra date/time/datetime fields, precision, overflowed spans, bad modules/providers and malformed horizons refuse before any counting callback. |
 | CIV-T4 | 02/04/05: Instrumented immutable providers establish the finite callback bound and independent concurrent contexts. Refused/malformed/reversed-fold/mismatching round-trip/duplicate-UTC output yields fixed errors without private payloads; implementation faults propagate. |
 | CIV-T5 | 01–04: Bounded StreamData UTC patterns agree with an independent day/weekday oracle. Partition/union queries agree after sorting where their explicit policies succeed. Retry is identical and unrelated ambient timezone settings have no effect. |
+| CIV-T7 | 02–06: Independent threefold and maximum 732-candidate providers exercise every policy and stable local fold positions; invalid discarded alternatives still refuse. Exact 732 total localizations succeeds, the next complete label refuses before localization, and 733 candidates refuse. Optional callback faults/refusals never fall back; legacy helpers/occurrences never invoke it. The actual archive/no-start consumer exercises a threefold query. |
 | CIV-T6 | 01–05: Public facade/domain doctests and actual extracted archive consumer execute the new API with no application start. Existing SP.08 COUNT/ordinal/second-fold DTSTART and availability gap tests retain their original behavior. |
 
 These are software obligations, not proof of a consumer's clock, durable

@@ -220,7 +220,7 @@ the fault injections establish that their assertions distinguish broken behavior
 
 ## Bounded civil-query acceptance
 
-[SP.09 CIV-T1–T6](SP.09-civil-occurrences.md#independent-acceptance) require
+[SP.09 CIV-T1–T7](SP.09-civil-occurrences.md#independent-acceptance) require
 independent UTC/day and Stockholm/New York expectations, explicit gap/fold
 policies, strict native/option preflight, immutable callback bounds/refusals,
 partition/retry properties and an actual extracted archive consumer. Preserve
