@@ -9,8 +9,13 @@ defmodule ExBooking.CivilOccurrence do
       date/time label.
     * `:starts_at` is the corresponding original UTC `DateTime`, never clipped to
       a query boundary.
-    * `:resolution` is `:unique`, `:first_fold` or `:second_fold`. With both folds,
-      two points share a nominal label but have different, ordered UTC instants.
+    * `:resolution` is `:unique`, `:first_fold`, `:second_fold` or `{:fold, index}`
+      for local positions 3–732. Fold points share one nominal label with distinct,
+      ordered UTC instants. A fold position is not a recurrence ordinal.
+
+  A fold position belongs to the complete UTC-ordered resolution of one local
+  label, before policy and UTC filtering. If earlier alternatives fall outside
+  the query, a retained `{:fold, 3}` stays position 3; it is not renumbered.
 
   A point has no duration, end, identifier or cursor. Unlike
   `ExBooking.Occurrence`, it has no ordinal counted from DTSTART. The caller owns
@@ -36,6 +41,6 @@ defmodule ExBooking.CivilOccurrence do
   @type t :: %__MODULE__{
           nominal: NaiveDateTime.t(),
           starts_at: DateTime.t(),
-          resolution: :unique | :first_fold | :second_fold
+          resolution: :unique | :first_fold | :second_fold | {:fold, 3..732}
         }
 end

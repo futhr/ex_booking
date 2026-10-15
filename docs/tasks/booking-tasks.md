@@ -52,14 +52,35 @@ registry publication, hosted CI and downstream scheduling remain separate.
 
 Contract: [SP.09 CIV-06](../specs/SP.09-civil-occurrences.md#optional-complete-civil-resolution).
 
-- [ ] Add the optional complete civil callback and local fold positions while
+- [x] Add the optional complete civil callback and local fold positions while
   preserving legacy provider helpers and original recurrence behavior.
-- [ ] Enforce the existing total localization budget before each complete label;
+- [x] Enforce the existing total localization budget before each complete label;
   cover all policies, malformed discarded alternatives, no fallback and exact bounds.
-- [ ] Execute CIV-T7 through independent providers and the actual no-start archive
+- [x] Execute CIV-T7 through independent providers and the actual no-start archive
   consumer; run the owning public-API quality milestone and record evidence.
 
-This additive contract is accepted; implementation/evidence remain pending.
+Development validation on 2026-10-15 used the working tree based on `a0f61d6`,
+Elixir 1.20.4/OTP 29.0.4 and unchanged repository dependencies/toolchain.
+`mix check --no-retry` passed 429 checks (87 doctests, 31 properties, 311 tests;
+seed 774847), with 97.1% line coverage, compiler/formatter/Credo, dependency and
+security audits, Dialyzer, Doctor and ExDoc. Doctor reports 100% documentation,
+module documentation and public specification coverage. Optional checks for
+absent ex_knigge/gettext/knigge/sobelow/usage_rules packages were skipped.
+
+Independent provider fixtures check complete sets of 2, 3, 9 and 732 alternatives,
+literal original UTC coordinates, stable local fold positions after filtering,
+every policy, invalid discarded candidates and legacy callback isolation.
+A two-label query succeeds at exactly 732 localizations; a 367-alternative label
+followed by another refuses before any localization of the second label.
+A 733-candidate result refuses before localization. Refusal and faults never
+invoke the legacy fallback. Existing original-occurrence/provider suites passed.
+
+The actual extracted archive executed a threefold query and literal UTC/tag
+assertions in a fresh process with neither ex_booking nor tz started. The fresh
+production consumer, README quick start and all six notebooks also passed.
+The verifier removed its temporary consumer/archive/notebook directories;
+generated local documentation was removed after review. This is local software
+evidence; registry publication, hosted CI and downstream adoption are separate.
 
 ## Original recurrence occurrences
 

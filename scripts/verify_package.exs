@@ -75,6 +75,33 @@ defmodule ExBooking.PackageVerification do
     {:error, {:invalid, :civil_occurrences, :options}} =
       ExBooking.civil_occurrences(~T[09:00:00], ~D[2026-07-13], opts ++ [days: 1])
     false = Enum.any?(Application.started_applications(), fn {app, _, _} -> app in [:ex_booking, :tz] end)
+    defmodule CompleteCivilZone do
+      @moduledoc false
+
+      @behaviour ExBooking.TimeZoneProvider
+      @impl ExBooking.TimeZoneProvider
+      def resolve(_, _, _), do: {:error, :legacy_unsupported}
+      @impl ExBooking.TimeZoneProvider
+      def resolve_civil(nominal, zone, _) do
+        wall = DateTime.from_naive!(nominal, "Etc/UTC")
+        {:ambiguous, for(offset <- [2, 1, 0], do: %{wall | time_zone: zone, utc_offset: offset})}
+      end
+      @impl ExBooking.TimeZoneProvider
+      def localize(utc, zone, _) do
+        offset = 9 * 3600 - (utc.hour * 3600 + utc.minute * 60 + utc.second)
+        {:ok, %{DateTime.add(utc, offset) | time_zone: zone, utc_offset: offset}}
+      end
+    end
+    {:ok, provider} = ExBooking.TimeZoneProvider.new(CompleteCivilZone, <<>>)
+    complete_opts = Keyword.merge(opts, days: 1, weekdays: [1],
+      from: ~U[2026-07-13 00:00:00Z], until: ~U[2026-07-14 00:00:00Z],
+      time_zone: "Synthetic/Multiple", time_zone_database: provider, fold_policy: :both)
+    {:ok, [first, second, third]} = ExBooking.civil_occurrences(~T[09:00:00], ~D[2026-07-13], complete_opts)
+    [:first_fold, :second_fold, {:fold, 3}] = Enum.map([first, second, third], & &1.resolution)
+    [~U[2026-07-13 08:59:58Z], ~U[2026-07-13 08:59:59Z], ~U[2026-07-13 09:00:00Z]] =
+      Enum.map([first, second, third], & &1.starts_at)
+    {:error, :time_zone_provider_refused} = ExBooking.TimeZoneProvider.from_naive(~N[2026-07-13 09:00:00], "Synthetic/Multiple", provider)
+    false = Enum.any?(Application.started_applications(), fn {app, _, _} -> app in [:ex_booking, :tz] end)
     IO.puts("#{mode} civil query without application startup passed.")
     """)
 

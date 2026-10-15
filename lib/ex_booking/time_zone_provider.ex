@@ -1,11 +1,37 @@
 defmodule ExBooking.TimeZoneProvider do
   @moduledoc """
-  An explicit immutable timezone context for original recurrence enumeration.
+  An explicit immutable timezone context for recurrence and civil queries.
 
-  Consumers implement `resolve/3` and `localize/3` using only their supplied
-  binary context. No registry, process, I/O or ambient database is selected.
-  Calendar.TimeZoneDatabase modules remain supported by the public helpers.
-  Provider values and their complete context are retained in native cursors.
+  Implement `c:resolve/3` and `c:localize/3`, then pass that existing module and
+  at most 1 MiB of binary context to `new/2`. The context supplies immutable data;
+  no registry, process, I/O or ambient database is selected. Construction checks
+  the required exports and native provider shape, not the correctness or
+  immutability of callback code/data. Consumers own those obligations and each
+  callback's work/runtime.
+
+  The required resolver returns `{:ok, datetime}`,
+  `{:ambiguous, first, second}`, `:gap` or `{:error, reason}`. Localization returns
+  `{:ok, local}` or `{:error, reason}`, preserving the original instant and its
+  precision. `from_naive/3` and `shift_zone/3` validate their respective results
+  with offset components and totals in `-86_400..86_400` seconds. Explicit
+  `Calendar.TimeZoneDatabase` modules remain supported by these helpers.
+
+  For civil queries, a module may additionally implement `c:resolve_civil/3`.
+  It accepts the same inputs and legacy result shapes, plus
+  `{:ambiguous, candidates}`: the complete proper list of 2–732 native local
+  DateTimes, strictly ordered by UTC. Return every alternative without truncating
+  intermediate candidates. `ExBooking.CivilRecurrence.occurrences/3` prefers
+  this optional callback when exported and never falls back after its refusal,
+  malformed result or implementation fault. If absent, it calls `c:resolve/3`.
+  Civil queries validate every alternative under their own offset/work profile.
+
+  The optional callback does not change provider constructor requirements or
+  legacy operations: `from_naive/3` and original RRULE enumeration through
+  `ExBooking.occurrences/3` still use only `c:resolve/3`; `shift_zone/3` still uses
+  `c:localize/3`. Their accepted shapes and offset bounds are unchanged.
+  Original recurrence cursors retain the complete native provider/context;
+  civil queries have no cursor. A retained context is data attribution, not
+  authorization or proof of installed timezone authenticity.
   """
 
   alias ExBooking.Temporal
@@ -24,6 +50,21 @@ defmodule ExBooking.TimeZoneProvider do
   @callback resolve(NaiveDateTime.t(), String.t(), binary()) :: resolution()
   @callback localize(DateTime.t(), String.t(), binary()) ::
               {:ok, DateTime.t()} | {:error, term()}
+
+  @typedoc "Civil-only resolution, optionally retaining a complete bounded ambiguity list."
+  @type civil_resolution :: resolution() | {:ambiguous, [DateTime.t()]}
+
+  @doc """
+  Optionally resolves every civil alternative, in strictly increasing UTC order.
+
+  Only civil queries select this callback. An ambiguity list has 2–732 native
+  DateTimes and is completely validated before policy/filtering. Refusals and
+  faults never fall back to `c:resolve/3`. Original RRULE enumeration and
+  `from_naive/3` continue to use `c:resolve/3` only; `shift_zone/3` retains its
+  existing `c:localize/3` path.
+  """
+  @callback resolve_civil(NaiveDateTime.t(), String.t(), binary()) :: civil_resolution()
+  @optional_callbacks resolve_civil: 3
 
   @doc """
   Constructs a provider for an existing module and at most 1 MiB of context.

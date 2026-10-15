@@ -3,31 +3,47 @@ defmodule ExBooking.CivilRecurrence do
   Enumerates a weekday/time pattern over an explicit finite local-date span.
 
   Call `occurrences/3` directly or use `ExBooking.civil_occurrences/3`. Success
-  is `{:ok, points}`, where `points` is a UTC-ordered list of
-  `ExBooking.CivilOccurrence` values: original local labels paired with original
-  instants, without durations or booking availability.
-  The local span and UTC query window are independent inputs.
+  is `{:ok, points}`, where `points` is a strictly UTC-ordered list of
+  `ExBooking.CivilOccurrence` values: original local labels and original instants,
+  without durations or booking availability. The 1–366 local dates and half-open
+  UTC window are independent inputs; all eight options are explicit.
 
-  Every selected local label is resolved; each returned instant is round-tripped
-  through the supplied database before gap/fold policy and UTC filtering.
-  Rejection therefore applies even outside the UTC window. Selecting the first fold never substitutes the
-  second merely because the first lies outside that window. A gap is skipped or
-  rejected; a nonexistent time is never snapped forward.
+  For an immutable `ExBooking.TimeZoneProvider`, civil resolution prefers
+  `c:ExBooking.TimeZoneProvider.resolve_civil/3` when exported. It can supply a
+  complete ambiguity list of 2–732 alternatives. Refusal, malformed output or an
+  implementation fault never retries the legacy resolver. When absent, the
+  required resolver is used once; `Calendar.TimeZoneDatabase` modules retain
+  their unique/twofold interface. Existing helpers and original RRULE enumeration
+  never select the optional callback.
 
-  This calculation has no DTSTART, RRULE, COUNT, global ordinal or cursor. Empty
-  output describes only the supplied dates. Extending or combining queries leaves
-  wider ordering, deduplication and durable identity with the caller; returned
-  points grant no execution authority. There is no library state, clock read,
-  process or I/O to restore, cancel or restart.
+  Within the work budget, every alternative round-trips through the same database
+  before gap/fold policy and UTC filtering, including alternatives that policy
+  will discard. `:first`/`:second` selects positions 1/2; `:both` retains the whole
+  set. Local positions 1/2 use `:first_fold`/`:second_fold`, and later positions
+  use `{:fold, index}`. They are not recurrence ordinals and are never renumbered
+  after filtering. Rejection applies even outside the UTC window; first policy
+  never substitutes another fold. Gaps are skipped or rejected, never snapped.
+
+  The whole query permits at most 366 selected-label resolutions and 732
+  round-trip localizations. A new label's complete candidate count must fit the
+  remaining localization budget before any of that label's localizations run;
+  otherwise return `{:error, {:limit, :civil_occurrences, :work}}`. Gaps consume
+  no localizations. Policy and filtering do not refund work. No partial or
+  truncated result is returned; the caller owns splitting a larger query and
+  combining its results. These finite counts do not impose a callback deadline.
 
   Civil DateTimes permit `:utc_offset` and `:std_offset` each within
   `-93_599..93_599` seconds and their total within `-89_999..93_599` seconds.
-  Immutable `ExBooking.TimeZoneProvider` callbacks are invoked directly and checked under
-  that civil profile. `ExBooking.TimeZoneProvider.from_naive/3` and
-  `ExBooking.TimeZoneProvider.shift_zone/3` keep their existing component/total
-  bounds of `-86_400..86_400` seconds. The caller owns the immutable database
-  contents and each callback's work/runtime; finite callback counts impose no
-  wall-time deadline on a callback.
+  Provider callbacks are checked directly under that profile;
+  `ExBooking.TimeZoneProvider.from_naive/3` and
+  `ExBooking.TimeZoneProvider.shift_zone/3` retain their component/total
+  `-86_400..86_400` bounds. Callback error payloads become fixed query errors;
+  implementation exceptions propagate as programming errors.
+
+  There is no DTSTART, RRULE, COUNT, global ordinal or cursor. Empty output covers
+  only the supplied dates, not all later dates. Consumers own immutable database
+  custody, wider ordering/deduplication, durable identity and downstream authority.
+  No library state, process, clock read or I/O is owned by this calculation.
   """
 
   alias ExBooking.CivilOccurrence
@@ -67,11 +83,16 @@ defmodule ExBooking.CivilRecurrence do
   Returned points satisfy `from <= starts_at < until` without clipping either
   their instant or nominal label.
 
-  Both alternatives of a fold must round-trip correctly before selection, even
-  when only one would pass the UTC filter. Results contain at most 732
+  Every alternative of a fold must round-trip correctly before selection, even
+  when only one would pass the UTC filter. Optional `c:ExBooking.TimeZoneProvider.resolve_civil/3`
+  can return a complete 2–732-candidate ambiguity list. Later local positions
+  retain `{:fold, index}` tags rather than inventing recurrence ordinals. Results contain at most 732
   `ExBooking.CivilOccurrence` values; duplicate UTC instants refuse rather than
   being merged. Empty output means no matching point in this finite local span.
   There are at most 366 local resolutions and 732 round-trip localizations.
+  A complete label that would exceed the remaining localization budget returns
+  `{:error, {:limit, :civil_occurrences, :work}}` before localizing any of its
+  alternatives. Policy/filtering does not refund work; no partial result is returned.
 
   Invalid input returns `{:error, {:invalid, :civil_occurrences, field}}`, with
   field one of `:options`, `:time`, `:first_date`, `:days`, `:weekdays`, `:from`,
@@ -122,13 +143,18 @@ defmodule ExBooking.CivilRecurrence do
   end
 
   defp enumerate(time, first_date, opts) do
-    Enum.reduce_while(0..(opts.days - 1), {:ok, []}, fn offset, {:ok, points} ->
-      case selected(Date.add(first_date, offset), time, opts) do
-        {:ok, values} -> {:cont, {:ok, values ++ points}}
-        error -> {:halt, error}
-      end
-    end)
-    |> ordered()
+    result =
+      Enum.reduce_while(0..(opts.days - 1), {:ok, [], 732}, fn offset, {:ok, points, remaining} ->
+        case selected(Date.add(first_date, offset), time, opts, remaining) do
+          {:ok, values, used} -> {:cont, {:ok, values ++ points, remaining - used}}
+          error -> {:halt, error}
+        end
+      end)
+
+    case result do
+      {:ok, points, _} -> ordered({:ok, points})
+      error -> error
+    end
   end
 
   defp options([], opts) when map_size(opts) == 8, do: {:ok, opts}
@@ -154,46 +180,71 @@ defmodule ExBooking.CivilRecurrence do
     end
   end
 
-  defp selected(date, time, opts) do
+  defp selected(date, time, opts, remaining) do
     if Date.day_of_week(date) in opts.weekdays do
       {:ok, nominal} = NaiveDateTime.new(date, time)
 
       with {:ok, values} <- resolve(nominal, opts),
+           used = work(values),
+           :ok <- work_budget(used, remaining),
            {:ok, values} <- round_trips(values, nominal, opts),
            {:ok, values} <- policy(values, opts) do
-        {:ok,
-         for(
-           {instant, resolution} <- values,
-           DateTime.compare(instant, opts.from) != :lt,
-           DateTime.compare(instant, opts.until) == :lt,
-           do: %CivilOccurrence{nominal: nominal, starts_at: instant, resolution: resolution}
-         )}
+        {:ok, points(values, nominal, opts), used}
       end
     else
-      {:ok, []}
+      {:ok, [], 0}
     end
   end
 
-  defp resolve(nominal, opts) do
-    result =
-      case opts.time_zone_database do
-        %TimeZoneProvider{module: module, context: context} ->
-          module.resolve(nominal, opts.time_zone, context)
+  defp points(values, nominal, opts) do
+    for {instant, resolution} <- values,
+        DateTime.compare(instant, opts.from) != :lt,
+        DateTime.compare(instant, opts.until) == :lt,
+        do: %CivilOccurrence{nominal: nominal, starts_at: instant, resolution: resolution}
+  end
 
-        database ->
+  defp resolve(nominal, opts) do
+    case opts.time_zone_database do
+      %TimeZoneProvider{module: module, context: context} ->
+        if function_exported?(module, :resolve_civil, 3),
+          do: resolution(module.resolve_civil(nominal, opts.time_zone, context), true),
+          else: resolution(module.resolve(nominal, opts.time_zone, context), false)
+
+      database ->
+        result =
           case DateTime.from_naive(nominal, opts.time_zone, database) do
             {:gap, _, _} -> :gap
             result -> result
           end
-      end
 
-    case result do
-      :gap -> {:ok, :gap}
-      {:ok, value} -> {:ok, [{value, :unique}]}
-      {:ambiguous, first, second} -> {:ok, [{first, :first_fold}, {second, :second_fold}]}
-      _ -> invalid(:time_zone_result)
+        resolution(result, false)
     end
   end
+
+  defp resolution(:gap, _), do: {:ok, :gap}
+  defp resolution({:ok, value}, _), do: {:ok, [{value, :unique}]}
+
+  defp resolution({:ambiguous, first, second}, _),
+    do: {:ok, [{first, :first_fold}, {second, :second_fold}]}
+
+  defp resolution({:ambiguous, candidates}, true), do: alternatives(candidates, 1, [])
+  defp resolution(_, _), do: invalid(:time_zone_result)
+
+  defp alternatives([], index, reversed) when index in 3..733,
+    do: {:ok, Enum.reverse(reversed)}
+
+  defp alternatives([value | rest], index, reversed) when index <= 732,
+    do: alternatives(rest, index + 1, [{value, fold_position(index)} | reversed])
+
+  defp alternatives(_, _, _), do: invalid(:time_zone_result)
+  defp fold_position(1), do: :first_fold
+  defp fold_position(2), do: :second_fold
+  defp fold_position(index), do: {:fold, index}
+
+  defp work(:gap), do: 0
+  defp work(values), do: length(values)
+  defp work_budget(used, remaining) when used <= remaining, do: :ok
+  defp work_budget(_, _), do: {:error, {:limit, :civil_occurrences, :work}}
 
   defp round_trips(:gap, _, _), do: {:ok, :gap}
 
@@ -247,8 +298,8 @@ defmodule ExBooking.CivilRecurrence do
   defp policy(:gap, _), do: {:error, {:gap, :civil_occurrences}}
   defp policy([{_, :unique}] = values, _), do: {:ok, values}
   defp policy(values, %{fold_policy: :both}), do: {:ok, values}
-  defp policy([first, _], %{fold_policy: :first}), do: {:ok, [first]}
-  defp policy([_, second], %{fold_policy: :second}), do: {:ok, [second]}
+  defp policy([first | _], %{fold_policy: :first}), do: {:ok, [first]}
+  defp policy([_, second | _], %{fold_policy: :second}), do: {:ok, [second]}
   defp policy(_, _), do: {:error, {:ambiguous, :civil_occurrences}}
 
   defp ordered({:ok, points}) do
@@ -258,8 +309,6 @@ defmodule ExBooking.CivilRecurrence do
       do: {:ok, points},
       else: invalid(:time_zone_result)
   end
-
-  defp ordered(error), do: error
 
   defp increasing?(values),
     do:
