@@ -8,6 +8,14 @@ erl_crash.dump
 ex_booking-*.tar
 .elixir_ls/
 .cache/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.DS_Store
+*.beam
+mix.lock.bak
+/.fetch
 .vscode/
 /.claude/
 .codex/
