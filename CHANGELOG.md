@@ -5,6 +5,35 @@ See [Conventional Commits](https://www.conventionalcommits.org) for commit guide
 
 <!-- changelog -->
 
+## [v0.3.0](https://github.com/futhr/ex_booking/compare/v0.2.3...v0.3.0) (2026-10-23)
+
+
+
+
+### Features:
+
+* integrate bounded date windows with civil queries by futhr
+
+* preserve complete bounded civil ambiguities by Tobias Bohwalli
+
+* enumerate bounded civil-time occurrences by Tobias Bohwalli
+
+* enumerate occurrences with explicit immutable timezone providers by Tobias Bohwalli
+
+* enumerate original recurrence occurrences by Tobias Bohwalli
+
+### Bug Fixes:
+
+* ci: isolate caches by resolved BEAM versions by Tobias Bohwalli
+
+* normalize recurrence UTC coordinates by Tobias Bohwalli
+
+* redact foreign timezone provider refusal payloads by Tobias Bohwalli
+
+* allow production-mode checkout builds by Tobias Bohwalli
+
+* deps: update Decimal past security advisory by Tobias Bohwalli
+
 ## Unreleased
 
 ### Maintenance

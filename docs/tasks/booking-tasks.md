@@ -22,7 +22,8 @@ Legend:
 - [x] Isolate dependency and PLT caches by resolved OTP/Elixir versions in CI
   and publication; retain regressions for runtime collisions and patch changes.
 - [x] Pass the full local gate.
-- [ ] Qualify hosted CI and the final archive dependency matrix before tagging.
+- [x] Qualify the maintenance commits in hosted CI and verify the final archive
+  dependency matrix before tagging.
 
 The runtime dependency surface remains `tz` and `nimble_options`. Cache
 regressions first failed on the mixed 1.18/28 and 1.20/29 dependency key and
@@ -33,6 +34,18 @@ already match the current releases. `mix check --no-retry` passed 455 checks
 (90 doctests, 35 properties, 330 tests; seed 25136), with 97.3% line coverage,
 the extracted consumer and all six notebooks. The checks for absent optional
 ex_knigge, gettext, knigge, sobelow and usage_rules packages remain skipped.
+
+[Hosted CI](https://github.com/futhr/ex_booking/actions/runs/39988040643)
+passed all six jobs for `2e4129c`, including Elixir 1.18/OTP 28,
+Elixir 1.19/OTP 28 and Elixir 1.20/OTP 29 consumers. GitOps generated the
+0.3.0 release metadata and notebook pins. The initial parallel release gate
+encountered a local Hex 2.5.1 `cache.ets` write error (`:eaccess`) in the
+archive helper. No dependency code or cache permissions were changed.
+`mix check --no-retry --no-parallel` then passed all required checks and
+455 ExUnit checks (seed 711129), with 97.5% line coverage.
+`mix verify.package --matrix` passed locked, fresh, minimum
+(`tz 0.28.0`, `nimble_options 1.1.0`) and optional-runtime dependency
+consumers, no-start queries and every packaged notebook setup/example cell.
 
 ## Library boundary and UTC normalization review
 
