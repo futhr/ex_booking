@@ -6,7 +6,7 @@ ex_booking:
   status: normative
   priority: high
   created: "2026-07-08"
-  updated: "2026-10-13"
+  updated: "2026-10-23"
   tags: ["tests", "quality-gates", "coverage", "properties"]
   depends_on: ["SP.03"]
 ---
@@ -104,6 +104,13 @@ The September 2026 maintenance baseline uses ExDoc 0.40.4 and Req 0.7.4. ExDoc f
 ## Pinned CI action maintenance
 
 All checkout and cache action references use full commit pins for checkout v7.0.1 and cache v6.1.0. Checkout v7 restricts unsafe privileged fork-PR checkout; our push and pull_request triggers remain supported. Cache v6 uses the Node 24 ESM runtime, supported by GitHub-hosted Ubuntu runners. Keep credential persistence disabled. Release notes: [checkout](https://github.com/actions/checkout/releases/tag/v7.0.1), [cache](https://github.com/actions/cache/releases/tag/v6.1.0). Local gates validate repository behavior; hosted workflow execution remains a CI responsibility.
+
+Dependency build caches and their restore prefixes must distinguish the exact
+installed OTP and Elixir versions reported by `setup-beam`. PLT caches must
+invalidate after either toolchain's patch version changes. CI and publication
+may share a cache only for the same resolved runtime pair. Workflow regressions
+render every configured runtime lane and probe independent OTP/Elixir patch
+changes; hosted execution remains separate evidence.
 
 ## Behavioral property coverage
 

@@ -16,6 +16,24 @@ Legend:
 [-] delegated / not an in-repo task
 ```
 
+## October dependency and CI cache maintenance
+
+- [x] Refresh dependency versions and review their release notes.
+- [x] Isolate dependency and PLT caches by resolved OTP/Elixir versions in CI
+  and publication; retain regressions for runtime collisions and patch changes.
+- [x] Pass the full local gate.
+- [ ] Qualify hosted CI and the final archive dependency matrix before tagging.
+
+The runtime dependency surface remains `tz` and `nimble_options`. Cache
+regressions first failed on the mixed 1.18/28 and 1.20/29 dependency key and
+the publication PLT's unchanged key after an OTP patch change.
+
+ExCheck is updated to 0.17.1; all other locked packages and pinned Actions
+already match the current releases. `mix check --no-retry` passed 455 checks
+(90 doctests, 35 properties, 330 tests; seed 25136), with 97.3% line coverage,
+the extracted consumer and all six notebooks. The checks for absent optional
+ex_knigge, gettext, knigge, sobelow and usage_rules packages remain skipped.
+
 ## Library boundary and UTC normalization review
 
 Contracts: [SP.08](../specs/SP.08-occurrence-enumeration.md) and

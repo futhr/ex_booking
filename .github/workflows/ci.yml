@@ -41,6 +41,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Elixir
+        id: beam
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: ${{ matrix.elixir }}
@@ -52,8 +53,8 @@ jobs:
           path: |
             deps
             _build
-          key: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
+          key: deps-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: deps-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
 
       - name: Install dependencies
         run: mix deps.get
@@ -94,6 +95,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Elixir
+        id: beam
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: "1.20"
@@ -105,7 +107,7 @@ jobs:
           path: |
             deps
             _build
-          key: deps-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
+          key: deps-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('**/mix.lock') }}
 
       - name: Install dependencies
         run: mix deps.get
@@ -131,16 +133,11 @@ jobs:
           persist-credentials: false
 
       - name: Setup Elixir
+        id: beam
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: "1.20"
           otp-version: "29"
-
-      - name: Identify BEAM versions for the PLT cache
-        id: beam
-        run: |
-          echo "erts=$(erl -noshell -eval 'io:format("~s", [erlang:system_info(version)]), halt().')" >> "$GITHUB_OUTPUT"
-          echo "elixir=$(elixir -e 'IO.write(System.version())')" >> "$GITHUB_OUTPUT"
 
       - name: Restore deps cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -148,14 +145,14 @@ jobs:
           path: |
             deps
             _build
-          key: deps-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
+          key: deps-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('**/mix.lock') }}
 
       - name: Restore PLT cache
         id: plt-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: priv/plts
-          key: plt-${{ runner.os }}-${{ steps.beam.outputs.erts }}-${{ steps.beam.outputs.elixir }}-${{ hashFiles('**/mix.lock') }}
+          key: plt-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('**/mix.lock') }}
 
       - name: Remove stale PLTs
         if: steps.plt-cache.outputs.cache-hit != 'true'
@@ -188,6 +185,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Elixir
+        id: beam
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: "1.20"
@@ -199,7 +197,7 @@ jobs:
           path: |
             deps
             _build
-          key: deps-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
+          key: deps-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('**/mix.lock') }}
 
       - name: Install dependencies
         run: mix deps.get
